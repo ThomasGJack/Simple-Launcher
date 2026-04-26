@@ -1,5 +1,8 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
+import { AlertTriangle } from "lucide-react";
+import { loginWithDiscord } from "@/firebase/auth";
+import { useUIStore } from "@/store/ui";
 
 const DiscordIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -8,15 +11,28 @@ const DiscordIcon = ({ className }: { className?: string }) => (
 );
 
 export function LoginPage() {
+  const navigate = useUIStore((s) => s.navigate);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleDiscordLogin = async () => {
     setLoading(true);
-    // TODO Phase 1: open Discord OAuth window via Tauri WebviewWindow
-    // For now: stub message until VITE_DISCORD_CLIENT_ID + Cloud Function ready
-    await new Promise((r) => setTimeout(r, 800));
-    alert("Discord OAuth pas encore branché — il faut configurer l'app Discord et la Cloud Function. Voir PLAN.md §7.");
-    setLoading(false);
+    setError(null);
+    try {
+      await loginWithDiscord();
+      navigate({ name: "home" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes("functions/not-found") || message.includes("internal")) {
+        setError(
+          "Cloud Function `discordAuth` pas encore déployée. Le code Discord a bien été reçu, mais on a besoin du backend pour finir l'auth. Voir functions/README.md.",
+        );
+      } else {
+        setError(message);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -32,21 +48,30 @@ export function LoginPage() {
             <span className="font-display text-2xl text-accent">SL</span>
           </div>
           <h1 className="font-display text-3xl tracking-wide text-fg-primary">Connexion</h1>
-          <p className="mt-2 text-sm text-fg-muted">
-            Authentification via Discord uniquement.
-          </p>
+          <p className="mt-2 text-sm text-fg-muted">Authentification via Discord uniquement.</p>
         </div>
 
         <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
+          whileHover={{ scale: loading ? 1 : 1.02 }}
+          whileTap={{ scale: loading ? 1 : 0.98 }}
           onClick={handleDiscordLogin}
           disabled={loading}
           className="no-drag flex w-full items-center justify-center gap-3 rounded-2xl bg-[#5865F2] px-6 py-4 font-medium text-white shadow-[0_0_24px_rgba(88,101,242,0.4)] transition-shadow hover:shadow-[0_0_36px_rgba(88,101,242,0.6)] disabled:opacity-60"
         >
           <DiscordIcon className="size-5" />
-          <span>{loading ? "Connexion en cours…" : "Se connecter avec Discord"}</span>
+          <span>{loading ? "En attente de Discord…" : "Se connecter avec Discord"}</span>
         </motion.button>
+
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-5 flex items-start gap-3 rounded-xl bg-danger/10 p-4 text-sm ring-1 ring-danger/30"
+          >
+            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-danger" strokeWidth={2.5} />
+            <p className="text-fg-primary">{error}</p>
+          </motion.div>
+        )}
 
         <p className="mt-6 text-center text-xs text-fg-dim">
           En te connectant, tu acceptes que ton pseudo et ton avatar Discord soient utilisés.

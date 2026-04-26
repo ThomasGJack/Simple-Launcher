@@ -1,0 +1,30 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users can only read/write their own profile.
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Modules: anyone authenticated can read, only the owner UID listed in
+    // server-side env can write (admin app will use Admin SDK, bypassing rules).
+    match /modules/{moduleId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // Module versions: same as modules.
+    match /modules/{moduleId}/versions/{version} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // Launcher release info: public read.
+    match /launcher/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}
