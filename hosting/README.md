@@ -8,7 +8,15 @@ Backend Firebase Hosting du launcher. Sert :
 
 ## Workflow de release
 
-### 1. Bumper la version
+### Pendant le dev
+
+Chaque modification du launcher → **ajouter une entrée dans `CHANGELOG.md`** sous `## [Unreleased]`, dans la bonne catégorie (Ajouté / Changé / Corrigé / Supprimé / Sécurité). Ces entrées deviennent les notes affichées dans la popup de MAJ côté client.
+
+⚠ **L'IA assistant (Claude) NE déploie PAS de nouvelle version launcher tant que l'utilisateur ne lui dit pas explicitement de le faire.** Les modifs s'accumulent dans `[Unreleased]` jusqu'à ce que tu décides de release.
+
+### Quand tu veux release
+
+#### 1. Bumper la version
 
 Modifie **les trois fichiers** suivants à la même valeur (ex: `0.2.0`) :
 
@@ -16,18 +24,21 @@ Modifie **les trois fichiers** suivants à la même valeur (ex: `0.2.0`) :
 - `src-tauri/Cargo.toml` → `version = "..."`
 - `package.json` → `"version"`
 
-### 2. Build + sign
+#### 2. Build + sign
 
 ```bash
-NOTES="Ajout système de modules + fix login Discord" npm run release:launcher
+npm run release:launcher
 ```
 
 Le script :
+- Refuse si `[Unreleased]` est vide
 - Build le launcher en release (signed)
 - Copie `Simple Launcher_X.Y.Z_x64-setup.exe` + `.sig` dans `hosting/releases/X.Y.Z/`
-- Génère `hosting/launcher/latest.json` avec la signature et l'URL
+- Met à jour `hosting/download/SimpleLauncher-Setup.exe` (URL stable)
+- Génère `hosting/launcher/latest.json` avec la signature, l'URL et les notes
+- Rewrite `CHANGELOG.md` : déplace `[Unreleased]` → `[X.Y.Z] - YYYY-MM-DD`, recrée une `[Unreleased]` vide
 
-### 3. Déployer
+#### 3. Déployer
 
 ```bash
 firebase deploy --only hosting
