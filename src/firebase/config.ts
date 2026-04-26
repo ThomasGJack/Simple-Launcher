@@ -1,5 +1,5 @@
 import { initializeApp, type FirebaseApp } from "firebase/app";
-import { getAuth, type Auth } from "firebase/auth";
+import { browserLocalPersistence, getAuth, setPersistence, type Auth } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
 import { getStorage, type FirebaseStorage } from "firebase/storage";
 import { getFunctions, type Functions } from "firebase/functions";
@@ -27,6 +27,9 @@ export function getFirebase() {
     }
     app = initializeApp(firebaseConfig);
     auth = getAuth(app);
+    setPersistence(auth, browserLocalPersistence).catch((err) =>
+      console.warn("[firebase] persistence failed:", err),
+    );
     db = getFirestore(app);
     storage = getStorage(app);
     functions = getFunctions(app, "europe-west1");

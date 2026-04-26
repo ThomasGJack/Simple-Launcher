@@ -7,6 +7,8 @@ import { HomePage } from "@/pages/HomePage";
 import { LibraryPage } from "@/pages/LibraryPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { SettingsPage } from "@/pages/SettingsPage";
+import { ProfilePage } from "@/pages/ProfilePage";
+import { UpdateBanner } from "@/components/updater/UpdateBanner";
 
 export function AppShell() {
   const route = useUIStore((s) => s.route);
@@ -35,6 +37,8 @@ export function AppShell() {
           </AnimatePresence>
         </main>
       </div>
+
+      <UpdateBanner />
     </div>
   );
 }
@@ -49,6 +53,8 @@ function renderRoute(name: string) {
       return <LibraryPage />;
     case "settings":
       return <SettingsPage />;
+    case "profile":
+      return <ProfilePage />;
     case "login":
       return <LoginPage />;
     default:

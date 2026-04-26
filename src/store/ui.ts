@@ -5,6 +5,7 @@ export type Route =
   | { name: "library" }
   | { name: "module"; moduleId: string }
   | { name: "settings" }
+  | { name: "profile" }
   | { name: "login" };
 
 type UIState = {
