@@ -4,6 +4,7 @@ import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { Download, RefreshCw, X } from "lucide-react";
 import { sounds } from "@/lib/sounds";
+import { formatDisplay } from "@/lib/version";
 
 type Status =
   | { kind: "idle" }
@@ -111,7 +112,7 @@ function Available({
           </div>
           <div>
             <div className="font-medium text-fg-primary">Mise à jour disponible</div>
-            <div className="text-xs text-fg-muted">v{version}</div>
+            <div className="text-xs text-fg-muted">{formatDisplay(version)}</div>
           </div>
         </div>
         <button onClick={onDismiss} className="p-1 text-fg-muted transition-colors hover:text-fg-primary">

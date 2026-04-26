@@ -1,11 +1,21 @@
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Cog, Palette, Volume2, VolumeX, FolderDown } from "lucide-react";
+import { Cog, Palette, Volume2, VolumeX, FolderDown, Tag } from "lucide-react";
+import { getVersion } from "@tauri-apps/api/app";
 import { useSettingsStore } from "@/store/settings";
 import { sounds } from "@/lib/sounds";
+import { formatDisplay } from "@/lib/version";
 import { cn } from "@/lib/cn";
 
 export function SettingsPage() {
   const { soundsEnabled, toggleSounds } = useSettingsStore();
+  const [versionDisplay, setVersionDisplay] = useState<string>("…");
+
+  useEffect(() => {
+    getVersion()
+      .then((v) => setVersionDisplay(formatDisplay(v)))
+      .catch(() => setVersionDisplay("?"));
+  }, []);
 
   return (
     <div className="relative h-full overflow-y-auto p-12">
@@ -40,6 +50,16 @@ export function SettingsPage() {
           status="Bientôt"
         />
         <SettingCard icon={Cog} title="Avancé" description="Cache, logs, version du launcher." status="Bientôt" />
+
+        <div className="mt-2 flex items-center gap-3 rounded-2xl bg-white/[0.02] p-4 ring-1 ring-white/[0.04]">
+          <div className="grid size-10 place-items-center rounded-xl bg-accent/10 text-accent ring-1 ring-accent/20">
+            <Tag className="size-4" strokeWidth={2} />
+          </div>
+          <div className="flex-1">
+            <div className="text-xs uppercase tracking-wider text-fg-dim">Version</div>
+            <div className="font-mono text-sm text-fg-primary">{versionDisplay}</div>
+          </div>
+        </div>
       </div>
     </div>
   );

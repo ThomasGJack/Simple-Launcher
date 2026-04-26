@@ -4,13 +4,17 @@
 // section) and rewrites the changelog to move that block under the new
 // version heading.
 //
-// Then `firebase deploy --only hosting` publishes everything.
+// Calver versioning:
+//   - Internal semver: YY.MMDD.S (e.g. 26.426.0)
+//   - Display: vYY.MM.DD or vYY.MM.DD.{S+1} (e.g. v26.04.26 / v26.04.26.2)
+// The version used is whatever is currently in tauri.conf.json. To bump it,
+// run `npm run bump` first (auto-detects today's date and sequence).
 //
 // Usage:
 //   1. Add entries under "## [Unreleased]" in CHANGELOG.md as you work.
-//   2. Bump version in src-tauri/tauri.conf.json + package.json + src-tauri/Cargo.toml.
-//   3. node scripts/release-launcher.mjs
-//   4. firebase deploy --only hosting
+//   2. npm run bump                       ← bump to today's date
+//   3. node scripts/release-launcher.mjs  ← build + sign + write hosting/
+//   4. firebase deploy --only hosting     ← only with explicit user OK
 //
 // The script will refuse to release if [Unreleased] is empty.
 
@@ -24,9 +28,10 @@ const tauriConfPath = join(root, "src-tauri", "tauri.conf.json");
 const conf = JSON.parse(readFileSync(tauriConfPath, "utf8"));
 const version = conf.version;
 const productName = conf.productName;
+const displayVersion = formatDisplay(version);
 const changelogPath = join(root, "CHANGELOG.md");
 
-console.log(`\n— Release Simple Launcher v${version} —\n`);
+console.log(`\n— Release Simple Launcher ${displayVersion} (semver ${version}) —\n`);
 
 const privateKeyPath = join(root, ".tauri-keys", "sign.key");
 if (!existsSync(privateKeyPath)) {
@@ -34,17 +39,21 @@ if (!existsSync(privateKeyPath)) {
   process.exit(1);
 }
 
-const { unreleasedBody, rewrittenChangelog } = extractAndRewriteChangelog(changelogPath, version);
+const { unreleasedBody, rewrittenChangelog } = extractAndRewriteChangelog(
+  changelogPath,
+  version,
+  displayVersion,
+);
 if (!unreleasedBody.trim()) {
   console.error("Refus de release : la section [Unreleased] de CHANGELOG.md est vide.");
   console.error("Ajoute au moins une entrée avant de release.");
   process.exit(1);
 }
 
-console.log("[0/4] Regenerating installer artwork…");
+console.log("[1/5] Regenerating installer artwork…");
 execSync("node scripts/build-installer-art.mjs", { stdio: "inherit", cwd: root });
 
-console.log("[1/4] Building signed release bundle (this can take a while on first build)…");
+console.log("[2/5] Building signed release bundle…");
 execSync("npm run tauri:build", {
   stdio: "inherit",
   cwd: root,
@@ -57,7 +66,6 @@ execSync("npm run tauri:build", {
 
 const bundleRoot = join(root, "src-tauri", "target", "release", "bundle");
 const nsisDir = join(bundleRoot, "nsis");
-
 if (!existsSync(nsisDir)) {
   console.error(`Bundle dir not found: ${nsisDir}. Did the build succeed?`);
   process.exit(1);
@@ -71,7 +79,7 @@ if (!existsSync(exePath) || !existsSync(sigPath)) {
   process.exit(1);
 }
 
-console.log("[2/4] Copying installer + signature into hosting/…");
+console.log("[3/5] Copying installer + signature into hosting/…");
 const releaseDir = join(root, "hosting", "releases", version);
 mkdirSync(releaseDir, { recursive: true });
 copyFileSync(exePath, join(releaseDir, exeName));
@@ -81,11 +89,12 @@ const stableDir = join(root, "hosting", "download");
 mkdirSync(stableDir, { recursive: true });
 copyFileSync(exePath, join(stableDir, "SimpleLauncher-Setup.exe"));
 
-console.log("[3/4] Generating hosting/launcher/latest.json…");
+console.log("[4/5] Generating hosting/launcher/latest.json…");
 const signature = readFileSync(sigPath, "utf8").trim();
 const downloadUrl = `https://simplelaunche.web.app/releases/${version}/${exeName}`;
 const manifest = {
   version,
+  displayVersion,
   notes: unreleasedBody.trim(),
   pub_date: new Date().toISOString(),
   platforms: {
@@ -97,16 +106,38 @@ const manifest = {
 };
 writeFileSync(join(root, "hosting", "launcher", "latest.json"), JSON.stringify(manifest, null, 2) + "\n");
 
-console.log("[4/4] Rewriting CHANGELOG.md…");
+console.log("[5/5] Rewriting CHANGELOG.md…");
 writeFileSync(changelogPath, rewrittenChangelog);
 
-console.log(`\n✓ Release v${version} prête dans hosting/`);
+console.log(`\n✓ Release ${displayVersion} prête dans hosting/`);
 console.log(`Étape suivante (à valider explicitement par l'utilisateur) :`);
 console.log(`    firebase deploy --only hosting\n`);
 
 // ---------------------------------------------------------------------------
 
-function extractAndRewriteChangelog(path, releaseVersion) {
+function parseVersion(semver) {
+  const m = /^(\d+)\.(\d+)\.(\d+)$/.exec((semver ?? "").trim());
+  if (!m) return null;
+  const year = parseInt(m[1], 10);
+  const mmdd = parseInt(m[2], 10);
+  const sequence = parseInt(m[3], 10);
+  const month = Math.floor(mmdd / 100);
+  const day = mmdd % 100;
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  return { year, month, day, sequence };
+}
+
+function formatDisplay(semver) {
+  const p = parseVersion(semver);
+  if (!p) return `v${semver}`;
+  const yy = String(p.year).padStart(2, "0");
+  const mm = String(p.month).padStart(2, "0");
+  const dd = String(p.day).padStart(2, "0");
+  const suffix = p.sequence > 0 ? `.${p.sequence + 1}` : "";
+  return `v${yy}.${mm}.${dd}${suffix}`;
+}
+
+function extractAndRewriteChangelog(path, releaseSemver, releaseDisplay) {
   const raw = readFileSync(path, "utf8");
   const lines = raw.split("\n");
 
@@ -116,15 +147,15 @@ function extractAndRewriteChangelog(path, releaseVersion) {
     throw new Error("Section ## [Unreleased] introuvable dans CHANGELOG.md");
   }
 
-  const nextVersion = lines.slice(start + 1).findIndex((l) => /^## \[/.test(l.trim()));
-  const end = nextVersion === -1 ? lines.length : start + 1 + nextVersion;
+  const nextHeading = lines.slice(start + 1).findIndex((l) => /^## \[/.test(l.trim()));
+  const end = nextHeading === -1 ? lines.length : start + 1 + nextHeading;
 
   const block = lines.slice(start + 1, end);
   const cleanedBlock = stripEmptyCategories(block);
   const unreleasedBody = cleanedBlock.join("\n").trim();
 
   const today = new Date().toISOString().slice(0, 10);
-  const versionHeader = `## [${releaseVersion}] - ${today}`;
+  const versionHeader = `## [${releaseDisplay}] - ${today}  · semver \`${releaseSemver}\``;
   const emptyUnreleased = [
     "## [Unreleased]",
     "",

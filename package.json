@@ -1,7 +1,7 @@
 {
   "name": "simple-launcher",
   "private": true,
-  "version": "0.1.0",
+  "version": "26.426.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,7 +11,8 @@
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "release:launcher": "node scripts/release-launcher.mjs",
-    "installer:art": "node scripts/build-installer-art.mjs"
+    "installer:art": "node scripts/build-installer-art.mjs",
+    "bump": "node scripts/bump-version.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
