@@ -24,6 +24,9 @@ src-tauri/gen/
 # Tauri updater signing keys (NEVER commit private key!)
 .tauri-keys/
 
+# Firebase CLI cache
+.firebase/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
