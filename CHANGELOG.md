@@ -21,6 +21,11 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 - **Page d'accueil enrichie** : prénom Discord en accroche, stats jeux disponibles + installés, section "Modules récents" avec cards 16:9 et chips d'état, navigation rapide vers la bibliothèque ou le premier jeu.
 - **Sons d'interface** synthétisés en WebAudio (zéro fichier audio à bundler) : hover doux, click bas-fréquence, whoosh montant au lancement de jeu, jingle de succès après install, bip d'erreur, ding de notification quand une MAJ launcher est dispo.
 - **Toggle "Sons d'interface"** dans la page Paramètres pour couper/réactiver tous les effets, avec préférence persistée en localStorage.
+- **Page admin enrichie** :
+  - Upload des icônes/bannières directement dans Firebase Storage depuis l'admin (drop d'un PNG/JPG/WebP/GIF), plus besoin d'héberger l'image ailleurs.
+  - Nouvelle section "Personnalisation de la page module" dans le formulaire admin : couleurs primaire et accent du thème (color picker), font display, preset de particules (étoiles / neige / lucioles / étincelles / aucune) avec couleur et densité réglables, type de background hero (image / vidéo / aucun) avec URL.
+- **Discord Rich Presence** : quand le launcher est ouvert, ton statut Discord affiche "Dans le menu — Simple Launcher". Quand tu lances un jeu via le launcher, il devient "Joue à {nom du jeu} — via Simple Launcher" avec le timer de session. Au retour dans le launcher, repasse en "Dans le menu". Échec silencieux si Discord n'est pas lancé.
+- **Tracking du temps de jeu** : chaque session de jeu (depuis le clic JOUER jusqu'à la fermeture du process) est enregistrée dans Firestore (`/users/{uid}/playtime/{moduleId}` avec `totalMs`, `totalLaunches`, `lastPlayedAt`). Affiché sur la page Profil : temps total cumulé, nombre de lancements, top 5 des jeux les plus joués (cliquables pour ouvrir leur page détail).
 
 ### Changé
 

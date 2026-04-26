@@ -9,7 +9,7 @@ import {
 } from "firebase/firestore";
 import { deleteObject, getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 import { getFirebase } from "./config";
-import type { LauncherModule } from "@/types/module";
+import type { LauncherModule, ModulePage } from "@/types/module";
 
 export type UploadProgress = {
   bytesUploaded: number;
@@ -122,3 +122,36 @@ async function computeSha256Hex(buffer: ArrayBuffer): Promise<string> {
   const bytes = new Uint8Array(digest);
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
+
+export async function uploadModuleAsset(
+  moduleId: string,
+  kind: "icon" | "banner",
+  file: File,
+): Promise<string> {
+  const fb = getFirebase();
+  if (!fb) throw new Error("Firebase not configured");
+  const ext = inferExt(file);
+  const path = `modules/${moduleId}/${kind}${ext}`;
+  const storageRef = ref(fb.storage, path);
+  await uploadBytesResumable(storageRef, file, {
+    contentType: file.type || "image/png",
+    customMetadata: { moduleId, kind },
+  });
+  return getDownloadURL(storageRef);
+}
+
+function inferExt(file: File): string {
+  const name = file.name.toLowerCase();
+  for (const ext of [".png", ".jpg", ".jpeg", ".webp", ".gif", ".mp4", ".webm"]) {
+    if (name.endsWith(ext)) return ext;
+  }
+  if (file.type.includes("png")) return ".png";
+  if (file.type.includes("webp")) return ".webp";
+  if (file.type.includes("jpeg")) return ".jpg";
+  if (file.type.includes("mp4")) return ".mp4";
+  if (file.type.includes("webm")) return ".webm";
+  return ".bin";
+}
+
+export type { ModulePage };
+

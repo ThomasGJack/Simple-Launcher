@@ -1,13 +1,64 @@
+use std::collections::HashSet;
 use std::path::PathBuf;
-use std::process::Command;
+use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
+use tokio::process::Command;
+use tokio::sync::Mutex as TokioMutex;
+
+use crate::discord_rpc::DiscordRpc;
+
+pub struct LaunchTracker {
+    inner: Arc<TrackerInner>,
+}
+
+struct TrackerInner {
+    running: TokioMutex<HashSet<String>>,
+}
+
+impl LaunchTracker {
+    pub fn new() -> Self {
+        Self {
+            inner: Arc::new(TrackerInner {
+                running: TokioMutex::new(HashSet::new()),
+            }),
+        }
+    }
+
+    fn arc(&self) -> Arc<TrackerInner> {
+        self.inner.clone()
+    }
+}
+
+#[derive(Debug, Serialize, Clone)]
+struct LaunchEvent<'a> {
+    #[serde(rename = "moduleId")]
+    module_id: &'a str,
+    #[serde(rename = "moduleName")]
+    module_name: &'a str,
+    #[serde(rename = "startedAt")]
+    started_at: u128,
+}
+
+#[derive(Debug, Serialize, Clone)]
+struct ExitEvent {
+    #[serde(rename = "moduleId")]
+    module_id: String,
+    #[serde(rename = "moduleName")]
+    module_name: String,
+    #[serde(rename = "startedAt")]
+    started_at: u128,
+    #[serde(rename = "exitedAt")]
+    exited_at: u128,
+    #[serde(rename = "durationMs")]
+    duration_ms: u128,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ModuleState {
@@ -147,30 +198,36 @@ pub async fn module_install_or_update(
 }
 
 #[tauri::command]
-pub fn module_launch_hosted(
+pub async fn module_launch_hosted(
     app: AppHandle,
+    tracker: State<'_, LaunchTracker>,
+    discord: State<'_, DiscordRpc>,
     module_id: String,
+    module_name: String,
     executable: String,
 ) -> Result<(), String> {
     let install_dir = module_install_dir(&app, &module_id)?;
     let exe_path = install_dir.join(&executable);
-    if !exe_path.exists() {
+    if !fs::try_exists(&exe_path).await.unwrap_or(false) {
         return Err(format!("Exécutable introuvable : {}", exe_path.display()));
     }
-    Command::new(&exe_path)
-        .current_dir(&install_dir)
-        .spawn()
-        .map_err(|e| format!("spawn: {}", e))?;
-    Ok(())
+    let mut cmd = Command::new(&exe_path);
+    cmd.current_dir(&install_dir);
+    spawn_tracked(&app, &tracker, &discord, &module_id, &module_name, &mut cmd).await
 }
 
 #[tauri::command]
-pub fn module_launch_shortcut(
+pub async fn module_launch_shortcut(
+    app: AppHandle,
+    tracker: State<'_, LaunchTracker>,
+    discord: State<'_, DiscordRpc>,
+    module_id: String,
+    module_name: String,
     executable_path: String,
     args: Option<Vec<String>>,
 ) -> Result<(), String> {
     let path = std::path::Path::new(&executable_path);
-    if !path.exists() {
+    if !fs::try_exists(path).await.unwrap_or(false) {
         return Err(format!("Chemin introuvable : {}", executable_path));
     }
     let mut cmd = Command::new(path);
@@ -180,8 +237,72 @@ pub fn module_launch_shortcut(
     if let Some(parent) = path.parent() {
         cmd.current_dir(parent);
     }
-    cmd.spawn().map_err(|e| format!("spawn: {}", e))?;
+    spawn_tracked(&app, &tracker, &discord, &module_id, &module_name, &mut cmd).await
+}
+
+async fn spawn_tracked(
+    app: &AppHandle,
+    tracker: &State<'_, LaunchTracker>,
+    discord: &State<'_, DiscordRpc>,
+    module_id: &str,
+    module_name: &str,
+    cmd: &mut Command,
+) -> Result<(), String> {
+    let mut child = cmd
+        .kill_on_drop(false)
+        .spawn()
+        .map_err(|e| format!("spawn: {}", e))?;
+
+    let started_at = now_ms();
+
+    {
+        let mut running = tracker.inner.running.lock().await;
+        running.insert(module_id.to_string());
+    }
+    let _ = app.emit(
+        "module-launched",
+        LaunchEvent {
+            module_id,
+            module_name,
+            started_at,
+        },
+    );
+    discord.arc().set_playing(module_name).await;
+
+    let tracker_arc = tracker.arc();
+    let discord_arc = discord.arc();
+    let module_id_owned = module_id.to_string();
+    let module_name_owned = module_name.to_string();
+    let app_owned = app.clone();
+    tokio::spawn(async move {
+        let _ = child.wait().await;
+        let exited_at = now_ms();
+
+        {
+            let mut running = tracker_arc.running.lock().await;
+            running.remove(&module_id_owned);
+        }
+        let _ = app_owned.emit(
+            "module-exited",
+            ExitEvent {
+                module_id: module_id_owned.clone(),
+                module_name: module_name_owned.clone(),
+                started_at,
+                exited_at,
+                duration_ms: exited_at.saturating_sub(started_at),
+            },
+        );
+        discord_arc.set_idle().await;
+    });
+
     Ok(())
+}
+
+fn now_ms() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0)
 }
 
 #[tauri::command]

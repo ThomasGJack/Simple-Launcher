@@ -11,6 +11,11 @@ service cloud.firestore {
     // Users can only read/write their own profile.
     match /users/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
+
+      // Playtime per module — owner only
+      match /playtime/{moduleId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
     }
 
     // Modules: any authenticated user can read; admins can write.

@@ -31,14 +31,31 @@ export async function launchModule(module: LauncherModule): Promise<void> {
   if (module.type === "hosted") {
     return invoke<void>("module_launch_hosted", {
       moduleId: module.id,
+      moduleName: module.name,
       executable: module.executable,
     });
   }
   return invoke<void>("module_launch_shortcut", {
+    moduleId: module.id,
+    moduleName: module.name,
     executablePath: module.executablePath,
     args: module.args ?? null,
   });
 }
+
+export type ModuleLaunchEvent = {
+  moduleId: string;
+  moduleName: string;
+  startedAt: number;
+};
+
+export type ModuleExitEvent = {
+  moduleId: string;
+  moduleName: string;
+  startedAt: number;
+  exitedAt: number;
+  durationMs: number;
+};
 
 export async function uninstallModule(moduleId: string): Promise<void> {
   return invoke<void>("module_uninstall", { moduleId });

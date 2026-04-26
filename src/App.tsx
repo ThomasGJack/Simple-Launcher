@@ -1,9 +1,12 @@
 import { useEffect } from "react";
 import { onAuthStateChanged } from "firebase/auth";
+import { listen } from "@tauri-apps/api/event";
 import { AppShell } from "@/components/layout/AppShell";
 import { useAuthStore } from "@/store/auth";
 import { useUIStore } from "@/store/ui";
 import { getFirebase } from "@/firebase/config";
+import { recordPlaytime } from "@/firebase/playtime";
+import type { ModuleExitEvent } from "@/lib/modules";
 
 function App() {
   const setUser = useAuthStore((s) => s.setUser);
@@ -19,7 +22,7 @@ function App() {
       setLoading(false);
       return;
     }
-    const unsubscribe = onAuthStateChanged(fb.auth, (user) => setUser(user));
+    const unsubscribe = onAuthStateChanged(fb.auth, (u) => setUser(u));
     return () => unsubscribe();
   }, [setUser, setLoading]);
 
@@ -31,6 +34,21 @@ function App() {
       navigate({ name: "home" });
     }
   }, [loading, user, route, navigate]);
+
+  useEffect(() => {
+    if (!user) return;
+    const uid = user.uid;
+    const promise = listen<ModuleExitEvent>("module-exited", (event) => {
+      const { moduleId, durationMs } = event.payload;
+      if (durationMs <= 0) return;
+      recordPlaytime(uid, moduleId, durationMs).catch((err) =>
+        console.warn("[playtime] write failed:", err),
+      );
+    });
+    return () => {
+      promise.then((u) => u()).catch(() => {});
+    };
+  }, [user]);
 
   if (loading) {
     return (

@@ -13,6 +13,9 @@ import {
   CheckCircle2,
   Shield,
   Gamepad2,
+  Palette,
+  Sparkles,
+  Wand2,
 } from "lucide-react";
 import { useAuthStore } from "@/store/auth";
 import { isAdmin } from "@/lib/admin";
@@ -21,13 +24,17 @@ import {
   deleteModule,
   saveShortcutModule,
   uploadHostedModule,
+  uploadModuleAsset,
   watchModules,
   type UploadProgress,
 } from "@/firebase/modules";
-import type { LauncherModule } from "@/types/module";
+import type { LauncherModule, ModulePage, ParticlesConfig } from "@/types/module";
 import { cn } from "@/lib/cn";
 
 type ModuleType = "hosted" | "shortcut";
+type ParticlesPreset = NonNullable<ParticlesConfig["preset"]> | "none";
+type BgType = "none" | "image" | "video";
+
 type FormState = {
   type: ModuleType;
   id: string;
@@ -39,6 +46,14 @@ type FormState = {
   executable: string;
   executablePath: string;
   args: string;
+  themePrimary: string;
+  themeAccent: string;
+  fontDisplay: string;
+  particlesPreset: ParticlesPreset;
+  particlesColor: string;
+  particlesDensity: number;
+  bgType: BgType;
+  bgUrl: string;
 };
 
 const EMPTY_FORM: FormState = {
@@ -52,6 +67,14 @@ const EMPTY_FORM: FormState = {
   executable: "",
   executablePath: "",
   args: "",
+  themePrimary: "",
+  themeAccent: "",
+  fontDisplay: "",
+  particlesPreset: "none",
+  particlesColor: "#00d4ff",
+  particlesDensity: 60,
+  bgType: "none",
+  bgUrl: "",
 };
 
 export function AdminPage() {
@@ -62,6 +85,9 @@ export function AdminPage() {
   const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
+  const [iconUploading, setIconUploading] = useState(false);
+  const [bannerUploading, setBannerUploading] = useState(false);
+  const [showCustom, setShowCustom] = useState(false);
 
   useEffect(() => {
     return watchModules(setModules);
@@ -88,6 +114,7 @@ export function AdminPage() {
     setForm(EMPTY_FORM);
     setFile(null);
     setProgress(null);
+    setShowCustom(false);
   };
 
   const validate = (): string | null => {
@@ -103,6 +130,36 @@ export function AdminPage() {
     return null;
   };
 
+  const buildPage = (): ModulePage | undefined => {
+    const theme: ModulePage["theme"] = {};
+    if (form.themePrimary) theme.primary = form.themePrimary;
+    if (form.themeAccent) theme.accent = form.themeAccent;
+    if (form.fontDisplay) theme.fontDisplay = form.fontDisplay;
+
+    let background: ModulePage["background"] | undefined;
+    const particles =
+      form.particlesPreset !== "none"
+        ? {
+            preset: form.particlesPreset,
+            color: form.particlesColor,
+            density: form.particlesDensity,
+          }
+        : undefined;
+
+    if (form.bgType === "image" && form.bgUrl) {
+      background = { type: "image", url: form.bgUrl, ...(particles && { particles }) };
+    } else if (form.bgType === "video" && form.bgUrl) {
+      background = { type: "video", url: form.bgUrl, ...(particles && { particles }) };
+    } else if (particles) {
+      background = { type: "image", url: form.bannerUrl || "", particles };
+    }
+
+    const page: ModulePage = {};
+    if (Object.keys(theme).length > 0) page.theme = theme;
+    if (background) page.background = background;
+    return Object.keys(page).length > 0 ? page : undefined;
+  };
+
   const handleSubmit = async () => {
     const err = validate();
     if (err) {
@@ -112,6 +169,7 @@ export function AdminPage() {
     setFeedback(null);
     setSubmitting(true);
     try {
+      const page = buildPage();
       if (form.type === "shortcut") {
         const args = form.args.split(" ").filter(Boolean);
         await saveShortcutModule({
@@ -123,6 +181,7 @@ export function AdminPage() {
           ...(form.bannerUrl && { bannerUrl: form.bannerUrl }),
           executablePath: form.executablePath,
           ...(args.length > 0 && { args }),
+          ...(page && { page }),
         });
       } else {
         await uploadHostedModule(
@@ -135,6 +194,7 @@ export function AdminPage() {
             ...(form.bannerUrl && { bannerUrl: form.bannerUrl }),
             version: form.version,
             executable: form.executable,
+            ...(page && { page }),
           },
           file!,
           setProgress,
@@ -158,6 +218,23 @@ export function AdminPage() {
       setFeedback({ kind: "ok", message: `Module "${mod.name}" supprimé.` });
     } catch (e) {
       setFeedback({ kind: "error", message: e instanceof Error ? e.message : String(e) });
+    }
+  };
+
+  const uploadAsset = async (kind: "icon" | "banner", uploadedFile: File) => {
+    if (!form.id) {
+      setFeedback({ kind: "error", message: "Renseigne d'abord l'ID du module." });
+      return;
+    }
+    const setter = kind === "icon" ? setIconUploading : setBannerUploading;
+    setter(true);
+    try {
+      const url = await uploadModuleAsset(form.id, kind, uploadedFile);
+      updateForm(kind === "icon" ? "iconUrl" : "bannerUrl", url);
+    } catch (e) {
+      setFeedback({ kind: "error", message: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setter(false);
     }
   };
 
@@ -210,13 +287,24 @@ export function AdminPage() {
                 placeholder="Description en une phrase"
               />
             </Field>
+
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Icône (URL)" icon={ImageIcon}>
-                <Input value={form.iconUrl} onChange={(v) => updateForm("iconUrl", v)} placeholder="https://…" />
-              </Field>
-              <Field label="Bannière (URL)" icon={ImageIcon}>
-                <Input value={form.bannerUrl} onChange={(v) => updateForm("bannerUrl", v)} placeholder="https://…" />
-              </Field>
+              <ImageField
+                label="Icône"
+                hint="carré recommandé"
+                url={form.iconUrl}
+                uploading={iconUploading}
+                onPickFile={(f) => uploadAsset("icon", f)}
+                onClear={() => updateForm("iconUrl", "")}
+              />
+              <ImageField
+                label="Bannière"
+                hint="16:9 recommandé"
+                url={form.bannerUrl}
+                uploading={bannerUploading}
+                onPickFile={(f) => uploadAsset("banner", f)}
+                onClear={() => updateForm("bannerUrl", "")}
+              />
             </div>
 
             {form.type === "hosted" ? (
@@ -242,6 +330,70 @@ export function AdminPage() {
               </>
             )}
           </div>
+
+          <button
+            onClick={() => setShowCustom((v) => !v)}
+            className="mt-6 flex w-full items-center gap-2 rounded-xl bg-accent/[0.06] px-4 py-2.5 text-sm text-accent ring-1 ring-accent/20 transition-colors hover:bg-accent/[0.1]"
+          >
+            <Wand2 className="size-4" />
+            Personnalisation de la page module {showCustom ? "—" : "+"}
+          </button>
+
+          <AnimatePresence>
+            {showCustom && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.25 }}
+                className="overflow-hidden"
+              >
+                <div className="mt-5 grid gap-5 rounded-2xl bg-bg-base/30 p-5 ring-1 ring-white/[0.04]">
+                  <SectionHeader icon={Palette} title="Thème" />
+                  <div className="grid grid-cols-2 gap-4">
+                    <ColorField label="Couleur primaire" value={form.themePrimary} onChange={(v) => updateForm("themePrimary", v)} />
+                    <ColorField label="Couleur accent" value={form.themeAccent} onChange={(v) => updateForm("themeAccent", v)} />
+                  </div>
+                  <Field label="Police titre (optionnel)" hint="ex: Audiowide, Orbitron…">
+                    <Input value={form.fontDisplay} onChange={(v) => updateForm("fontDisplay", v)} placeholder="Audiowide" />
+                  </Field>
+
+                  <SectionHeader icon={Sparkles} title="Particules" />
+                  <div className="grid gap-3">
+                    <PresetSelect value={form.particlesPreset} onChange={(v) => updateForm("particlesPreset", v)} />
+                    {form.particlesPreset !== "none" && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <ColorField label="Couleur" value={form.particlesColor} onChange={(v) => updateForm("particlesColor", v)} />
+                        <Field label="Densité" hint="20–200">
+                          <input
+                            type="range"
+                            min={20}
+                            max={200}
+                            value={form.particlesDensity}
+                            onChange={(e) => updateForm("particlesDensity", Number(e.target.value))}
+                            className="no-drag w-full accent-[var(--color-accent)]"
+                          />
+                          <div className="mt-1 text-xs text-fg-muted">{form.particlesDensity} particules</div>
+                        </Field>
+                      </div>
+                    )}
+                  </div>
+
+                  <SectionHeader icon={ImageIcon} title="Background hero" />
+                  <BgTypeSelect value={form.bgType} onChange={(v) => updateForm("bgType", v)} />
+                  {form.bgType !== "none" && (
+                    <Field
+                      label={form.bgType === "video" ? "URL vidéo (mp4/webm)" : "URL image"}
+                      hint="optionnel · sinon utilise la bannière"
+                      icon={LinkIcon}
+                    >
+                      <Input value={form.bgUrl} onChange={(v) => updateForm("bgUrl", v)} placeholder="https://…" />
+                    </Field>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {progress && (
             <div className="mt-5">
@@ -354,6 +506,14 @@ function TypeSwitch({ value, onChange }: { value: ModuleType; onChange: (v: Modu
   );
 }
 
+function SectionHeader({ icon: Icon, title }: { icon: typeof Palette; title: string }) {
+  return (
+    <div className="flex items-center gap-2 border-b border-white/[0.04] pb-2 text-xs uppercase tracking-[0.2em] text-accent">
+      <Icon className="size-3" /> {title}
+    </div>
+  );
+}
+
 function Field({
   label,
   hint,
@@ -379,6 +539,101 @@ function Field({
   );
 }
 
+function ColorField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <Field label={label} hint="hex">
+      <div className="flex items-center gap-2">
+        <input
+          type="color"
+          value={value || "#00d4ff"}
+          onChange={(e) => onChange(e.target.value)}
+          className="no-drag size-10 cursor-pointer rounded-lg bg-bg-base/40 ring-1 ring-white/[0.06]"
+        />
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="#00d4ff"
+          className="no-drag flex-1 rounded-lg bg-bg-base/40 px-3 py-2 font-mono text-xs text-fg-primary placeholder:text-fg-dim ring-1 ring-white/[0.06] focus:outline-none focus:ring-1 focus:ring-accent/60"
+        />
+        {value && (
+          <button
+            onClick={() => onChange("")}
+            type="button"
+            className="rounded-lg bg-white/[0.03] px-2 py-2 text-xs text-fg-muted ring-1 ring-white/[0.06] transition-colors hover:bg-white/[0.06]"
+          >
+            ×
+          </button>
+        )}
+      </div>
+    </Field>
+  );
+}
+
+function PresetSelect({
+  value,
+  onChange,
+}: {
+  value: ParticlesPreset;
+  onChange: (v: ParticlesPreset) => void;
+}) {
+  const presets: { value: ParticlesPreset; label: string }[] = [
+    { value: "none", label: "Aucune" },
+    { value: "stars", label: "Étoiles" },
+    { value: "snow", label: "Neige" },
+    { value: "fireflies", label: "Lucioles" },
+    { value: "sparkles", label: "Étincelles" },
+  ];
+  return (
+    <div className="grid grid-cols-5 gap-1 rounded-xl bg-bg-base/40 p-1 ring-1 ring-white/[0.06]">
+      {presets.map((p) => (
+        <button
+          key={p.value}
+          onClick={() => onChange(p.value)}
+          className={cn(
+            "rounded-lg px-2 py-2 text-xs font-medium transition-colors",
+            value === p.value ? "bg-accent text-bg-base" : "text-fg-muted hover:bg-white/[0.04] hover:text-fg-primary",
+          )}
+        >
+          {p.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function BgTypeSelect({ value, onChange }: { value: BgType; onChange: (v: BgType) => void }) {
+  const types: { value: BgType; label: string }[] = [
+    { value: "none", label: "Aucun (utilise la bannière)" },
+    { value: "image", label: "Image" },
+    { value: "video", label: "Vidéo" },
+  ];
+  return (
+    <div className="grid grid-cols-3 gap-1 rounded-xl bg-bg-base/40 p-1 ring-1 ring-white/[0.06]">
+      {types.map((t) => (
+        <button
+          key={t.value}
+          onClick={() => onChange(t.value)}
+          className={cn(
+            "rounded-lg px-2 py-2 text-xs font-medium transition-colors",
+            value === t.value ? "bg-accent text-bg-base" : "text-fg-muted hover:bg-white/[0.04] hover:text-fg-primary",
+          )}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function Input({
   value,
   onChange,
@@ -401,6 +656,78 @@ function Input({
         mono && "font-mono text-xs",
       )}
     />
+  );
+}
+
+function ImageField({
+  label,
+  hint,
+  url,
+  uploading,
+  onPickFile,
+  onClear,
+}: {
+  label: string;
+  hint?: string;
+  url: string;
+  uploading: boolean;
+  onPickFile: (f: File) => void;
+  onClear: () => void;
+}) {
+  const id = `img-${label}`;
+  return (
+    <Field label={label} hint={hint} icon={ImageIcon}>
+      <div className="flex h-[110px] items-center gap-3 overflow-hidden rounded-xl border border-dashed border-white/10 bg-bg-base/30 p-3 transition-colors hover:border-accent/40">
+        <input
+          type="file"
+          id={id}
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) onPickFile(f);
+          }}
+          className="hidden"
+        />
+        {url ? (
+          <>
+            <img src={url} alt="" className="h-full aspect-square rounded-lg object-cover ring-1 ring-white/10" />
+            <div className="flex flex-1 flex-col gap-2">
+              <label
+                htmlFor={id}
+                className="no-drag cursor-pointer rounded-md bg-white/[0.04] px-3 py-1.5 text-center text-xs text-fg-primary ring-1 ring-white/[0.06] transition-colors hover:bg-white/[0.08]"
+              >
+                Remplacer
+              </label>
+              <button
+                onClick={onClear}
+                type="button"
+                className="rounded-md bg-white/[0.02] px-3 py-1.5 text-xs text-fg-muted ring-1 ring-white/[0.04] transition-colors hover:bg-danger/10 hover:text-danger"
+              >
+                Retirer
+              </button>
+            </div>
+          </>
+        ) : (
+          <label htmlFor={id} className="no-drag flex flex-1 cursor-pointer items-center gap-3">
+            <div className="grid h-full aspect-square place-items-center rounded-lg bg-accent/10 text-accent">
+              {uploading ? (
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                  className="size-5 rounded-full border-2 border-accent border-t-transparent"
+                />
+              ) : (
+                <Upload className="size-5" />
+              )}
+            </div>
+            <div className="flex-1">
+              <div className="text-sm text-fg-primary">{uploading ? "Upload…" : "Choisir un fichier"}</div>
+              <div className="text-xs text-fg-muted">PNG / JPG / WebP / GIF</div>
+            </div>
+          </label>
+        )}
+      </div>
+    </Field>
   );
 }
 
