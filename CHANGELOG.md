@@ -20,6 +20,7 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 ### Changé
 
 ### Corrigé
+- Page Admin : la création d'un module échouait avec "Unsupported field value: undefined" quand un champ optionnel était vide (description, icône, bannière, arguments). Les champs vides sont maintenant omis du document Firestore au lieu d'envoyer `undefined`.
 
 ### Supprimé
 

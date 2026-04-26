@@ -113,15 +113,16 @@ export function AdminPage() {
     setSubmitting(true);
     try {
       if (form.type === "shortcut") {
+        const args = form.args.split(" ").filter(Boolean);
         await saveShortcutModule({
           type: "shortcut",
           id: form.id,
           name: form.name,
-          shortDescription: form.shortDescription || undefined,
-          iconUrl: form.iconUrl || undefined,
-          bannerUrl: form.bannerUrl || undefined,
+          ...(form.shortDescription && { shortDescription: form.shortDescription }),
+          ...(form.iconUrl && { iconUrl: form.iconUrl }),
+          ...(form.bannerUrl && { bannerUrl: form.bannerUrl }),
           executablePath: form.executablePath,
-          args: form.args ? form.args.split(" ").filter(Boolean) : undefined,
+          ...(args.length > 0 && { args }),
         });
       } else {
         await uploadHostedModule(
@@ -129,9 +130,9 @@ export function AdminPage() {
             type: "hosted",
             id: form.id,
             name: form.name,
-            shortDescription: form.shortDescription || undefined,
-            iconUrl: form.iconUrl || undefined,
-            bannerUrl: form.bannerUrl || undefined,
+            ...(form.shortDescription && { shortDescription: form.shortDescription }),
+            ...(form.iconUrl && { iconUrl: form.iconUrl }),
+            ...(form.bannerUrl && { bannerUrl: form.bannerUrl }),
             version: form.version,
             executable: form.executable,
           },
