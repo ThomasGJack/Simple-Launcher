@@ -1,0 +1,105 @@
+import { motion } from "framer-motion";
+import { Home, Library, Settings, LogIn, LogOut, Gamepad2 } from "lucide-react";
+import { useUIStore, type Route } from "@/store/ui";
+import { useAuthStore } from "@/store/auth";
+import { signOut } from "@/firebase/auth";
+import { cn } from "@/lib/cn";
+
+type NavItem = {
+  icon: typeof Home;
+  label: string;
+  route: Route;
+};
+
+const NAV_ITEMS: NavItem[] = [
+  { icon: Home, label: "Accueil", route: { name: "home" } },
+  { icon: Library, label: "Bibliothèque", route: { name: "library" } },
+];
+
+export function Sidebar() {
+  const { route, navigate } = useUIStore();
+  const user = useAuthStore((s) => s.user);
+
+  const isActive = (target: Route) => target.name === route.name;
+
+  return (
+    <aside className="no-drag flex w-20 shrink-0 flex-col items-center justify-between border-r border-white/[0.04] bg-bg-soft/60 py-5 backdrop-blur-md">
+      <div className="flex flex-col items-center gap-3">
+        <button
+          onClick={() => navigate({ name: "home" })}
+          className="group relative grid size-12 place-items-center rounded-xl bg-gradient-to-br from-accent/40 to-accent/10 transition-transform hover:scale-105"
+        >
+          <Gamepad2 className="size-6 text-accent" strokeWidth={2} />
+          <div className="absolute inset-0 rounded-xl ring-1 ring-accent/30 group-hover:ring-accent/60 group-hover:shadow-[0_0_24px_var(--color-accent-glow)]" />
+        </button>
+
+        <div className="my-2 h-px w-8 bg-white/[0.06]" />
+
+        <nav className="flex flex-col items-center gap-2">
+          {NAV_ITEMS.map((item) => (
+            <NavButton
+              key={item.label}
+              icon={item.icon}
+              label={item.label}
+              active={isActive(item.route)}
+              onClick={() => navigate(item.route)}
+            />
+          ))}
+        </nav>
+      </div>
+
+      <div className="flex flex-col items-center gap-2">
+        <NavButton
+          icon={Settings}
+          label="Paramètres"
+          active={isActive({ name: "settings" })}
+          onClick={() => navigate({ name: "settings" })}
+        />
+        {user ? (
+          <NavButton icon={LogOut} label="Déconnexion" onClick={() => signOut()} />
+        ) : (
+          <NavButton
+            icon={LogIn}
+            label="Connexion"
+            active={isActive({ name: "login" })}
+            onClick={() => navigate({ name: "login" })}
+          />
+        )}
+      </div>
+    </aside>
+  );
+}
+
+function NavButton({
+  icon: Icon,
+  label,
+  active,
+  onClick,
+}: {
+  icon: typeof Home;
+  label: string;
+  active?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "group relative grid size-12 place-items-center rounded-xl transition-colors",
+        active ? "text-accent" : "text-fg-muted hover:text-fg-primary",
+      )}
+    >
+      {active && (
+        <motion.div
+          layoutId="sidebar-active"
+          className="absolute inset-0 rounded-xl bg-accent/10 ring-1 ring-accent/40 shadow-[0_0_24px_var(--color-accent-soft)]"
+          transition={{ type: "spring", stiffness: 380, damping: 30 }}
+        />
+      )}
+      <Icon className="relative z-10 size-5" strokeWidth={2} />
+      <span className="pointer-events-none absolute left-full ml-3 whitespace-nowrap rounded-md bg-bg-elevated px-2.5 py-1 text-xs text-fg-primary opacity-0 shadow-lg ring-1 ring-white/[0.06] transition-opacity group-hover:opacity-100 z-50">
+        {label}
+      </span>
+    </button>
+  );
+}
