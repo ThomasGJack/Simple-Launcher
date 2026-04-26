@@ -30,6 +30,7 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 - **Statut serveur Minecraft** : nouveau champ optionnel `serverAddress` dans l'admin (panneau Personnalisation). Si renseigné, un badge "X/Y" en temps réel apparaît sur la carte de bibliothèque, et la page détail affiche un encart dédié avec le nombre de joueurs en ligne, la version du serveur et le MOTD. Polling toutes les 30 sec via `mcsrvstat.us`, cache local 30 sec pour éviter le spam.
 - **Sections riches sur la page module** : la page détail rend désormais les sections définies dans le manifest — grille de captures d'écran (cliquables, ouvre l'image en grand), stats clé/valeur. Pour les modules hébergés, un bloc "Versions publiées" est généré automatiquement à partir du sous-dossier Firestore `/modules/{id}/versions`. Les types `carousel` et `custom-html` sont supportés par le moteur mais sans éditeur visuel pour l'instant.
 - **Éditeur de sections dans l'admin** : nouvelles textareas dans le panneau Personnalisation pour saisir les URLs des screenshots (une par ligne) et les stats au format `label = valeur`.
+- **Installeur stylisé** aux couleurs de l'app : header banner avec logo + nom en cyan, sidebar verticale (welcome / finish) avec gros logo, fond néon dégradé, grille subtile et texte typo display. Icône custom dans la barre de titre de l'installeur, langue forcée en français, install per-user (pas besoin d'admin Windows). Images générées automatiquement depuis le logo via `npm run installer:art`.
 
 ### Changé
 

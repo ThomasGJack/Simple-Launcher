@@ -41,6 +41,9 @@ if (!unreleasedBody.trim()) {
   process.exit(1);
 }
 
+console.log("[0/4] Regenerating installer artwork…");
+execSync("node scripts/build-installer-art.mjs", { stdio: "inherit", cwd: root });
+
 console.log("[1/4] Building signed release bundle (this can take a while on first build)…");
 execSync("npm run tauri:build", {
   stdio: "inherit",

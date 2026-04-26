@@ -10,7 +10,8 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
-    "release:launcher": "node scripts/release-launcher.mjs"
+    "release:launcher": "node scripts/release-launcher.mjs",
+    "installer:art": "node scripts/build-installer-art.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
@@ -39,7 +40,9 @@
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
     "autoprefixer": "^10.5.0",
+    "jimp": "^1.6.1",
     "postcss": "^8.5.12",
+    "sharp": "^0.34.5",
     "tailwindcss": "^4.2.4",
     "typescript": "~5.8.3",
     "vite": "^7.0.4"
