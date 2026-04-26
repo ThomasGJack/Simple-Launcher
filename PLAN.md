@@ -288,6 +288,30 @@ Référence : **Paladium Launcher**, **ReCube (Nation Glory)** — launchers MC 
 }
 ```
 
+## 11.bis Workflow de release (Phase 1 implémentée)
+
+### URLs publiques
+- **Page de téléchargement** : `https://simplelaunche.web.app/`
+- **Installer toujours-à-jour** : `https://simplelaunche.web.app/download/SimpleLauncher-Setup.exe`
+- **Manifest auto-updater** : `https://simplelaunche.web.app/launcher/latest.json`
+- **Releases versionnées** : `https://simplelaunche.web.app/releases/{version}/...`
+
+### Pour distribuer à un nouveau pote
+- Lui envoyer le lien `https://simplelaunche.web.app/`
+- Il télécharge, installe, lance → connecté Discord, prêt
+- À partir de là, **toutes les MAJ sont automatiques**
+
+### Pour pousser une nouvelle version
+1. Bumper `tauri.conf.json` + `Cargo.toml` + `package.json` (même version)
+2. `NOTES="..." npm run release:launcher` (build + sign + génère manifest, ~5-10 min)
+3. `firebase deploy --only hosting`
+4. Tous les launchers déjà installés voient le banner au prochain démarrage
+
+### Sécurité
+- Signature ed25519 (`.tauri-keys/sign.key` privée gitignorée, `.pub` dans `tauri.conf.json`)
+- Sans la clé privée, impossible de pousser un faux update
+- **À sauvegarder ailleurs** (KeePass, USB) : si perdue, plus aucune MAJ possible
+
 ## 12. Décisions figées
 
 | Question | Réponse |

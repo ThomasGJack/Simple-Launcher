@@ -1,6 +1,11 @@
 {
   "version": "0.1.0",
-  "notes": "Initial release — pas de MAJ disponible.",
-  "pub_date": "2026-04-26T00:00:00Z",
-  "platforms": {}
+  "notes": "Première release : auth Discord, page admin, auto-updater, frameless UI",
+  "pub_date": "2026-04-26T20:22:11.641Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReExlbkZGc0Y5eENZQXhsSS9lSFhKK2hmNjRneEI5ck5mUVNTNEtBUlJMVThlN0I0M1pJbWZvZkRIeVJTR2liMTg5QnVLNHVUZ1dHY3B1QzlZYjY4S3QxdnpGY2RhNUFVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3MjM0OTMxCWZpbGU6U2ltcGxlIExhdW5jaGVyXzAuMS4wX3g2NC1zZXR1cC5leGUKS0xSWVBSTXAreVVhckZudEJPK2ZjK3FVWEFPNFFVS3AvbjlQSEg1c05WSkpQL21NekF5R1I0ZGZmRkNEWmdVcmYyYUs4Y2JqU2lPRTlNNXJEaFZQREE9PQo=",
+      "url": "https://simplelaunche.web.app/releases/0.1.0/Simple Launcher_0.1.0_x64-setup.exe"
+    }
+  }
 }

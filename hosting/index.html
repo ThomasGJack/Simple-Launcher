@@ -2,42 +2,239 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <title>Simple Launcher</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Simple Launcher — Téléchargement</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Audiowide&display=swap"
+      rel="stylesheet"
+    />
     <style>
+      :root {
+        --bg: #07090d;
+        --bg-soft: #0d1117;
+        --fg: #f5f7fa;
+        --fg-muted: #97a3b6;
+        --accent: #00d4ff;
+        --accent-glow: #00d4ff80;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
       body {
-        background: #07090d;
-        color: #f5f7fa;
-        font-family: system-ui, sans-serif;
+        margin: 0;
+        padding: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: "Inter", system-ui, sans-serif;
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+      body {
         display: grid;
         place-items: center;
-        height: 100vh;
-        margin: 0;
-        text-align: center;
+        position: relative;
       }
-      .card {
-        padding: 32px 48px;
-        border-radius: 18px;
+      .blob {
+        position: fixed;
+        border-radius: 50%;
+        filter: blur(120px);
+        z-index: 0;
+        pointer-events: none;
+      }
+      .blob-1 {
+        top: -20%;
+        left: -10%;
+        width: 600px;
+        height: 600px;
+        background: rgba(0, 212, 255, 0.18);
+        animation: float 22s ease-in-out infinite;
+      }
+      .blob-2 {
+        bottom: -20%;
+        right: -10%;
+        width: 500px;
+        height: 500px;
+        background: rgba(255, 0, 170, 0.14);
+        animation: float 28s ease-in-out infinite reverse;
+      }
+      @keyframes float {
+        0%, 100% { transform: translate(0, 0); }
+        33% { transform: translate(60px, -40px); }
+        66% { transform: translate(-40px, 60px); }
+      }
+      .grid {
+        position: fixed;
+        inset: 0;
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.6) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.6) 1px, transparent 1px);
+        background-size: 48px 48px;
+        opacity: 0.025;
+        mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+      }
+      .container {
+        position: relative;
+        z-index: 1;
+        text-align: center;
+        max-width: 640px;
+        padding: 40px 24px;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 14px;
+        border-radius: 999px;
         background: rgba(255, 255, 255, 0.04);
         border: 1px solid rgba(255, 255, 255, 0.08);
-        backdrop-filter: blur(20px);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.25em;
+        color: var(--accent);
+        backdrop-filter: blur(18px);
+      }
+      .badge::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--accent);
+        box-shadow: 0 0 8px var(--accent);
+        animation: pulse 1.6s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 0.5; }
+        50% { opacity: 1; }
       }
       h1 {
+        font-family: "Audiowide", sans-serif;
+        font-size: clamp(48px, 8vw, 80px);
+        line-height: 0.95;
+        margin: 16px 0 0;
+        text-shadow: 0 0 40px var(--accent-glow);
+      }
+      .tag {
+        color: var(--fg-muted);
+        margin: 16px 0 40px;
+        font-size: 16px;
+      }
+      .download-btn {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        padding: 18px 40px;
+        background: linear-gradient(90deg, var(--accent), #4ed6ff, var(--accent));
+        background-size: 200% 100%;
+        color: var(--bg);
+        text-decoration: none;
+        border-radius: 18px;
+        font-family: "Audiowide", sans-serif;
+        font-size: 18px;
+        letter-spacing: 0.18em;
+        box-shadow: 0 0 32px var(--accent-glow);
+        transition: transform 0.2s, box-shadow 0.2s;
+        overflow: hidden;
+        animation: shimmer 4s linear infinite;
+      }
+      .download-btn:hover {
+        transform: scale(1.04);
+        box-shadow: 0 0 48px var(--accent-glow);
+      }
+      .download-btn[aria-disabled="true"] {
+        opacity: 0.5;
+        pointer-events: none;
+      }
+      @keyframes shimmer {
+        0% { background-position: 0 0; }
+        100% { background-position: 200% 0; }
+      }
+      .meta {
+        margin-top: 24px;
+        color: var(--fg-muted);
+        font-size: 13px;
+      }
+      .meta strong {
+        color: var(--fg);
+      }
+      .notes {
+        margin-top: 36px;
+        padding: 20px 24px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 16px;
+        backdrop-filter: blur(18px);
+        text-align: left;
+        font-size: 14px;
+        color: var(--fg-muted);
+        white-space: pre-line;
+      }
+      .notes h3 {
         margin: 0 0 8px;
-        font-weight: 500;
+        color: var(--fg);
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.2em;
       }
-      p {
-        margin: 0;
-        color: #97a3b6;
-      }
-      a {
-        color: #00d4ff;
+      .footer {
+        margin-top: 56px;
+        font-size: 11px;
+        color: rgba(151, 163, 182, 0.6);
+        letter-spacing: 0.1em;
       }
     </style>
   </head>
   <body>
-    <div class="card">
-      <h1>Simple Launcher</h1>
-      <p>Backend de mise à jour. Si tu vois cette page, le hosting est actif.</p>
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="grid"></div>
+
+    <div class="container">
+      <span class="badge"><span id="status">Disponible</span></span>
+      <h1>SIMPLE<br />LAUNCHER</h1>
+      <p class="tag">Multi-jeux. Auto-update. Pour Windows.</p>
+
+      <a id="download" class="download-btn" href="/download/SimpleLauncher-Setup.exe" download>
+        ⬇ TÉLÉCHARGER
+      </a>
+
+      <div class="meta">
+        Version <strong id="version">…</strong> · <span id="date">…</span>
+      </div>
+
+      <div id="notes-block" class="notes" style="display: none">
+        <h3>Notes de version</h3>
+        <p id="notes"></p>
+      </div>
+
+      <div class="footer">v1 · Privé · Auto-update activé après install</div>
     </div>
+
+    <script>
+      fetch("/launcher/latest.json", { cache: "no-cache" })
+        .then((r) => r.json())
+        .then((data) => {
+          document.getElementById("version").textContent = data.version;
+          document.getElementById("date").textContent = new Date(data.pub_date).toLocaleDateString("fr-FR", {
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+          });
+          if (data.notes) {
+            document.getElementById("notes").textContent = data.notes;
+            document.getElementById("notes-block").style.display = "block";
+          }
+          if (!data.platforms || !data.platforms["windows-x86_64"]) {
+            document.getElementById("status").textContent = "Bientôt";
+            document.getElementById("download").setAttribute("aria-disabled", "true");
+          }
+        })
+        .catch(() => {
+          document.getElementById("version").textContent = "?";
+        });
+    </script>
   </body>
 </html>

@@ -55,11 +55,16 @@ if (!existsSync(exePath) || !existsSync(sigPath)) {
   process.exit(1);
 }
 
-console.log("[2/3] Copying installer + signature into hosting/releases/…");
+console.log("[2/3] Copying installer + signature into hosting/…");
 const releaseDir = join(root, "hosting", "releases", version);
 mkdirSync(releaseDir, { recursive: true });
 copyFileSync(exePath, join(releaseDir, exeName));
 copyFileSync(sigPath, join(releaseDir, basename(sigPath)));
+
+// Stable URL: always-latest installer for first-time installs
+const stableDir = join(root, "hosting", "download");
+mkdirSync(stableDir, { recursive: true });
+copyFileSync(exePath, join(stableDir, "SimpleLauncher-Setup.exe"));
 
 console.log("[3/3] Generating hosting/launcher/latest.json…");
 const signature = readFileSync(sigPath, "utf8").trim();
