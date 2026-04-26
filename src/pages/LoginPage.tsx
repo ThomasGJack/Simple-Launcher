@@ -23,13 +23,8 @@ export function LoginPage() {
       navigate({ name: "home" });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      if (message.includes("functions/not-found") || message.includes("internal")) {
-        setError(
-          "Cloud Function `discordAuth` pas encore déployée. Le code Discord a bien été reçu, mais on a besoin du backend pour finir l'auth. Voir functions/README.md.",
-        );
-      } else {
-        setError(message);
-      }
+      console.error("[discord login]", err);
+      setError(message);
     } finally {
       setLoading(false);
     }
