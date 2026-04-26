@@ -3,6 +3,7 @@ import { Home, Library, Settings, LogIn, Shield } from "lucide-react";
 import { useUIStore, type Route } from "@/store/ui";
 import { useAuthStore } from "@/store/auth";
 import { isAdmin } from "@/lib/admin";
+import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
 
 type NavItem = {
@@ -97,7 +98,11 @@ function NavButton({
 }) {
   return (
     <button
-      onClick={onClick}
+      onClick={() => {
+        sounds.click();
+        onClick();
+      }}
+      onMouseEnter={() => sounds.hover()}
       className={cn(
         "group relative grid size-12 place-items-center rounded-xl transition-colors",
         active ? "text-accent" : "text-fg-muted hover:text-fg-primary",
@@ -130,7 +135,14 @@ function AvatarButton({
   onClick: () => void;
 }) {
   return (
-    <button onClick={onClick} className="group relative grid size-12 place-items-center rounded-xl">
+    <button
+      onClick={() => {
+        sounds.click();
+        onClick();
+      }}
+      onMouseEnter={() => sounds.hover()}
+      className="group relative grid size-12 place-items-center rounded-xl"
+    >
       {active && (
         <motion.div
           layoutId="sidebar-active"

@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { Download, RefreshCw, X } from "lucide-react";
+import { sounds } from "@/lib/sounds";
 
 type Status =
   | { kind: "idle" }
@@ -21,7 +22,10 @@ export function UpdateBanner() {
       try {
         const update = await check();
         if (cancelled) return;
-        if (update) setStatus({ kind: "available", update });
+        if (update) {
+          setStatus({ kind: "available", update });
+          sounds.notification();
+        }
       } catch (err) {
         console.warn("[updater] check failed (probably offline or no endpoint yet):", err);
       }

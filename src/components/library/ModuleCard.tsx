@@ -13,6 +13,8 @@ import {
   type DerivedStatus,
 } from "@/lib/modules";
 import type { LauncherModule } from "@/types/module";
+import { useUIStore } from "@/store/ui";
+import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
 
 type Action =
@@ -22,10 +24,13 @@ type Action =
   | { kind: "error"; message: string };
 
 export function ModuleCard({ module, index }: { module: LauncherModule; index: number }) {
+  const navigate = useUIStore((s) => s.navigate);
   const [local, setLocal] = useState<ModuleStateLocal | null>(null);
   const [stateLoaded, setStateLoaded] = useState(false);
   const [action, setAction] = useState<Action>({ kind: "idle" });
   const cleanupRef = useRef<(() => void) | null>(null);
+
+  const openDetail = () => navigate({ name: "module", moduleId: module.id });
 
   useEffect(() => {
     if (module.type === "shortcut") {
@@ -56,15 +61,18 @@ export function ModuleCard({ module, index }: { module: LauncherModule; index: n
 
   const status: DerivedStatus = deriveStatus(module, local);
 
-  const handlePrimary = async () => {
+  const handlePrimary = async (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (action.kind === "installing" || action.kind === "launching") return;
 
     if (status.kind === "shortcut" || status.kind === "installed") {
       setAction({ kind: "launching" });
+      sounds.launch();
       try {
         await launchModule(module);
-      } catch (e) {
-        setAction({ kind: "error", message: e instanceof Error ? e.message : String(e) });
+      } catch (err) {
+        sounds.error();
+        setAction({ kind: "error", message: err instanceof Error ? err.message : String(err) });
         return;
       }
       setTimeout(() => setAction({ kind: "idle" }), 1200);
@@ -84,8 +92,10 @@ export function ModuleCard({ module, index }: { module: LauncherModule; index: n
         const fresh = await getModuleState(module.id);
         setLocal(fresh);
         setAction({ kind: "idle" });
-      } catch (e) {
-        setAction({ kind: "error", message: e instanceof Error ? e.message : String(e) });
+        sounds.success();
+      } catch (err) {
+        sounds.error();
+        setAction({ kind: "error", message: err instanceof Error ? err.message : String(err) });
       } finally {
         cleanupRef.current?.();
         cleanupRef.current = null;
@@ -93,7 +103,8 @@ export function ModuleCard({ module, index }: { module: LauncherModule; index: n
     }
   };
 
-  const handleUninstall = async () => {
+  const handleUninstall = async (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (module.type !== "hosted") return;
     if (!confirm(`Désinstaller "${module.name}" ? Le jeu sera supprimé du disque.`)) return;
     try {
@@ -110,7 +121,8 @@ export function ModuleCard({ module, index }: { module: LauncherModule; index: n
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05, duration: 0.4 }}
       whileHover={{ y: -6 }}
-      className="group relative aspect-[4/5] overflow-hidden rounded-2xl glass"
+      onClick={openDetail}
+      className="group relative aspect-[4/5] overflow-hidden rounded-2xl glass cursor-pointer"
     >
       {module.bannerUrl ? (
         <img
@@ -318,7 +330,10 @@ function ProgressBar({ progress }: { progress?: ModuleProgress }) {
 function ErrorBanner({ message, onDismiss }: { message: string; onDismiss: () => void }) {
   return (
     <button
-      onClick={onDismiss}
+      onClick={(e) => {
+        e.stopPropagation();
+        onDismiss();
+      }}
       className="flex w-full items-start gap-2 rounded-xl bg-danger/10 p-2.5 text-left text-xs text-fg-primary ring-1 ring-danger/30"
     >
       <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-danger" strokeWidth={2.5} />

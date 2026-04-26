@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { Play } from "lucide-react";
+import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
 
 type PlayButtonProps = {
@@ -13,6 +14,8 @@ export function PlayButton({ label = "JOUER", onClick, disabled, className }: Pl
   return (
     <motion.button
       onClick={onClick}
+      onMouseEnter={() => sounds.hover()}
+      onMouseDown={() => sounds.click()}
       disabled={disabled}
       whileHover={{ scale: 1.04 }}
       whileTap={{ scale: 0.97 }}

@@ -2,13 +2,14 @@ import { AnimatePresence, motion } from "framer-motion";
 import { TitleBar } from "@/components/window/TitleBar";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { AnimatedBackground } from "@/components/layout/AnimatedBackground";
-import { useUIStore } from "@/store/ui";
+import { useUIStore, type Route } from "@/store/ui";
 import { HomePage } from "@/pages/HomePage";
 import { LibraryPage } from "@/pages/LibraryPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { ProfilePage } from "@/pages/ProfilePage";
 import { AdminPage } from "@/pages/AdminPage";
+import { ModuleDetailPage } from "@/pages/ModuleDetailPage";
 import { UpdateBanner } from "@/components/updater/UpdateBanner";
 
 export function AppShell() {
@@ -26,7 +27,7 @@ export function AppShell() {
 
           <AnimatePresence mode="wait">
             <motion.div
-              key={route.name}
+              key={routeKey(route)}
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
@@ -44,6 +45,10 @@ export function AppShell() {
   );
 }
 
+function routeKey(route: Route): string {
+  return route.name === "module" ? `module:${route.moduleId}` : route.name;
+}
+
 function renderRoute(name: string) {
   switch (name) {
     case "home":
@@ -51,7 +56,7 @@ function renderRoute(name: string) {
     case "library":
       return <LibraryPage />;
     case "module":
-      return <LibraryPage />;
+      return <ModuleDetailPage />;
     case "settings":
       return <SettingsPage />;
     case "profile":

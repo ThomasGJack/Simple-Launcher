@@ -16,6 +16,11 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 - Barre de progression live pendant le téléchargement et l'extraction, avec phase et taille en Mo.
 - Page Bibliothèque refaite : cartes 4×5 avec bannière, badge d'état (Non installé / vX.Y / vX.Y → vZ.W / Local), gradient overlay et animations au hover.
 - Logo officiel Simple Launcher (penguin néon à capuche) intégré partout : icône Windows / barre des tâches / installeur, page de connexion, sidebar, barre de titre, page de téléchargement web, et favicon.
+- **Page de détail par module** : un clic sur une carte de bibliothèque ouvre une page hero immersive avec grande bannière (zoom subtil au load), nom en font display, badge d'état, bouton JOUER/INSTALLER/MAJ géant, panneau d'infos latéral (taille, version, date d'install, chemin), bouton désinstaller, bouton retour bibliothèque. Thème accent couleur configurable par module dans Firestore (`page.theme.primary`).
+- **Particules WebGL** par module via tsParticles, configurables dans le manifest (presets `stars` / `snow` / `fireflies` / `sparkles`, couleur, densité).
+- **Page d'accueil enrichie** : prénom Discord en accroche, stats jeux disponibles + installés, section "Modules récents" avec cards 16:9 et chips d'état, navigation rapide vers la bibliothèque ou le premier jeu.
+- **Sons d'interface** synthétisés en WebAudio (zéro fichier audio à bundler) : hover doux, click bas-fréquence, whoosh montant au lancement de jeu, jingle de succès après install, bip d'erreur, ding de notification quand une MAJ launcher est dispo.
+- **Toggle "Sons d'interface"** dans la page Paramètres pour couper/réactiver tous les effets, avec préférence persistée en localStorage.
 
 ### Changé
 

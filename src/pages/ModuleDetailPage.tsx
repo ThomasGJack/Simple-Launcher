@@ -1,0 +1,531 @@
+import { useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowLeft, Play, Download, RefreshCw, Trash2, Folder, Hash, Loader2, AlertTriangle, HardDrive, Clock } from "lucide-react";
+import { useUIStore } from "@/store/ui";
+import { watchModules } from "@/firebase/modules";
+import {
+  deriveStatus,
+  getModuleState,
+  installOrUpdate,
+  launchModule,
+  subscribeProgress,
+  uninstallModule,
+  type ModuleProgress,
+  type ModuleStateLocal,
+  type DerivedStatus,
+} from "@/lib/modules";
+import type { LauncherModule } from "@/types/module";
+import { ModuleParticles } from "@/components/ui/Particles";
+import { sounds } from "@/lib/sounds";
+import { cn } from "@/lib/cn";
+
+type Action =
+  | { kind: "idle" }
+  | { kind: "installing"; progress?: ModuleProgress }
+  | { kind: "launching" }
+  | { kind: "error"; message: string };
+
+export function ModuleDetailPage() {
+  const route = useUIStore((s) => s.route);
+  const navigate = useUIStore((s) => s.navigate);
+  const [allModules, setAllModules] = useState<LauncherModule[]>([]);
+  const [local, setLocal] = useState<ModuleStateLocal | null>(null);
+  const [stateLoaded, setStateLoaded] = useState(false);
+  const [action, setAction] = useState<Action>({ kind: "idle" });
+  const cleanupRef = useRef<(() => void) | null>(null);
+
+  const moduleId = route.name === "module" ? route.moduleId : null;
+  const module = allModules.find((m) => m.id === moduleId);
+
+  useEffect(() => {
+    return watchModules(setAllModules);
+  }, []);
+
+  useEffect(() => {
+    if (!module) return;
+    if (module.type === "shortcut") {
+      setStateLoaded(true);
+      setLocal(null);
+      return;
+    }
+    let cancelled = false;
+    getModuleState(module.id).then((s) => {
+      if (!cancelled) {
+        setLocal(s);
+        setStateLoaded(true);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [module]);
+
+  useEffect(() => () => cleanupRef.current?.(), []);
+
+  if (!moduleId) {
+    return null;
+  }
+
+  if (allModules.length === 0) {
+    return (
+      <div className="grid h-full place-items-center text-fg-dim">
+        <Loader2 className="size-8 animate-spin" strokeWidth={1.5} />
+      </div>
+    );
+  }
+
+  if (!module) {
+    return (
+      <div className="grid h-full place-items-center p-12">
+        <div className="rounded-2xl glass p-8 text-center">
+          <p className="font-display text-xl text-fg-primary">Module introuvable</p>
+          <p className="mt-2 text-sm text-fg-muted">Il a peut-être été supprimé.</p>
+          <button
+            onClick={() => navigate({ name: "library" })}
+            className="mt-4 rounded-lg bg-white/[0.06] px-4 py-2 text-sm text-fg-primary transition-colors hover:bg-white/[0.1]"
+          >
+            Retour à la bibliothèque
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const status: DerivedStatus = deriveStatus(module, local);
+  const themePrimary = module.page?.theme?.primary;
+  const themeAccent = module.page?.theme?.accent;
+  const fontDisplay = module.page?.theme?.fontDisplay;
+
+  const handlePrimary = async () => {
+    if (action.kind === "installing" || action.kind === "launching") return;
+    if (status.kind === "shortcut" || status.kind === "installed") {
+      setAction({ kind: "launching" });
+      sounds.launch();
+      try {
+        await launchModule(module);
+      } catch (e) {
+        sounds.error();
+        setAction({ kind: "error", message: e instanceof Error ? e.message : String(e) });
+        return;
+      }
+      setTimeout(() => setAction({ kind: "idle" }), 1400);
+      return;
+    }
+
+    if (module.type === "hosted") {
+      setAction({ kind: "installing" });
+      const unlistenPromise = subscribeProgress(module.id, (progress) => {
+        setAction({ kind: "installing", progress });
+      });
+      cleanupRef.current = () => unlistenPromise.then((u) => u()).catch(() => {});
+      try {
+        await installOrUpdate(module);
+        const fresh = await getModuleState(module.id);
+        setLocal(fresh);
+        setAction({ kind: "idle" });
+        sounds.success();
+      } catch (e) {
+        sounds.error();
+        setAction({ kind: "error", message: e instanceof Error ? e.message : String(e) });
+      } finally {
+        cleanupRef.current?.();
+        cleanupRef.current = null;
+      }
+    }
+  };
+
+  const handleUninstall = async () => {
+    if (module.type !== "hosted") return;
+    if (!confirm(`Désinstaller "${module.name}" ?`)) return;
+    try {
+      await uninstallModule(module.id);
+      setLocal(null);
+    } catch (e) {
+      setAction({ kind: "error", message: e instanceof Error ? e.message : String(e) });
+    }
+  };
+
+  const themeStyle: React.CSSProperties = {
+    ...(themePrimary && { ["--module-primary" as string]: themePrimary }),
+    ...(themeAccent && { ["--module-accent" as string]: themeAccent }),
+  };
+
+  return (
+    <div
+      className="relative h-full overflow-y-auto"
+      style={themeStyle}
+    >
+      <Hero module={module} themePrimary={themePrimary} fontDisplay={fontDisplay} />
+
+      {module.page?.background && "particles" in module.page.background && (
+        <ModuleParticles config={module.page.background.particles} />
+      )}
+
+      <button
+        onClick={() => navigate({ name: "library" })}
+        className="no-drag absolute left-6 top-6 z-30 inline-flex items-center gap-1.5 rounded-lg bg-bg-base/60 px-3 py-2 text-xs font-medium text-fg-primary backdrop-blur-md ring-1 ring-white/[0.08] transition-colors hover:bg-bg-base/80"
+      >
+        <ArrowLeft className="size-3.5" /> Bibliothèque
+      </button>
+
+      <div className="relative z-20 -mt-32 px-12 pb-12">
+        <div className="mx-auto grid max-w-6xl grid-cols-12 gap-6">
+          <div className="col-span-12 lg:col-span-7">
+            <motion.div
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="rounded-3xl glass-strong p-7"
+            >
+              <div className="flex items-end gap-5">
+                {module.iconUrl ? (
+                  <img
+                    src={module.iconUrl}
+                    alt=""
+                    className="size-24 shrink-0 rounded-2xl object-cover ring-2 ring-white/10 shadow-2xl"
+                  />
+                ) : (
+                  <div className="grid size-24 shrink-0 place-items-center rounded-2xl bg-accent/20 ring-2 ring-accent/30 shadow-2xl">
+                    <Folder className="size-10 text-accent" strokeWidth={1.5} />
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="mb-2 flex items-center gap-2">
+                    <StatusBadge module={module} status={status} loaded={stateLoaded} action={action} />
+                  </div>
+                  <h2
+                    className="font-display text-3xl text-fg-primary line-clamp-2"
+                    style={fontDisplay ? { fontFamily: fontDisplay } : undefined}
+                  >
+                    {module.name}
+                  </h2>
+                </div>
+              </div>
+
+              {module.shortDescription && (
+                <p className="mt-6 leading-relaxed text-fg-muted">{module.shortDescription}</p>
+              )}
+
+              <div className="mt-6">
+                {action.kind === "installing" ? (
+                  <ProgressDetailed progress={action.progress} />
+                ) : action.kind === "error" ? (
+                  <ErrorBanner message={action.message} onDismiss={() => setAction({ kind: "idle" })} />
+                ) : (
+                  <PrimaryButton
+                    status={status}
+                    action={action}
+                    onClick={handlePrimary}
+                    themePrimary={themePrimary}
+                  />
+                )}
+              </div>
+
+              {module.type === "hosted" && local && action.kind === "idle" && (
+                <button
+                  onClick={handleUninstall}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-white/[0.04] px-3 py-1.5 text-xs text-fg-muted ring-1 ring-white/[0.06] transition-colors hover:bg-danger/10 hover:text-danger hover:ring-danger/30"
+                >
+                  <Trash2 className="size-3" /> Désinstaller
+                </button>
+              )}
+            </motion.div>
+          </div>
+
+          <div className="col-span-12 lg:col-span-5">
+            <motion.div
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="rounded-3xl glass p-6"
+            >
+              <h3 className="mb-4 text-xs uppercase tracking-[0.2em] text-fg-muted">Informations</h3>
+              <div className="grid gap-2.5">
+                <InfoLine icon={Hash} label="ID" value={module.id} mono />
+                {module.type === "hosted" ? (
+                  <>
+                    <InfoLine icon={HardDrive} label="Taille" value={`${(module.size / 1_048_576).toFixed(1)} Mo`} />
+                    <InfoLine icon={Clock} label="Version" value={`v${module.version}`} />
+                    {local && (
+                      <InfoLine
+                        icon={Clock}
+                        label="Installé le"
+                        value={new Date(local.installedAt).toLocaleDateString("fr-FR", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      />
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <InfoLine icon={Folder} label="Type" value="Raccourci local" />
+                    <InfoLine icon={HardDrive} label="Chemin" value={module.executablePath} mono small />
+                  </>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Hero({
+  module,
+  themePrimary,
+  fontDisplay,
+}: {
+  module: LauncherModule;
+  themePrimary?: string;
+  fontDisplay?: string;
+}) {
+  const banner = module.bannerUrl ?? module.iconUrl;
+  return (
+    <div className="relative h-[420px] w-full overflow-hidden">
+      {banner ? (
+        <motion.img
+          initial={{ scale: 1.08 }}
+          animate={{ scale: 1 }}
+          transition={{ duration: 1.2, ease: "easeOut" }}
+          src={banner}
+          alt=""
+          className="absolute inset-0 size-full object-cover"
+        />
+      ) : (
+        <div className="absolute inset-0 bg-gradient-to-br from-accent/40 via-bg-base to-fuchsia-500/20" />
+      )}
+
+      <div className="absolute inset-0 bg-gradient-to-t from-bg-base via-bg-base/40 to-bg-base/20" />
+      <div className="absolute inset-0 bg-gradient-to-r from-bg-base/70 via-transparent to-transparent" />
+
+      {themePrimary && (
+        <div
+          className="absolute inset-0 mix-blend-soft-light opacity-50"
+          style={{
+            background: `radial-gradient(ellipse at 30% 70%, ${themePrimary}80, transparent 60%)`,
+          }}
+        />
+      )}
+
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+        className="absolute bottom-32 left-12 max-w-2xl"
+      >
+        <h1
+          className="font-display text-6xl leading-[0.95] text-fg-primary text-glow-accent"
+          style={fontDisplay ? { fontFamily: fontDisplay } : undefined}
+        >
+          {module.name}
+        </h1>
+      </motion.div>
+    </div>
+  );
+}
+
+function StatusBadge({
+  module,
+  status,
+  loaded,
+  action,
+}: {
+  module: LauncherModule;
+  status: DerivedStatus;
+  loaded: boolean;
+  action: Action;
+}) {
+  if (!loaded) return <Pill color="muted">…</Pill>;
+  if (action.kind === "installing") {
+    const phase = action.progress?.phase ?? "downloading";
+    return <Pill color="accent" pulsing>{phase === "extracting" ? "Extraction" : "Téléchargement"}</Pill>;
+  }
+  if (action.kind === "launching") return <Pill color="accent">Lancement…</Pill>;
+
+  switch (status.kind) {
+    case "shortcut":
+      return <Pill color="fuchsia">Raccourci local</Pill>;
+    case "not-installed":
+      return <Pill color="muted">Non installé</Pill>;
+    case "installed":
+      return <Pill color="success">v{status.localVersion}</Pill>;
+    case "update-available":
+      return <Pill color="amber">v{status.localVersion} → v{status.remoteVersion}</Pill>;
+    default:
+      return module.type === "hosted" ? <Pill color="muted">Inconnu</Pill> : null;
+  }
+}
+
+function Pill({
+  color,
+  pulsing,
+  children,
+}: {
+  color: "accent" | "fuchsia" | "muted" | "success" | "amber";
+  pulsing?: boolean;
+  children: React.ReactNode;
+}) {
+  const map = {
+    accent: "bg-accent/15 text-accent ring-accent/30",
+    fuchsia: "bg-fuchsia-500/15 text-fuchsia-300 ring-fuchsia-500/30",
+    muted: "bg-white/[0.05] text-fg-muted ring-white/[0.08]",
+    success: "bg-success/15 text-success ring-success/30",
+    amber: "bg-amber-500/15 text-amber-300 ring-amber-500/30",
+  } as const;
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider ring-1",
+        map[color],
+        pulsing && "animate-pulse",
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+function PrimaryButton({
+  status,
+  action,
+  onClick,
+  themePrimary,
+}: {
+  status: DerivedStatus;
+  action: Action;
+  onClick: () => void;
+  themePrimary?: string;
+}) {
+  const launching = action.kind === "launching";
+  let label = "JOUER";
+  let Icon = Play;
+
+  switch (status.kind) {
+    case "not-installed":
+      label = "INSTALLER";
+      Icon = Download;
+      break;
+    case "update-available":
+      label = "METTRE À JOUR";
+      Icon = RefreshCw;
+      break;
+    case "installed":
+    case "shortcut":
+      label = launching ? "LANCEMENT…" : "JOUER";
+      Icon = Play;
+      break;
+  }
+
+  const bg = themePrimary
+    ? `linear-gradient(90deg, ${themePrimary}, ${themePrimary}dd, ${themePrimary})`
+    : undefined;
+  const shadow = themePrimary ? `0 0 32px ${themePrimary}80` : undefined;
+
+  return (
+    <motion.button
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.97 }}
+      onClick={onClick}
+      disabled={launching}
+      className={cn(
+        "no-drag group relative inline-flex items-center gap-3 overflow-hidden rounded-2xl px-12 py-4 font-display text-xl tracking-[0.18em] text-bg-base",
+        "shadow-[0_0_32px_var(--color-accent-glow)] ring-1 ring-white/30",
+        "disabled:cursor-not-allowed disabled:opacity-60",
+      )}
+      style={
+        themePrimary
+          ? { background: bg, boxShadow: shadow }
+          : { background: "linear-gradient(90deg, var(--color-accent), #4ed6ff, var(--color-accent))", backgroundSize: "200% 100%", animation: "shimmer 4s linear infinite, glow-pulse 2.4s ease-in-out infinite" }
+      }
+    >
+      <Icon className="size-5 fill-bg-base" strokeWidth={0} />
+      <span>{label}</span>
+      <span className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent group-hover:translate-x-full transition-transform duration-700" />
+    </motion.button>
+  );
+}
+
+function ProgressDetailed({ progress }: { progress?: ModuleProgress }) {
+  const phase = progress?.phase ?? "downloading";
+  const total = progress?.bytesTotal ?? 0;
+  const done = progress?.bytesDownloaded ?? 0;
+  const pct = total > 0 ? Math.min(100, (done / total) * 100) : phase === "extracting" ? 100 : 5;
+
+  return (
+    <div className="rounded-2xl bg-bg-base/80 p-4 ring-1 ring-white/[0.06]">
+      <div className="mb-2 flex items-baseline justify-between">
+        <span className="text-sm font-medium text-fg-primary">
+          {phase === "extracting" ? "Extraction des fichiers…" : "Téléchargement en cours…"}
+        </span>
+        <span className="text-xs text-fg-muted">
+          {total > 0
+            ? `${(done / 1_048_576).toFixed(1)} / ${(total / 1_048_576).toFixed(1)} Mo · ${pct.toFixed(0)}%`
+            : "…"}
+        </span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
+        <motion.div
+          className="h-full bg-accent shadow-[0_0_18px_var(--color-accent-glow)]"
+          animate={{ width: `${pct}%` }}
+          transition={{ duration: 0.2 }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ErrorBanner({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  return (
+    <AnimatePresence>
+      <motion.button
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -8 }}
+        onClick={onDismiss}
+        className="flex w-full items-start gap-3 rounded-xl bg-danger/10 p-3 text-left text-sm text-fg-primary ring-1 ring-danger/30"
+      >
+        <AlertTriangle className="mt-0.5 size-4 shrink-0 text-danger" strokeWidth={2.5} />
+        <span>{message}</span>
+      </motion.button>
+    </AnimatePresence>
+  );
+}
+
+function InfoLine({
+  icon: Icon,
+  label,
+  value,
+  mono,
+  small,
+}: {
+  icon: typeof Hash;
+  label: string;
+  value: string;
+  mono?: boolean;
+  small?: boolean;
+}) {
+  return (
+    <div className="flex items-start gap-2.5 rounded-lg bg-white/[0.02] p-2.5 ring-1 ring-white/[0.04]">
+      <div className="grid size-7 shrink-0 place-items-center rounded-md bg-white/[0.04] text-fg-muted">
+        <Icon className="size-3.5" strokeWidth={2} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-[10px] uppercase tracking-wider text-fg-dim">{label}</div>
+        <div
+          className={cn(
+            "truncate text-sm text-fg-primary",
+            mono && "font-mono",
+            small && "text-xs",
+          )}
+        >
+          {value}
+        </div>
+      </div>
+    </div>
+  );
+}
