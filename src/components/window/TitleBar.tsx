@@ -29,7 +29,7 @@ export function TitleBar() {
       className="drag relative flex h-9 shrink-0 items-center justify-between bg-bg-base/80 px-3 backdrop-blur-md border-b border-white/[0.04] z-50"
     >
       <div data-tauri-drag-region className="flex items-center gap-2 text-xs text-fg-muted font-medium tracking-wide">
-        <div className="size-2 rounded-full bg-accent shadow-[0_0_8px_var(--color-accent-glow)]" />
+        <img src="/logo.png" alt="" className="size-4 rounded-sm" data-tauri-drag-region />
         <span data-tauri-drag-region>Simple Launcher</span>
       </div>
 

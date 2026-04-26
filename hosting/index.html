@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/png" href="/logo.png" />
     <title>Simple Launcher — Téléchargement</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -81,6 +82,19 @@
         text-align: center;
         max-width: 640px;
         padding: 40px 24px;
+      }
+      .logo {
+        width: 140px;
+        height: 140px;
+        border-radius: 28px;
+        margin: 0 auto 24px;
+        display: block;
+        box-shadow: 0 0 64px rgba(0, 212, 255, 0.4);
+        animation: float-y 6s ease-in-out infinite;
+      }
+      @keyframes float-y {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-8px); }
       }
       .badge {
         display: inline-flex;
@@ -193,6 +207,7 @@
     <div class="grid"></div>
 
     <div class="container">
+      <img src="/logo.png" alt="Simple Launcher" class="logo" />
       <span class="badge"><span id="status">Disponible</span></span>
       <h1>SIMPLE<br />LAUNCHER</h1>
       <p class="tag">Multi-jeux. Auto-update. Pour Windows.</p>

@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Home, Library, Settings, LogIn, Gamepad2, Shield } from "lucide-react";
+import { Home, Library, Settings, LogIn, Shield } from "lucide-react";
 import { useUIStore, type Route } from "@/store/ui";
 import { useAuthStore } from "@/store/auth";
 import { isAdmin } from "@/lib/admin";
@@ -27,9 +27,9 @@ export function Sidebar() {
       <div className="flex flex-col items-center gap-3">
         <button
           onClick={() => navigate({ name: "home" })}
-          className="group relative grid size-12 place-items-center rounded-xl bg-gradient-to-br from-accent/40 to-accent/10 transition-transform hover:scale-105"
+          className="group relative grid size-12 place-items-center overflow-hidden rounded-xl transition-transform hover:scale-105"
         >
-          <Gamepad2 className="size-6 text-accent" strokeWidth={2} />
+          <img src="/logo.png" alt="Simple Launcher" className="size-12 object-cover" />
           <div className="absolute inset-0 rounded-xl ring-1 ring-accent/30 group-hover:ring-accent/60 group-hover:shadow-[0_0_24px_var(--color-accent-glow)]" />
         </button>
 

@@ -15,6 +15,7 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 - Bouton "Désinstaller" (corbeille au survol) pour les modules hébergés.
 - Barre de progression live pendant le téléchargement et l'extraction, avec phase et taille en Mo.
 - Page Bibliothèque refaite : cartes 4×5 avec bannière, badge d'état (Non installé / vX.Y / vX.Y → vZ.W / Local), gradient overlay et animations au hover.
+- Logo officiel Simple Launcher (penguin néon à capuche) intégré partout : icône Windows / barre des tâches / installeur, page de connexion, sidebar, barre de titre, page de téléchargement web, et favicon.
 
 ### Changé
 

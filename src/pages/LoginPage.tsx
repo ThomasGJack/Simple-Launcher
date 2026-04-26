@@ -39,9 +39,14 @@ export function LoginPage() {
         className="w-full max-w-md rounded-3xl glass-strong p-10"
       >
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-5 grid size-14 place-items-center rounded-2xl bg-accent/15 ring-1 ring-accent/30 shadow-[0_0_32px_var(--color-accent-soft)]">
-            <span className="font-display text-2xl text-accent">SL</span>
-          </div>
+          <motion.img
+            src="/logo.png"
+            alt="Simple Launcher"
+            className="mx-auto mb-5 size-24 rounded-2xl shadow-[0_0_48px_rgba(0,212,255,0.35)]"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 200, damping: 18, delay: 0.1 }}
+          />
           <h1 className="font-display text-3xl tracking-wide text-fg-primary">Connexion</h1>
           <p className="mt-2 text-sm text-fg-muted">Authentification via Discord uniquement.</p>
         </div>
