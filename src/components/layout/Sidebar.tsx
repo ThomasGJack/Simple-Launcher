@@ -1,7 +1,8 @@
 import { motion } from "framer-motion";
-import { Home, Library, Settings, LogIn, Gamepad2 } from "lucide-react";
+import { Home, Library, Settings, LogIn, Gamepad2, Shield } from "lucide-react";
 import { useUIStore, type Route } from "@/store/ui";
 import { useAuthStore } from "@/store/auth";
+import { isAdmin } from "@/lib/admin";
 import { cn } from "@/lib/cn";
 
 type NavItem = {
@@ -48,6 +49,14 @@ export function Sidebar() {
       </div>
 
       <div className="flex flex-col items-center gap-2">
+        {isAdmin(user) && (
+          <NavButton
+            icon={Shield}
+            label="Admin"
+            active={isActive({ name: "admin" })}
+            onClick={() => navigate({ name: "admin" })}
+          />
+        )}
         <NavButton
           icon={Settings}
           label="Paramètres"

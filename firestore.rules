@@ -3,22 +3,26 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    function isAdmin() {
+      return request.auth != null &&
+        request.auth.uid in ['discord_306118713537462273'];
+    }
+
     // Users can only read/write their own profile.
     match /users/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 
-    // Modules: anyone authenticated can read, only the owner UID listed in
-    // server-side env can write (admin app will use Admin SDK, bypassing rules).
+    // Modules: any authenticated user can read; admins can write.
     match /modules/{moduleId} {
       allow read: if request.auth != null;
-      allow write: if false;
+      allow write: if isAdmin();
     }
 
-    // Module versions: same as modules.
+    // Module versions: same.
     match /modules/{moduleId}/versions/{version} {
       allow read: if request.auth != null;
-      allow write: if false;
+      allow write: if isAdmin();
     }
 
     // Launcher release info: public read.

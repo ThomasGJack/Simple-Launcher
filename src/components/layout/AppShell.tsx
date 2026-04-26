@@ -8,6 +8,7 @@ import { LibraryPage } from "@/pages/LibraryPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { ProfilePage } from "@/pages/ProfilePage";
+import { AdminPage } from "@/pages/AdminPage";
 import { UpdateBanner } from "@/components/updater/UpdateBanner";
 
 export function AppShell() {
@@ -55,6 +56,8 @@ function renderRoute(name: string) {
       return <SettingsPage />;
     case "profile":
       return <ProfilePage />;
+    case "admin":
+      return <AdminPage />;
     case "login":
       return <LoginPage />;
     default:
