@@ -9,6 +9,12 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 ## [Unreleased]
 
 ### Ajouté
+- Installation des modules type "Hébergé" depuis la bibliothèque : téléchargement, vérification SHA-256, extraction du zip dans `%APPDATA%\com.simplelaunche.app\games\{id}\`, suivi de la version installée localement.
+- Bouton "Jouer" qui lance l'exécutable du module (raccourci local pour Type B, exe extrait pour Type A) avec son working directory.
+- Bouton "Mettre à jour" qui apparaît automatiquement quand la version Firestore d'un module est plus récente que celle installée.
+- Bouton "Désinstaller" (corbeille au survol) pour les modules hébergés.
+- Barre de progression live pendant le téléchargement et l'extraction, avec phase et taille en Mo.
+- Page Bibliothèque refaite : cartes 4×5 avec bannière, badge d'état (Non installé / vX.Y / vX.Y → vZ.W / Local), gradient overlay et animations au hover.
 
 ### Changé
 
@@ -17,6 +23,8 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 ### Supprimé
 
 ### Sécurité
+- Vérification SHA-256 obligatoire après chaque téléchargement de module : si le hash ne correspond pas au manifest, le zip est supprimé et l'installation échoue.
+- Protection contre le path traversal lors de l'extraction des zips (les chemins hors du dossier de destination sont ignorés).
 
 ## [0.1.0] - 2026-04-26
 
