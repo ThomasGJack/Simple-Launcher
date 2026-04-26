@@ -16,6 +16,7 @@ import type { LauncherModule } from "@/types/module";
 import { useUIStore } from "@/store/ui";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
+import { MinecraftStatusBadge } from "@/components/library/MinecraftStatusBadge";
 
 type Action =
   | { kind: "idle" }
@@ -142,8 +143,13 @@ export function ModuleCard({ module, index }: { module: LauncherModule; index: n
         </div>
       )}
 
-      <div className="absolute inset-x-0 top-0 flex items-start justify-between p-4">
-        <StatusBadge module={module} status={status} loaded={stateLoaded} action={action} />
+      <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-4">
+        <div className="flex flex-wrap items-start gap-1.5">
+          <StatusBadge module={module} status={status} loaded={stateLoaded} action={action} />
+          {module.server?.type === "minecraft" && (
+            <MinecraftStatusBadge address={module.server.address} compact />
+          )}
+        </div>
         {module.type === "hosted" && status.kind !== "not-installed" && action.kind === "idle" && (
           <button
             onClick={handleUninstall}

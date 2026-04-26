@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { listen } from "@tauri-apps/api/event";
 import { AppShell } from "@/components/layout/AppShell";
@@ -6,7 +6,8 @@ import { useAuthStore } from "@/store/auth";
 import { useUIStore } from "@/store/ui";
 import { getFirebase } from "@/firebase/config";
 import { recordPlaytime } from "@/firebase/playtime";
-import type { ModuleExitEvent } from "@/lib/modules";
+import { pushHeartbeat, type CurrentActivity } from "@/firebase/presence";
+import type { ModuleExitEvent, ModuleLaunchEvent } from "@/lib/modules";
 
 function App() {
   const setUser = useAuthStore((s) => s.setUser);
@@ -47,6 +48,34 @@ function App() {
     });
     return () => {
       promise.then((u) => u()).catch(() => {});
+    };
+  }, [user]);
+
+  const currentActivityRef = useRef<CurrentActivity | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    const uid = user.uid;
+
+    pushHeartbeat(uid, currentActivityRef.current).catch(() => {});
+    const interval = setInterval(() => {
+      pushHeartbeat(uid, currentActivityRef.current).catch(() => {});
+    }, 30_000);
+
+    const launchPromise = listen<ModuleLaunchEvent>("module-launched", (event) => {
+      const { moduleId, moduleName, startedAt } = event.payload;
+      currentActivityRef.current = { moduleId, moduleName, startedAt };
+      pushHeartbeat(uid, currentActivityRef.current).catch(() => {});
+    });
+    const exitPromise = listen<ModuleExitEvent>("module-exited", () => {
+      currentActivityRef.current = null;
+      pushHeartbeat(uid, null).catch(() => {});
+    });
+
+    return () => {
+      clearInterval(interval);
+      launchPromise.then((u) => u()).catch(() => {});
+      exitPromise.then((u) => u()).catch(() => {});
     };
   }, [user]);
 

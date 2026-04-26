@@ -16,6 +16,8 @@ import {
   Palette,
   Sparkles,
   Wand2,
+  Server,
+  Activity,
 } from "lucide-react";
 import { useAuthStore } from "@/store/auth";
 import { isAdmin } from "@/lib/admin";
@@ -28,7 +30,7 @@ import {
   watchModules,
   type UploadProgress,
 } from "@/firebase/modules";
-import type { LauncherModule, ModulePage, ParticlesConfig } from "@/types/module";
+import type { LauncherModule, ModulePage, ParticlesConfig, PageSection } from "@/types/module";
 import { cn } from "@/lib/cn";
 
 type ModuleType = "hosted" | "shortcut";
@@ -54,6 +56,9 @@ type FormState = {
   particlesDensity: number;
   bgType: BgType;
   bgUrl: string;
+  serverAddress: string;
+  screenshots: string;
+  stats: string;
 };
 
 const EMPTY_FORM: FormState = {
@@ -75,6 +80,9 @@ const EMPTY_FORM: FormState = {
   particlesDensity: 60,
   bgType: "none",
   bgUrl: "",
+  serverAddress: "",
+  screenshots: "",
+  stats: "",
 };
 
 export function AdminPage() {
@@ -154,9 +162,30 @@ export function AdminPage() {
       background = { type: "image", url: form.bannerUrl || "", particles };
     }
 
+    const sections: PageSection[] = [];
+    const screenshotUrls = form.screenshots
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.startsWith("http"));
+    if (screenshotUrls.length > 0) {
+      sections.push({ type: "screenshots-grid", images: screenshotUrls });
+    }
+    const statsLines = form.stats
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.includes("="));
+    const stats = statsLines.map((l) => {
+      const [label, ...rest] = l.split("=");
+      return { label: label.trim(), value: rest.join("=").trim() };
+    });
+    if (stats.length > 0) {
+      sections.push({ type: "stats", data: stats });
+    }
+
     const page: ModulePage = {};
     if (Object.keys(theme).length > 0) page.theme = theme;
     if (background) page.background = background;
+    if (sections.length > 0) page.sections = sections;
     return Object.keys(page).length > 0 ? page : undefined;
   };
 
@@ -170,6 +199,10 @@ export function AdminPage() {
     setSubmitting(true);
     try {
       const page = buildPage();
+      const server =
+        form.serverAddress.trim().length > 0
+          ? ({ type: "minecraft" as const, address: form.serverAddress.trim() })
+          : undefined;
       if (form.type === "shortcut") {
         const args = form.args.split(" ").filter(Boolean);
         await saveShortcutModule({
@@ -182,6 +215,7 @@ export function AdminPage() {
           executablePath: form.executablePath,
           ...(args.length > 0 && { args }),
           ...(page && { page }),
+          ...(server && { server }),
         });
       } else {
         await uploadHostedModule(
@@ -195,6 +229,7 @@ export function AdminPage() {
             version: form.version,
             executable: form.executable,
             ...(page && { page }),
+            ...(server && { server }),
           },
           file!,
           setProgress,
@@ -390,6 +425,39 @@ export function AdminPage() {
                       <Input value={form.bgUrl} onChange={(v) => updateForm("bgUrl", v)} placeholder="https://…" />
                     </Field>
                   )}
+
+                  <SectionHeader icon={Server} title="Serveur Minecraft (optionnel)" />
+                  <Field label="Adresse" hint="ex: play.manchoworld.fr · ip:port">
+                    <Input
+                      value={form.serverAddress}
+                      onChange={(v) => updateForm("serverAddress", v)}
+                      placeholder="play.example.com"
+                      mono
+                    />
+                  </Field>
+                  <p className="text-xs text-fg-dim">
+                    Si renseigné, le statut du serveur (joueurs en ligne, version, MOTD) s'affichera sur la carte et la page détail.
+                  </p>
+
+                  <SectionHeader icon={ImageIcon} title="Captures d'écran" />
+                  <Field label="URLs d'images" hint="une URL par ligne · grille auto sur la page module">
+                    <Textarea
+                      value={form.screenshots}
+                      onChange={(v) => updateForm("screenshots", v)}
+                      rows={3}
+                      placeholder={"https://example.com/screen1.png\nhttps://example.com/screen2.png"}
+                    />
+                  </Field>
+
+                  <SectionHeader icon={Activity} title="Stats" />
+                  <Field label="Lignes label = valeur" hint="ex: Joueurs = 1k+">
+                    <Textarea
+                      value={form.stats}
+                      onChange={(v) => updateForm("stats", v)}
+                      rows={3}
+                      placeholder={"Joueurs = 1k+\nVersion = 1.20.4\nUptime = 99.9%"}
+                    />
+                  </Field>
                 </div>
               </motion.div>
             )}
@@ -655,6 +723,28 @@ function Input({
         "no-drag w-full rounded-lg bg-bg-base/40 px-3.5 py-2.5 text-sm text-fg-primary placeholder:text-fg-dim ring-1 ring-white/[0.06] transition-shadow focus:outline-none focus:ring-1 focus:ring-accent/60 focus:shadow-[0_0_0_3px_var(--color-accent-soft)]",
         mono && "font-mono text-xs",
       )}
+    />
+  );
+}
+
+function Textarea({
+  value,
+  onChange,
+  placeholder,
+  rows = 3,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  rows?: number;
+}) {
+  return (
+    <textarea
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      rows={rows}
+      className="no-drag w-full resize-none rounded-lg bg-bg-base/40 px-3.5 py-2.5 font-mono text-xs text-fg-primary placeholder:text-fg-dim ring-1 ring-white/[0.06] transition-shadow focus:outline-none focus:ring-1 focus:ring-accent/60 focus:shadow-[0_0_0_3px_var(--color-accent-soft)]"
     />
   );
 }

@@ -16,6 +16,8 @@ import {
 } from "@/lib/modules";
 import type { LauncherModule } from "@/types/module";
 import { ModuleParticles } from "@/components/ui/Particles";
+import { ModuleSections } from "@/components/library/ModuleSections";
+import { useMinecraftStatus } from "@/lib/minecraftStatus";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
 
@@ -169,7 +171,8 @@ export function ModuleDetailPage() {
       </button>
 
       <div className="relative z-20 -mt-32 px-12 pb-12">
-        <div className="mx-auto grid max-w-6xl grid-cols-12 gap-6">
+        <div className="mx-auto max-w-6xl">
+        <div className="grid grid-cols-12 gap-6">
           <div className="col-span-12 lg:col-span-7">
             <motion.div
               initial={{ opacity: 0, y: 24 }}
@@ -232,7 +235,10 @@ export function ModuleDetailPage() {
             </motion.div>
           </div>
 
-          <div className="col-span-12 lg:col-span-5">
+          <div className="col-span-12 space-y-6 lg:col-span-5">
+            {module.server?.type === "minecraft" && (
+              <MinecraftServerCard address={module.server.address} />
+            )}
             <motion.div
               initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
@@ -269,6 +275,16 @@ export function ModuleDetailPage() {
               </div>
             </motion.div>
           </div>
+        </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="mt-10"
+        >
+          <ModuleSections module={module} />
+        </motion.div>
         </div>
       </div>
     </div>
@@ -493,6 +509,55 @@ function ErrorBanner({ message, onDismiss }: { message: string; onDismiss: () =>
         <span>{message}</span>
       </motion.button>
     </AnimatePresence>
+  );
+}
+
+function MinecraftServerCard({ address }: { address: string }) {
+  const status = useMinecraftStatus(address);
+  const motd = status?.motd?.clean?.join("\n");
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.15 }}
+      className="overflow-hidden rounded-3xl glass-strong"
+    >
+      <div className="flex items-center justify-between bg-gradient-to-r from-success/15 to-transparent px-6 py-4">
+        <div>
+          <div className="text-xs uppercase tracking-[0.2em] text-success">Serveur Minecraft</div>
+          <div className="mt-0.5 font-mono text-xs text-fg-muted">{address}</div>
+        </div>
+        {status === null ? (
+          <div className="text-xs text-fg-muted">…</div>
+        ) : status.online ? (
+          <div className="text-right">
+            <div className="font-display text-2xl text-fg-primary">
+              {status.players ? `${status.players.online}/${status.players.max}` : "—"}
+            </div>
+            <div className="text-[10px] uppercase tracking-wider text-success">En ligne</div>
+          </div>
+        ) : (
+          <div className="text-xs uppercase tracking-wider text-danger">Hors ligne</div>
+        )}
+      </div>
+      {status?.online && (
+        <div className="space-y-2 px-6 py-4 text-xs">
+          {status.version && (
+            <div className="flex justify-between">
+              <span className="text-fg-muted">Version</span>
+              <span className="font-mono text-fg-primary">{status.version}</span>
+            </div>
+          )}
+          {motd && (
+            <div className="rounded-lg bg-bg-base/50 p-3 text-fg-muted ring-1 ring-white/[0.04]">
+              <div className="mb-1 text-[10px] uppercase tracking-wider text-fg-dim">MOTD</div>
+              <div className="whitespace-pre-line font-mono text-[11px]">{motd}</div>
+            </div>
+          )}
+        </div>
+      )}
+    </motion.div>
   );
 }
 

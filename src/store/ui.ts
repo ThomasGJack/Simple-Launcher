@@ -7,6 +7,7 @@ export type Route =
   | { name: "settings" }
   | { name: "profile" }
   | { name: "admin" }
+  | { name: "community" }
   | { name: "login" };
 
 type UIState = {

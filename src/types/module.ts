@@ -55,6 +55,9 @@ export type ModulePage = {
   };
 };
 
+export type ServerInfo =
+  | { type: "minecraft"; address: string };
+
 export type BaseModule = {
   id: string;
   name: string;
@@ -63,6 +66,7 @@ export type BaseModule = {
   bannerUrl?: string;
   page?: ModulePage;
   allowedDiscordIds?: string[];
+  server?: ServerInfo;
 };
 
 export type HostedModule = BaseModule & {

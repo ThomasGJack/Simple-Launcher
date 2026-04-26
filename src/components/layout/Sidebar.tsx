@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Home, Library, Settings, LogIn, Shield } from "lucide-react";
+import { Home, Library, Settings, LogIn, Shield, Users } from "lucide-react";
 import { useUIStore, type Route } from "@/store/ui";
 import { useAuthStore } from "@/store/auth";
 import { isAdmin } from "@/lib/admin";
@@ -15,6 +15,7 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { icon: Home, label: "Accueil", route: { name: "home" } },
   { icon: Library, label: "Bibliothèque", route: { name: "library" } },
+  { icon: Users, label: "Communauté", route: { name: "community" } },
 ];
 
 export function Sidebar() {

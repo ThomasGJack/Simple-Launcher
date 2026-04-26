@@ -10,6 +10,7 @@ import { SettingsPage } from "@/pages/SettingsPage";
 import { ProfilePage } from "@/pages/ProfilePage";
 import { AdminPage } from "@/pages/AdminPage";
 import { ModuleDetailPage } from "@/pages/ModuleDetailPage";
+import { CommunityPage } from "@/pages/CommunityPage";
 import { UpdateBanner } from "@/components/updater/UpdateBanner";
 
 export function AppShell() {
@@ -63,6 +64,8 @@ function renderRoute(name: string) {
       return <ProfilePage />;
     case "admin":
       return <AdminPage />;
+    case "community":
+      return <CommunityPage />;
     case "login":
       return <LoginPage />;
     default:
