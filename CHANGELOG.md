@@ -9,6 +9,19 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 ## [Unreleased]
 
 ### Ajouté
+
+### Changé
+
+### Corrigé
+
+### Supprimé
+
+### Sécurité
+
+## [v26.04.26] - 2026-04-26  · semver `26.426.0`
+
+
+### Ajouté
 - Installation des modules type "Hébergé" depuis la bibliothèque : téléchargement, vérification SHA-256, extraction du zip dans `%APPDATA%\com.simplelaunche.app\games\{id}\`, suivi de la version installée localement.
 - Bouton "Jouer" qui lance l'exécutable du module (raccourci local pour Type B, exe extrait pour Type A) avec son working directory.
 - Bouton "Mettre à jour" qui apparaît automatiquement quand la version Firestore d'un module est plus récente que celle installée.
@@ -33,17 +46,14 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 - **Installeur stylisé** aux couleurs de l'app : header banner avec logo + nom en cyan, sidebar verticale (welcome / finish) avec gros logo, fond néon dégradé, grille subtile et texte typo display. Icône custom dans la barre de titre de l'installeur, langue forcée en français, install per-user (pas besoin d'admin Windows). Images générées automatiquement depuis le logo via `npm run installer:art`.
 - **Versioning calver** : la version du launcher passe au format date `vYY.MM.JJ` (par ex. v26.04.26) avec variantes `vYY.MM.JJ.2`, `.3` pour les multi-releases dans la même journée. Le semver interne (que cargo et l'auto-updater exigent) est encodé en `YY.MMDD.S` (ex: `26.426.0` = 1ère release du 26 avril, `26.426.1` = 2ème). Affichage unifié partout : popup de mise à jour, page Paramètres, header du changelog. Nouveau script `npm run bump` qui auto-détecte la date du jour et incrémente la séquence si une release a déjà eu lieu aujourd'hui.
 
-### Changé
 
 ### Corrigé
 - Page Admin : la création d'un module échouait avec "Unsupported field value: undefined" quand un champ optionnel était vide (description, icône, bannière, arguments). Les champs vides sont maintenant omis du document Firestore au lieu d'envoyer `undefined`.
 
-### Supprimé
 
 ### Sécurité
 - Vérification SHA-256 obligatoire après chaque téléchargement de module : si le hash ne correspond pas au manifest, le zip est supprimé et l'installation échoue.
 - Protection contre le path traversal lors de l'extraction des zips (les chemins hors du dossier de destination sont ignorés).
-
 ## [0.1.0] - 2026-04-26
 
 ### Ajouté

@@ -34,7 +34,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis"],
     "createUpdaterArtifacts": true,
     "shortDescription": "Launcher multi-jeux",
     "longDescription": "Simple Launcher — un launcher Windows multi-jeux modulaire avec auto-update, comptes Discord, et page custom par jeu.",
