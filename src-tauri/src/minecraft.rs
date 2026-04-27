@@ -301,17 +301,32 @@ pub async fn mc_install_modpack(
         .map_err(|e| format!("CurseForge API: {}", e))?;
 
     let status = info_resp.status();
-    if status == reqwest::StatusCode::NOT_FOUND {
-        return Err(format!(
-            "CurseForge HTTP 404 — Project ID {} ou File ID {} introuvables. Re-vérifie dans le panel admin.",
-            project_id, file_id
-        ));
-    }
-    if status == reqwest::StatusCode::UNAUTHORIZED {
-        return Err("Clé API CurseForge invalide (HTTP 401). Régénère-la sur console.curseforge.com.".to_string());
-    }
     if !status.is_success() {
-        return Err(format!("CurseForge API HTTP {}", status));
+        // Read the body to surface CF's explanation in the UI for debugging.
+        let body_text = info_resp.text().await.unwrap_or_default();
+        let snippet = body_text.chars().take(500).collect::<String>();
+        if status == reqwest::StatusCode::NOT_FOUND {
+            return Err(format!(
+                "CurseForge HTTP 404 sur /mods/{}/files/{} — Project ID ou File ID introuvable. Réponse CF : {}",
+                project_id, file_id, snippet
+            ));
+        }
+        if status == reqwest::StatusCode::UNAUTHORIZED {
+            return Err(format!(
+                "CurseForge HTTP 401 — clé API invalide. Réponse : {}",
+                snippet
+            ));
+        }
+        if status == reqwest::StatusCode::FORBIDDEN {
+            return Err(format!(
+                "CurseForge HTTP 403 sur /mods/{}/files/{} — l'API refuse même la lecture de la metadata. Causes possibles : (1) le réglage « Distribute on third-party launchers » du PROJET (pas seulement du fichier) n'est pas activé sur curseforge.com, (2) un mod inclus dans le modpack interdit la distribution par tiers, ce qui bloque tout le modpack. Réponse de CurseForge : {}",
+                project_id, file_id, snippet
+            ));
+        }
+        return Err(format!(
+            "CurseForge API HTTP {} sur /mods/{}/files/{} — Réponse : {}",
+            status, project_id, file_id, snippet
+        ));
     }
 
     let info: serde_json::Value = info_resp
