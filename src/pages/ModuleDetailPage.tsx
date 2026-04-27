@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Play, Download, RefreshCw, Trash2, Folder, Hash, Loader2, AlertTriangle, HardDrive, Clock } from "lucide-react";
+import { ArrowLeft, Play, Download, RefreshCw, Trash2, Folder, Hash, Loader2, AlertTriangle, HardDrive, Clock, Star } from "lucide-react";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/auth";
+import { useFavoritesStore } from "@/store/favorites";
+import { addFavorite, removeFavorite } from "@/firebase/favorites";
 import { watchModules } from "@/firebase/modules";
 import { watchUserShortcuts } from "@/firebase/shortcuts";
 import {
@@ -179,6 +181,9 @@ export function ModuleDetailPage() {
       >
         <ArrowLeft className="size-3.5" /> Bibliothèque
       </button>
+
+      <FavoriteToggle moduleId={module.id} />
+
 
       <div className="relative z-20 -mt-32 px-12 pb-12">
         <div className="mx-auto max-w-6xl">
@@ -522,6 +527,38 @@ function ErrorBanner({ message, onDismiss }: { message: string; onDismiss: () =>
   );
 }
 
+function FavoriteToggle({ moduleId }: { moduleId: string }) {
+  const user = useAuthStore((s) => s.user);
+  const isFav = useFavoritesStore((s) => s.favorites.has(moduleId));
+
+  if (!user) return null;
+  const toggle = async () => {
+    sounds.click();
+    try {
+      if (isFav) await removeFavorite(user.uid, moduleId);
+      else await addFavorite(user.uid, moduleId);
+    } catch (err) {
+      console.warn("[favorite] toggle failed:", err);
+    }
+  };
+
+  return (
+    <button
+      onClick={toggle}
+      className={cn(
+        "no-drag absolute right-6 top-6 z-30 inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium backdrop-blur-md transition-all",
+        isFav
+          ? "bg-amber-300/15 text-amber-300 ring-1 ring-amber-300/40 shadow-[0_0_20px_rgba(252,211,77,0.25)] hover:bg-amber-300/25"
+          : "bg-bg-base/60 text-fg-primary ring-1 ring-white/[0.08] hover:bg-bg-base/80 hover:text-amber-300",
+      )}
+      title={isFav ? "Retirer des favoris" : "Ajouter aux favoris"}
+    >
+      <Star className="size-3.5" fill={isFav ? "currentColor" : "none"} strokeWidth={2.2} />
+      {isFav ? "Favori" : "Favoris"}
+    </button>
+  );
+}
+
 function MinecraftServerCard({ address }: { address: string }) {
   const status = useMinecraftStatus(address);
   const motd = status?.motd?.clean?.join("\n");
@@ -590,13 +627,14 @@ function InfoLine({
         <Icon className="size-3.5" strokeWidth={2} />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="text-[10px] uppercase tracking-wider text-fg-dim">{label}</div>
+        <div className="mb-0.5 text-[10px] uppercase tracking-wider text-fg-dim">{label}</div>
         <div
           className={cn(
-            "truncate text-sm text-fg-primary",
+            "info-scroll overflow-x-auto whitespace-nowrap text-sm text-fg-primary pb-0.5",
             mono && "font-mono",
             small && "text-xs",
           )}
+          title={value}
         >
           {value}
         </div>

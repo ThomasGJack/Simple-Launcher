@@ -1,9 +1,14 @@
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Home, Library, Settings, LogIn, Shield, Users } from "lucide-react";
+import { Home, Library, Settings, LogIn, Shield, Users, Star } from "lucide-react";
 import { useUIStore, type Route } from "@/store/ui";
 import { useAuthStore } from "@/store/auth";
+import { useFavoritesStore } from "@/store/favorites";
 import { isAdmin } from "@/lib/admin";
 import { sounds } from "@/lib/sounds";
+import { watchModules } from "@/firebase/modules";
+import { watchUserShortcuts } from "@/firebase/shortcuts";
+import type { LauncherModule } from "@/types/module";
 import { cn } from "@/lib/cn";
 
 type NavItem = {
@@ -21,11 +26,39 @@ const NAV_ITEMS: NavItem[] = [
 export function Sidebar() {
   const { route, navigate } = useUIStore();
   const user = useAuthStore((s) => s.user);
+  const favoriteIds = useFavoritesStore((s) => s.favorites);
+  const [hosted, setHosted] = useState<LauncherModule[]>([]);
+  const [shortcuts, setShortcuts] = useState<LauncherModule[]>([]);
 
-  const isActive = (target: Route) => target.name === route.name;
+  useEffect(() => {
+    return watchModules(setHosted);
+  }, []);
+  useEffect(() => {
+    if (!user) {
+      setShortcuts([]);
+      return;
+    }
+    return watchUserShortcuts(user.uid, setShortcuts);
+  }, [user]);
+
+  const favoriteModules = useMemo(() => {
+    const all = [...shortcuts, ...hosted];
+    const byId = new Map(all.map((m) => [m.id, m] as const));
+    return Array.from(favoriteIds)
+      .map((id) => byId.get(id))
+      .filter((m): m is LauncherModule => !!m);
+  }, [favoriteIds, hosted, shortcuts]);
+
+  const isActive = (target: Route) => {
+    if (target.name !== route.name) return false;
+    if (target.name === "module" && route.name === "module") {
+      return target.moduleId === route.moduleId;
+    }
+    return true;
+  };
 
   return (
-    <aside className="no-drag flex w-20 shrink-0 flex-col items-center justify-between border-r border-white/[0.04] bg-bg-soft/60 py-5 backdrop-blur-md">
+    <aside className="no-drag flex w-20 shrink-0 flex-col items-center justify-between overflow-y-auto border-r border-white/[0.04] bg-bg-soft/60 py-5 backdrop-blur-md">
       <div className="flex flex-col items-center gap-3">
         <button
           onClick={() => navigate({ name: "home" })}
@@ -48,9 +81,25 @@ export function Sidebar() {
             />
           ))}
         </nav>
+
+        {favoriteModules.length > 0 && (
+          <>
+            <div className="my-2 h-px w-8 bg-white/[0.06]" />
+            <div className="flex flex-col items-center gap-2">
+              {favoriteModules.map((m) => (
+                <FavoriteButton
+                  key={m.id}
+                  module={m}
+                  active={isActive({ name: "module", moduleId: m.id })}
+                  onClick={() => navigate({ name: "module", moduleId: m.id })}
+                />
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
-      <div className="flex flex-col items-center gap-2">
+      <div className="flex flex-col items-center gap-2 pt-3">
         {isAdmin(user) && (
           <NavButton
             icon={Shield}
@@ -119,6 +168,59 @@ function NavButton({
       <Icon className="relative z-10 size-5" strokeWidth={2} />
       <span className="pointer-events-none absolute left-full ml-3 whitespace-nowrap rounded-md bg-bg-elevated px-2.5 py-1 text-xs text-fg-primary opacity-0 shadow-lg ring-1 ring-white/[0.06] transition-opacity group-hover:opacity-100 z-50">
         {label}
+      </span>
+    </button>
+  );
+}
+
+function FavoriteButton({
+  module,
+  active,
+  onClick,
+}: {
+  module: LauncherModule;
+  active?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={() => {
+        sounds.click();
+        onClick();
+      }}
+      onMouseEnter={() => sounds.hover()}
+      className="group relative grid size-12 place-items-center rounded-xl"
+      title={module.name}
+    >
+      {active && (
+        <motion.div
+          layoutId="sidebar-active"
+          className="absolute inset-0 rounded-xl ring-2 ring-accent shadow-[0_0_24px_var(--color-accent-glow)]"
+          transition={{ type: "spring", stiffness: 380, damping: 30 }}
+        />
+      )}
+      {module.iconUrl ? (
+        <img
+          src={module.iconUrl}
+          alt={module.name}
+          className={cn(
+            "relative z-10 size-9 rounded-lg object-cover transition-all",
+            active ? "ring-1 ring-bg-base" : "ring-1 ring-white/10 group-hover:ring-amber-300/60",
+          )}
+        />
+      ) : (
+        <div
+          className={cn(
+            "relative z-10 grid size-9 place-items-center rounded-lg bg-amber-300/10 font-display text-sm text-amber-300",
+            active ? "ring-1 ring-bg-base" : "ring-1 ring-white/10 group-hover:ring-amber-300/60",
+          )}
+        >
+          {module.name.slice(0, 1).toUpperCase()}
+        </div>
+      )}
+      <Star className="absolute -right-0.5 -top-0.5 z-10 size-3 fill-amber-300 text-amber-300 drop-shadow-[0_0_4px_rgba(252,211,77,0.6)]" />
+      <span className="pointer-events-none absolute left-full ml-3 whitespace-nowrap rounded-md bg-bg-elevated px-2.5 py-1 text-xs text-fg-primary opacity-0 shadow-lg ring-1 ring-white/[0.06] transition-opacity group-hover:opacity-100 z-50">
+        {module.name}
       </span>
     </button>
   );

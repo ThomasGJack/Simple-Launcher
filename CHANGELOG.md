@@ -9,6 +9,7 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 ## [Unreleased]
 
 ### Ajouté
+- **Favoris** : étoile sur chaque carte de bibliothèque (visible au survol, ou tout le temps quand activée) et bouton "Favoris" sur la page détail d'un jeu. Les jeux favoris apparaissent comme des icônes cliquables dans la sidebar gauche, à la façon Discord, avec une mini-étoile dorée dans le coin supérieur droit. Stocké dans Firestore (`/users/{uid}.favorites`), partagé entre tous tes appareils.
 - **Sélecteur de fichier natif** pour le chemin de l'exécutable dans le formulaire d'ajout de raccourci : bouton « Parcourir » qui ouvre le dialog Windows pour choisir le `.exe`, le `.bat`, le `.cmd` ou le `.lnk`. Plus besoin de copier-coller le chemin manuellement. Le nom du fichier s'affiche en gros et le chemin complet en mono dessous.
 - **Bouton « Ajouter un jeu » dans la bibliothèque** : tout utilisateur peut maintenant créer ses propres raccourcis vers des .exe locaux directement depuis la page Bibliothèque, plus besoin de passer par l'admin.
 - **Modal de création/édition** avec formulaire à gauche et **aperçu en temps réel** de la carte à droite : nom, description, icône (upload), bannière (upload), chemin .exe, arguments, couleurs primaire/accent, font display, particules (preset + couleur + densité), serveur Minecraft optionnel. La preview se met à jour à chaque saisie pour visualiser le rendu final avant de valider.
@@ -22,6 +23,8 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 - **Sécurité Firestore + Storage** : nouvelles règles isolant `/users/{uid}/shortcuts/*` à l'utilisateur propriétaire en lecture comme en écriture.
 
 ### Corrigé
+- Page détail module : les chemins longs (ex: `C:\Users\…\CurseForge.lnk`) débordaient hors du panneau Informations de manière disgracieuse. Ils sont maintenant dans une zone scrollable horizontalement avec une mini scrollbar discrète, et le chemin complet s'affiche dans une infobulle au survol.
+- Formulaire d'ajout de raccourci : l'ID auto-généré depuis le nom restait bloqué sur la première lettre tapée (`MineColonies` → `c` au lieu de `minecolonies`). L'ID se synchronise désormais en continu avec le nom tant que le raccourci n'est pas sauvegardé.
 
 ### Supprimé
 

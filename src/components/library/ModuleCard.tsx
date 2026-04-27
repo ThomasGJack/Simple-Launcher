@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Play, Download, RefreshCw, Gamepad2, Trash2, AlertTriangle, Folder, Pencil } from "lucide-react";
+import { Play, Download, RefreshCw, Gamepad2, Trash2, AlertTriangle, Folder, Pencil, Star } from "lucide-react";
 import {
   deriveStatus,
   getModuleState,
@@ -14,6 +14,9 @@ import {
 } from "@/lib/modules";
 import type { LauncherModule } from "@/types/module";
 import { useUIStore } from "@/store/ui";
+import { useAuthStore } from "@/store/auth";
+import { useFavoritesStore } from "@/store/favorites";
+import { addFavorite, removeFavorite } from "@/firebase/favorites";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
 import { MinecraftStatusBadge } from "@/components/library/MinecraftStatusBadge";
@@ -34,7 +37,24 @@ export function ModuleCard({
   onEdit?: () => void;
 }) {
   const navigate = useUIStore((s) => s.navigate);
+  const user = useAuthStore((s) => s.user);
+  const isFavorite = useFavoritesStore((s) => s.favorites.has(module.id));
   const [local, setLocal] = useState<ModuleStateLocal | null>(null);
+
+  const toggleFavorite = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user) return;
+    sounds.click();
+    try {
+      if (isFavorite) {
+        await removeFavorite(user.uid, module.id);
+      } else {
+        await addFavorite(user.uid, module.id);
+      }
+    } catch (err) {
+      console.warn("[favorite] toggle failed:", err);
+    }
+  };
   const [stateLoaded, setStateLoaded] = useState(false);
   const [action, setAction] = useState<Action>({ kind: "idle" });
   const cleanupRef = useRef<(() => void) | null>(null);
@@ -159,6 +179,20 @@ export function ModuleCard({
           )}
         </div>
         <div className="flex items-center gap-1">
+          {user && (
+            <button
+              onClick={toggleFavorite}
+              className={cn(
+                "rounded-md p-1.5 backdrop-blur-md transition-all",
+                isFavorite
+                  ? "bg-amber-500/20 text-amber-300 opacity-100"
+                  : "bg-bg-base/60 text-fg-dim opacity-0 hover:text-amber-300 group-hover:opacity-100",
+              )}
+              title={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
+            >
+              <Star className="size-3.5" fill={isFavorite ? "currentColor" : "none"} strokeWidth={2.2} />
+            </button>
+          )}
           {onEdit && action.kind === "idle" && (
             <button
               onClick={(e) => {

@@ -85,6 +85,22 @@ textarea {
   border: 2px solid transparent;
 }
 
+.info-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+.info-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  border: none;
+}
+.info-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 212, 255, 0.4);
+}
+.info-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+
 @keyframes glow-pulse {
   0%,
   100% {

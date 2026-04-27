@@ -7,6 +7,8 @@ import { useUIStore } from "@/store/ui";
 import { getFirebase } from "@/firebase/config";
 import { recordPlaytime } from "@/firebase/playtime";
 import { pushHeartbeat, type CurrentActivity } from "@/firebase/presence";
+import { watchFavorites } from "@/firebase/favorites";
+import { useFavoritesStore } from "@/store/favorites";
 import type { ModuleExitEvent, ModuleLaunchEvent } from "@/lib/modules";
 
 function App() {
@@ -50,6 +52,15 @@ function App() {
       promise.then((u) => u()).catch(() => {});
     };
   }, [user]);
+
+  const setFavorites = useFavoritesStore((s) => s.setFavorites);
+  useEffect(() => {
+    if (!user) {
+      setFavorites([]);
+      return;
+    }
+    return watchFavorites(user.uid, setFavorites);
+  }, [user, setFavorites]);
 
   const currentActivityRef = useRef<CurrentActivity | null>(null);
 

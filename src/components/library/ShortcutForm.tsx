@@ -150,12 +150,15 @@ export function ShortcutForm({
   const [error, setError] = useState<string | null>(null);
   const isEdit = !!initial;
 
-  // Auto-derive ID from name when creating
+  // Auto-derive ID from name when creating (always re-syncs, not just on first char)
   useEffect(() => {
-    if (!isEdit && !form.id && form.name) {
-      setForm((f) => ({ ...f, id: slugify(f.name) }));
-    }
-  }, [form.name, form.id, isEdit]);
+    if (isEdit) return;
+    setForm((f) => {
+      const next = slugify(f.name);
+      if (next === f.id) return f;
+      return { ...f, id: next };
+    });
+  }, [form.name, isEdit]);
 
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
