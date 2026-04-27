@@ -1,9 +1,10 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret } from "firebase-functions/params";
 import { logger } from "firebase-functions/v2";
 import { initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getFirestore, FieldValue, Timestamp } from "firebase-admin/firestore";
 
 initializeApp();
 
@@ -129,5 +130,81 @@ export const discordAuth = onCall(
       logger.error("discordAuth unexpected error", { message, stack });
       throw new HttpsError("internal", message);
     }
+  },
+);
+
+/**
+ * Scheduled Cloud Function — runs every 24 hours and deletes log entries
+ * (and ServerStats snapshots, and resolved invitations) older than the
+ * retention window. Keeps Firestore quota under control without manual
+ * sweeping.
+ *
+ * Retention windows:
+ *   - logs                       : 30 days
+ *   - serverStats subcollections : 14 days (the per-5-min snapshots are
+ *                                  redundant past 2 weeks; the parent doc
+ *                                  keeps the all-time peak forever)
+ *   - invitations                : 7 days for resolved/expired (pending kept)
+ */
+export const cleanupOldData = onSchedule(
+  {
+    schedule: "every 24 hours",
+    region: "europe-west1",
+    timeoutSeconds: 540, // 9 min — Firestore deletes can take a while
+    memory: "512MiB",
+  },
+  async () => {
+    const db = getFirestore();
+    const stats = { logs: 0, snapshots: 0, invitations: 0 };
+
+    // --- /logs older than 30 days ----------------------------------------
+    {
+      const cutoff = Timestamp.fromMillis(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const snap = await db
+        .collection("logs")
+        .where("serverTs", "<", cutoff)
+        .limit(500)
+        .get();
+      const batch = db.batch();
+      for (const doc of snap.docs) {
+        batch.delete(doc.ref);
+      }
+      if (!snap.empty) await batch.commit();
+      stats.logs = snap.size;
+    }
+
+    // --- /serverStats/{id}/snapshots/* older than 14 days -----------------
+    {
+      const cutoff = Timestamp.fromMillis(Date.now() - 14 * 24 * 60 * 60 * 1000);
+      const allStats = await db.collection("serverStats").get();
+      for (const stat of allStats.docs) {
+        const oldSnaps = await stat.ref
+          .collection("snapshots")
+          .where("ts", "<", cutoff)
+          .limit(500)
+          .get();
+        if (oldSnaps.empty) continue;
+        const batch = db.batch();
+        for (const s of oldSnaps.docs) batch.delete(s.ref);
+        await batch.commit();
+        stats.snapshots += oldSnaps.size;
+      }
+    }
+
+    // --- /invitations resolved more than 7 days ago -----------------------
+    {
+      const cutoff = Timestamp.fromMillis(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const snap = await db
+        .collection("invitations")
+        .where("resolvedAt", "<", cutoff)
+        .limit(500)
+        .get();
+      const batch = db.batch();
+      for (const doc of snap.docs) batch.delete(doc.ref);
+      if (!snap.empty) await batch.commit();
+      stats.invitations = snap.size;
+    }
+
+    logger.info("cleanupOldData done", stats);
   },
 );

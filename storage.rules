@@ -24,5 +24,23 @@ service firebase.storage {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if request.auth != null && request.auth.uid == uid;
     }
+
+    // Profile customization assets (banner image, future custom avatar
+    // overlay, …). Public read so any launcher user can display the banner
+    // on a public profile page; write restricted to the owner.
+    match /users/{uid}/profile/{file} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Minecraft world/save backups — owner-only. Path mirrors the Rust
+    // upload target: users/{uid}/minecraftBackups/{moduleId}/{ts}.zip.
+    // Auth required for both read and write so backups are private even
+    // on a leaked download URL (the URL itself contains a download token,
+    // but Firebase rules add an extra defense layer).
+    match /users/{uid}/minecraftBackups/{moduleId}/{file} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
   }
 }

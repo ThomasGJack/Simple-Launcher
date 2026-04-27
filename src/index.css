@@ -120,6 +120,22 @@ textarea {
   }
 }
 
+/* Translate-x sweep used by Skeleton's `after:` overlay — different motion
+   model from the original `shimmer` (which animates background-position),
+   so we name it distinctly. Repeats infinitely with a slight pause. */
+@keyframes shimmer-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer-sweep 1.6s ease-in-out infinite;
+}
+
 @keyframes fade-in {
   from {
     opacity: 0;

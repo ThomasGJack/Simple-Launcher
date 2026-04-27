@@ -21,11 +21,20 @@ import {
 import type { LauncherModule } from "@/types/module";
 import { ModuleParticles } from "@/components/ui/Particles";
 import { ModuleSections } from "@/components/library/ModuleSections";
-import { useMinecraftStatus } from "@/lib/minecraftStatus";
+import { BlockRenderer } from "@/components/module-blocks/BlockRenderer";
+import { migrateModulePage } from "@/lib/modulePageMigration";
+import { isModulePageV2 } from "@/types/module";
+import { loadFontFace } from "@/lib/dynamicFont";
+import { MinecraftRamControl } from "@/components/library/MinecraftRamControl";
+import { MinecraftServerCard } from "@/components/library/MinecraftServerCard";
+import { MinecraftBackups } from "@/components/library/MinecraftBackups";
+import { RconConsoleModal } from "@/components/admin/RconConsole";
+import { isAdmin } from "@/lib/admin";
 import {
   deriveMinecraftStatus,
   installModpack,
   launchMinecraft,
+  requiredJavaVersion,
   type MinecraftStatus,
 } from "@/lib/minecraft";
 import { sounds } from "@/lib/sounds";
@@ -112,9 +121,19 @@ export function ModuleDetailPage() {
   }
 
   const status: DerivedStatus = deriveStatus(module, local);
+  const usingV2Page = isModulePageV2(module.page);
+  const migratedPage = usingV2Page ? migrateModulePage(module.page, module) : null;
   const themePrimary = module.page?.theme?.primary;
   const themeAccent = module.page?.theme?.accent;
   const fontDisplay = module.page?.theme?.fontDisplay;
+  const fontDisplayUrl = isModulePageV2(module.page) ? module.page.theme?.fontDisplayUrl : undefined;
+  const heroIsBlock = migratedPage?.blocks[0]?.type === "hero-parallax";
+
+  useEffect(() => {
+    if (fontDisplay && fontDisplayUrl) {
+      void loadFontFace(fontDisplay, fontDisplayUrl);
+    }
+  }, [fontDisplay, fontDisplayUrl]);
 
   const handlePrimary = async () => {
     if (action.kind === "installing" || action.kind === "launching") return;
@@ -165,9 +184,10 @@ export function ModuleDetailPage() {
     }
   };
 
-  const themeStyle: React.CSSProperties = {
-    ...(themePrimary && { ["--module-primary" as string]: themePrimary }),
-    ...(themeAccent && { ["--module-accent" as string]: themeAccent }),
+  const themeStyle: React.CSSProperties & Record<string, string | undefined> = {
+    ...(themePrimary && { "--module-primary": themePrimary }),
+    ...(themeAccent && { "--module-accent": themeAccent }),
+    ...(fontDisplay && { "--module-font-display": fontDisplay }),
   };
 
   return (
@@ -175,7 +195,15 @@ export function ModuleDetailPage() {
       className="relative h-full overflow-y-auto"
       style={themeStyle}
     >
-      <Hero module={module} themePrimary={themePrimary} fontDisplay={fontDisplay} />
+      {heroIsBlock && migratedPage ? (
+        <BlockRenderer
+          blocks={[migratedPage.blocks[0]]}
+          module={module}
+          onLaunch={handlePrimary}
+        />
+      ) : (
+        <Hero module={module} themePrimary={themePrimary} fontDisplay={fontDisplay} />
+      )}
 
       {module.page?.background && "particles" in module.page.background && (
         <ModuleParticles config={module.page.background.particles} />
@@ -243,6 +271,9 @@ export function ModuleDetailPage() {
                     action={action}
                     onClick={handlePrimary}
                     themePrimary={themePrimary}
+                    customLabel={module.page?.playButton?.label}
+                    sizeScale={isModulePageV2(module.page) ? module.page.playButton?.sizeScale : undefined}
+                    style={module.page?.playButton?.style}
                   />
                 )}
               </div>
@@ -260,8 +291,21 @@ export function ModuleDetailPage() {
 
           <div className="col-span-12 space-y-6 lg:col-span-5">
             {module.server?.type === "minecraft" && (
-              <MinecraftServerCard address={module.server.address} />
+              <>
+                <MinecraftServerCard
+                  address={module.server.address}
+                  module={module.type === "minecraft" ? module : undefined}
+                />
+                {isAdmin(user) && (
+                  <RconAdminLauncher
+                    address={module.server.address}
+                    serverDisplayName={module.name}
+                  />
+                )}
+              </>
             )}
+            {module.type === "minecraft" && <MinecraftRamControl module={module} />}
+            {module.type === "minecraft" && <MinecraftBackups moduleId={module.id} />}
             <motion.div
               initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
@@ -280,8 +324,24 @@ export function ModuleDetailPage() {
                     {module.modLoader && (
                       <InfoLine icon={Box} label="Mod loader" value={module.modLoader} />
                     )}
-                    <InfoLine icon={Hash} label="CF Project" value={String(module.curseforgeProjectId)} mono />
-                    <InfoLine icon={Hash} label="CF File" value={String(module.curseforgeFileId)} mono />
+                    {(() => {
+                      const java = requiredJavaVersion(module.minecraftVersion);
+                      if (!java) return null;
+                      return (
+                        <InfoLine
+                          icon={Box}
+                          label="Java requis"
+                          value={`Java ${java} · auto-installé par Prism si manquant`}
+                          small
+                        />
+                      );
+                    })()}
+                    {module.curseforgeProjectId !== undefined && (
+                      <InfoLine icon={Hash} label="CF Project" value={String(module.curseforgeProjectId)} mono />
+                    )}
+                    {module.curseforgeFileId !== undefined && (
+                      <InfoLine icon={Hash} label="CF File" value={String(module.curseforgeFileId)} mono />
+                    )}
                   </>
                 ) : module.type === "hosted" ? (
                   <>
@@ -318,11 +378,63 @@ export function ModuleDetailPage() {
           transition={{ delay: 0.3 }}
           className="mt-10"
         >
-          <ModuleSections module={module} />
+          {migratedPage && migratedPage.blocks.length > 0 ? (
+            <BlockRenderer
+              blocks={heroIsBlock ? migratedPage.blocks.slice(1) : migratedPage.blocks}
+              module={module}
+              onLaunch={handlePrimary}
+            />
+          ) : (
+            <ModuleSections module={module} />
+          )}
         </motion.div>
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Tiny admin-only entry point that exposes the RCON console modal — splits
+ * the host:port from the configured server address (defaulting port to
+ * 25575 when the launch port is the standard 25565 game port). Hidden for
+ * non-admin users.
+ */
+function RconAdminLauncher({
+  address,
+  serverDisplayName,
+}: {
+  address: string;
+  serverDisplayName: string;
+}) {
+  const [open, setOpen] = useState(false);
+  // Strip any trailing :port from the launcher's saved address — RCON has
+  // its own port (default 25575) configured server-side via server.properties.
+  const host = address.split(":")[0] ?? address;
+  return (
+    <>
+      <motion.button
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        onClick={() => setOpen(true)}
+        className="no-drag inline-flex w-full items-center gap-2 rounded-2xl bg-violet-500/10 px-4 py-3 text-xs font-medium text-violet-200 ring-1 ring-violet-500/30 transition-colors hover:bg-violet-500/20 hover:shadow-[0_0_18px_rgba(139,92,246,0.3)]"
+      >
+        <span className="grid size-7 place-items-center rounded-lg bg-violet-500/20 text-violet-200 ring-1 ring-violet-500/30">
+          ⌘
+        </span>
+        <span className="flex-1 text-left">
+          <span className="block">Console RCON admin</span>
+          <span className="text-[10px] text-fg-dim">Contrôler le serveur Minecraft</span>
+        </span>
+      </motion.button>
+      <RconConsoleModal
+        open={open}
+        onClose={() => setOpen(false)}
+        serverHost={host}
+        serverDisplayName={serverDisplayName}
+      />
+    </>
   );
 }
 
@@ -449,14 +561,20 @@ function PrimaryButton({
   action,
   onClick,
   themePrimary,
+  customLabel,
+  sizeScale,
+  style,
 }: {
   status: DerivedStatus;
   action: Action;
   onClick: () => void;
   themePrimary?: string;
+  customLabel?: string;
+  sizeScale?: number;
+  style?: "neon-pulse" | "solid" | "outline" | "ghost";
 }) {
   const launching = action.kind === "launching";
-  let label = "JOUER";
+  let label = customLabel ?? "JOUER";
   let Icon = Play;
 
   switch (status.kind) {
@@ -470,10 +588,12 @@ function PrimaryButton({
       break;
     case "installed":
     case "shortcut":
-      label = launching ? "LANCEMENT…" : "JOUER";
+      label = launching ? "LANCEMENT…" : (customLabel ?? "JOUER");
       Icon = Play;
       break;
   }
+  const scale = sizeScale ?? 1;
+  void style;
 
   const bg = themePrimary
     ? `linear-gradient(90deg, ${themePrimary}, ${themePrimary}dd, ${themePrimary})`
@@ -493,8 +613,13 @@ function PrimaryButton({
       )}
       style={
         themePrimary
-          ? { background: bg, boxShadow: shadow }
-          : { background: "linear-gradient(90deg, var(--color-accent), #4ed6ff, var(--color-accent))", backgroundSize: "200% 100%", animation: "shimmer 4s linear infinite, glow-pulse 2.4s ease-in-out infinite" }
+          ? { background: bg, boxShadow: shadow, transform: scale !== 1 ? `scale(${scale})` : undefined }
+          : {
+              background: "linear-gradient(90deg, var(--color-accent), #4ed6ff, var(--color-accent))",
+              backgroundSize: "200% 100%",
+              animation: "shimmer 4s linear infinite, glow-pulse 2.4s ease-in-out infinite",
+              transform: scale !== 1 ? `scale(${scale})` : undefined,
+            }
       }
     >
       <Icon className="size-5 fill-bg-base" strokeWidth={0} />
@@ -757,55 +882,6 @@ function FavoriteToggle({ moduleId }: { moduleId: string }) {
       <Star className="size-3.5" fill={isFav ? "currentColor" : "none"} strokeWidth={2.2} />
       {isFav ? "Favori" : "Favoris"}
     </button>
-  );
-}
-
-function MinecraftServerCard({ address }: { address: string }) {
-  const status = useMinecraftStatus(address);
-  const motd = status?.motd?.clean?.join("\n");
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 24 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.15 }}
-      className="overflow-hidden rounded-3xl glass-strong"
-    >
-      <div className="flex items-center justify-between bg-gradient-to-r from-success/15 to-transparent px-6 py-4">
-        <div>
-          <div className="text-xs uppercase tracking-[0.2em] text-success">Serveur Minecraft</div>
-          <div className="mt-0.5 font-mono text-xs text-fg-muted">{address}</div>
-        </div>
-        {status === null ? (
-          <div className="text-xs text-fg-muted">…</div>
-        ) : status.online ? (
-          <div className="text-right">
-            <div className="font-display text-2xl text-fg-primary">
-              {status.players ? `${status.players.online}/${status.players.max}` : "—"}
-            </div>
-            <div className="text-[10px] uppercase tracking-wider text-success">En ligne</div>
-          </div>
-        ) : (
-          <div className="text-xs uppercase tracking-wider text-danger">Hors ligne</div>
-        )}
-      </div>
-      {status?.online && (
-        <div className="space-y-2 px-6 py-4 text-xs">
-          {status.version && (
-            <div className="flex justify-between">
-              <span className="text-fg-muted">Version</span>
-              <span className="font-mono text-fg-primary">{status.version}</span>
-            </div>
-          )}
-          {motd && (
-            <div className="rounded-lg bg-bg-base/50 p-3 text-fg-muted ring-1 ring-white/[0.04]">
-              <div className="mb-1 text-[10px] uppercase tracking-wider text-fg-dim">MOTD</div>
-              <div className="whitespace-pre-line font-mono text-[11px]">{motd}</div>
-            </div>
-          )}
-        </div>
-      )}
-    </motion.div>
   );
 }
 

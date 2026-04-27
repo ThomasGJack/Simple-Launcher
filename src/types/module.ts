@@ -35,7 +35,8 @@ export type PageSection =
   | { type: "stats"; data: { label: string; value: string }[] }
   | { type: "custom-html"; content: string };
 
-export type ModulePage = {
+/** @deprecated V1 schema. Use ModulePageV2. Kept for rétrocompat reads. */
+export type ModulePageV1 = {
   background?: PageBackground;
   hero?: {
     title?: string;
@@ -54,6 +55,20 @@ export type ModulePage = {
     style?: "neon-pulse" | "solid" | "outline";
   };
 };
+
+export type ModulePageV2 = {
+  version: 2;
+  background?: PageBackground;
+  theme?: import("./moduleBlocks").ExtendedPageTheme;
+  playButton?: import("./moduleBlocks").PlayButtonConfig;
+  blocks: import("./moduleBlocks").AnyModuleBlock[];
+};
+
+export type ModulePage = ModulePageV1 | ModulePageV2;
+
+export function isModulePageV2(page: ModulePage | undefined | null): page is ModulePageV2 {
+  return !!page && (page as ModulePageV2).version === 2 && Array.isArray((page as ModulePageV2).blocks);
+}
 
 export type ServerInfo =
   | { type: "minecraft"; address: string };
@@ -104,6 +119,14 @@ export type MinecraftModule = BaseModule & {
   modLoader?: "forge" | "fabric" | "quilt" | "neoforge";
   // Optional override for the Prism instance name (default: from modpack manifest)
   prismInstanceName?: string;
+  /**
+   * Max heap size for the JVM, in MiB. When set, the launcher writes
+   * `OverrideMemory=true` + `MaxMemAlloc=<value>` to the Prism `instance.cfg`
+   * so the modpack runs with that allocation regardless of the user's global
+   * Prism settings. Recommended: 4096 (4 GB) for vanilla-ish, 6144–8192 for
+   * heavy modpacks. The min heap is automatically set to ~half this value.
+   */
+  maxRamMb?: number;
 };
 
 export type LauncherModule = HostedModule | ShortcutModule | MinecraftModule;

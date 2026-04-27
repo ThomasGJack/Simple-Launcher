@@ -16,22 +16,29 @@ import {
   Wand2,
   Server,
   Activity,
+  Layout,
 } from "lucide-react";
+import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/auth";
 import { isAdmin } from "@/lib/admin";
 import {
   deleteHostedZip,
   deleteModule,
+  rollbackModuleToVersion,
   saveMinecraftModule,
   updateHostedModuleMetadata,
   uploadHostedModule,
   uploadModpackZip,
   uploadModuleAsset,
   watchModules,
+  watchModuleVersions,
+  type ModuleVersionRecord,
   type UploadProgress,
 } from "@/firebase/modules";
 import type { LauncherModule, ModulePage, ParticlesConfig, PageSection } from "@/types/module";
+import { isModulePageV2 } from "@/types/module";
 import { ModulePreviewCard } from "@/components/library/ModulePreviewCard";
+import { RamSlider } from "@/components/library/RamSlider";
 import { cn } from "@/lib/cn";
 
 type ParticlesPreset = NonNullable<ParticlesConfig["preset"]> | "none";
@@ -68,6 +75,8 @@ type FormState = {
   customZipSize: number;
   minecraftVersion: string;
   modLoader: ModLoader;
+  // Heap allocation in MiB. 0 = "let Prism decide" (default).
+  maxRamMb: number;
 };
 
 const EMPTY_FORM: FormState = {
@@ -97,6 +106,7 @@ const EMPTY_FORM: FormState = {
   customZipSize: 0,
   minecraftVersion: "",
   modLoader: "",
+  maxRamMb: 4096,
 };
 
 export function AdminPage() {
@@ -146,9 +156,10 @@ export function AdminPage() {
   const startEdit = (m: LauncherModule) => {
     if (m.type === "shortcut") return; // shortcuts are user-side
     const page = m.page;
+    const v1Sections = page && !isModulePageV2(page) ? page.sections : undefined;
     const bg = page?.background && "particles" in page.background ? page.background.particles : undefined;
-    const screenshotsSection = page?.sections?.find((s) => s.type === "screenshots-grid");
-    const statsSection = page?.sections?.find((s) => s.type === "stats");
+    const screenshotsSection = v1Sections?.find((s) => s.type === "screenshots-grid");
+    const statsSection = v1Sections?.find((s) => s.type === "stats");
 
     setForm({
       type: m.type,
@@ -188,6 +199,7 @@ export function AdminPage() {
       customZipSize: m.type === "minecraft" ? m.customZipSize ?? 0 : 0,
       minecraftVersion: m.type === "minecraft" ? m.minecraftVersion ?? "" : "",
       modLoader: m.type === "minecraft" ? ((m.modLoader ?? "") as ModLoader) : "",
+      maxRamMb: m.type === "minecraft" ? m.maxRamMb ?? 4096 : 4096,
     });
     setFile(null);
     setProgress(null);
@@ -301,6 +313,7 @@ export function AdminPage() {
               }),
           ...(form.minecraftVersion && { minecraftVersion: form.minecraftVersion }),
           ...(form.modLoader && { modLoader: form.modLoader }),
+          ...(form.maxRamMb >= 512 && { maxRamMb: form.maxRamMb }),
           ...(page && { page }),
           ...(server && { server }),
         });
@@ -407,12 +420,32 @@ export function AdminPage() {
         </div>
       </motion.div>
 
+      {/* Published modules — full-width strip above the grid in *create*
+          mode (so the admin can pick one to edit at a glance). In *edit* mode
+          we replace it with a compact "currently editing" indicator since the
+          row would just duplicate what the form already says. */}
+      {!isEditing ? (
+        <PublishedModulesRow
+          modules={modules}
+          editingId={editingId}
+          onEdit={startEdit}
+          onDelete={handleDelete}
+        />
+      ) : (
+        <EditingChip name={form.name || form.id} onExit={reset} />
+      )}
+
       <div className="grid grid-cols-12 gap-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="col-span-12 rounded-3xl glass-strong p-7 lg:col-span-7"
+          /* `overflow-hidden` is the safety net: even if some inner element
+             refuses to honor `min-width: 0` (a long URL, a `<select>` with
+             a wide option, an overflowing flex row), it gets visually clipped
+             at the form's rounded boundary instead of bleeding into the
+             preview column. */
+          className="relative z-10 col-span-12 min-w-0 overflow-hidden rounded-3xl glass-strong p-7 lg:col-span-7"
         >
           <div className="mb-6 flex items-center gap-3">
             <div className="grid size-10 place-items-center rounded-xl bg-accent/15 text-accent ring-1 ring-accent/30">
@@ -492,6 +525,12 @@ export function AdminPage() {
                   <Input value={form.executable} onChange={(v) => updateForm("executable", v)} placeholder="MyGame.exe" />
                 </Field>
                 <FilePicker file={file} onChange={setFile} />
+                {isEditing && (
+                  <ModuleVersionsPanel
+                    moduleId={form.id}
+                    currentVersion={form.version}
+                  />
+                )}
               </>
             ) : (
               <MinecraftFields
@@ -675,67 +714,130 @@ export function AdminPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="col-span-12 space-y-6 lg:col-span-5"
+          className="relative z-0 col-span-12 min-w-0 lg:col-span-5"
         >
-          <div>
+          {/* Sticky preview — follows the form as the admin scrolls so the
+              live render stays visible while filling out long sections. The
+              wrapper is intentionally minimal (no glass-strong panel) so the
+              card floats against the page background instead of being a heavy
+              card-inside-a-card. `overflow-hidden` on the inner flex container
+              also doubles as a safety net to clip any particle canvas that
+              might escape the preview card's own bounds. */}
+          <div className="lg:sticky lg:top-6">
             <div className="mb-3 flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-accent">
               <Sparkles className="size-3" />
               Aperçu en temps réel
             </div>
-            <div className="rounded-2xl glass-strong p-5">
-              <div className="mx-auto">
-                <ModulePreviewCard
-                  draft={{
-                    type: form.type,
-                    name: form.name,
-                    shortDescription: form.shortDescription,
-                    iconUrl: form.iconUrl,
-                    bannerUrl: form.bannerUrl,
-                    themePrimary: form.themePrimary,
-                    themeAccent: form.themeAccent,
-                    fontDisplay: form.fontDisplay,
-                    particles:
-                      form.particlesPreset !== "none"
-                        ? {
-                            preset: form.particlesPreset,
-                            color: form.particlesColor,
-                            density: form.particlesDensity,
-                          }
-                        : undefined,
-                  }}
-                />
-              </div>
+            <div className="flex flex-col items-center overflow-hidden">
+              <ModulePreviewCard
+                draft={{
+                  type: form.type,
+                  name: form.name,
+                  shortDescription: form.shortDescription,
+                  iconUrl: form.iconUrl,
+                  bannerUrl: form.bannerUrl,
+                  themePrimary: form.themePrimary,
+                  themeAccent: form.themeAccent,
+                  fontDisplay: form.fontDisplay,
+                  particles:
+                    form.particlesPreset !== "none"
+                      ? {
+                          preset: form.particlesPreset,
+                          color: form.particlesColor,
+                          density: form.particlesDensity,
+                        }
+                      : undefined,
+                }}
+              />
               <p className="mt-4 text-center text-xs text-fg-muted">
                 Rendu de la carte côté bibliothèque.
               </p>
             </div>
           </div>
-
-          <div>
-            <div className="mb-4 flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-fg-muted">
-              <Cloud className="size-3" />
-              Modules publiés ({modules.length})
-            </div>
-            <div className="space-y-3">
-              {modules.length === 0 && (
-                <div className="rounded-2xl glass p-6 text-center text-sm text-fg-muted">
-                  Aucun module pour l'instant. Crée le premier à gauche.
-                </div>
-              )}
-              {modules.map((m) => (
-                <ModuleCard
-                  key={m.id}
-                  module={m}
-                  active={editingId === m.id}
-                  onEdit={() => startEdit(m)}
-                  onDelete={() => handleDelete(m)}
-                />
-              ))}
-            </div>
-          </div>
         </motion.div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Compact "currently editing" indicator shown in place of the published
+ * modules strip while the admin is editing an existing module. Avoids the
+ * visual redundancy of having the active card duplicated above the form
+ * (which already has its own "Modifier « X »" header).
+ */
+function EditingChip({ name, onExit }: { name: string; onExit: () => void }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.05 }}
+      className="mb-6 inline-flex items-center gap-3 rounded-2xl bg-accent/[0.08] px-4 py-2.5 text-sm ring-1 ring-accent/30"
+    >
+      <span className="grid size-7 place-items-center rounded-lg bg-accent/15 text-accent ring-1 ring-accent/30">
+        <Activity className="size-3.5" />
+      </span>
+      <span className="text-fg-muted">Édition en cours :</span>
+      <span className="font-medium text-fg-primary">{name}</span>
+      <button
+        type="button"
+        onClick={onExit}
+        className="ml-2 rounded-md bg-white/[0.04] px-2.5 py-1 text-xs text-fg-muted ring-1 ring-white/[0.06] transition-colors hover:bg-white/[0.08] hover:text-fg-primary"
+      >
+        Quitter
+      </button>
+    </motion.div>
+  );
+}
+
+/**
+ * Horizontal-scrolling strip of published modules, displayed as a single row
+ * above the form/preview grid. Replaces the old vertical list that lived in
+ * the right column — putting it here removes the visual collision with the
+ * form's two-column inner layouts (icon/banner pickers, version/loader rows).
+ */
+function PublishedModulesRow({
+  modules,
+  editingId,
+  onEdit,
+  onDelete,
+}: {
+  modules: LauncherModule[];
+  editingId: string | null;
+  onEdit: (m: LauncherModule) => void;
+  onDelete: (m: LauncherModule) => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.05 }}
+      className="mb-6"
+    >
+      <div className="mb-3 flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-fg-muted">
+        <Cloud className="size-3" />
+        Modules publiés ({modules.length})
+      </div>
+      {modules.length === 0 ? (
+        <div className="rounded-2xl glass p-6 text-center text-sm text-fg-muted">
+          Aucun module pour l'instant. Crée le premier ci-dessous.
+        </div>
+      ) : (
+        <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2 [scrollbar-width:thin]">
+          {modules.map((m) => (
+            <div key={m.id} className="w-[22rem] shrink-0">
+              <ModuleCard
+                module={m}
+                active={editingId === m.id}
+                onEdit={() => onEdit(m)}
+                onDelete={() => onDelete(m)}
+                onCustomize={() => useUIStore.getState().navigate({ name: "admin-builder", moduleId: m.id })}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </motion.div>
   );
 }
 
@@ -797,7 +899,7 @@ function MinecraftFields({
   ];
 
   const sources: { value: McSource; label: string; hint: string }[] = [
-    { value: "manual", label: "Upload manuel", hint: "Tu héberges le .zip directement" },
+    { value: "manual", label: "Upload manuel (fat-zip)", hint: "Aucune UI Prism, mods bundled" },
     { value: "curseforge", label: "API CurseForge", hint: "Récupéré via Project + File ID" },
   ];
 
@@ -892,13 +994,28 @@ function MinecraftFields({
         </Field>
       </div>
 
+      <RamSlider value={form.maxRamMb} onChange={(v) => updateForm("maxRamMb", v)} />
+
       {form.mcSource === "manual" ? (
-        <p className="text-xs leading-relaxed text-fg-dim">
-          📦 Upload directement l'export CurseForge du modpack (le `.zip` que tu obtiens via <em>File → Export</em> dans CurseForge desktop, contenant <code>manifest.json</code> + <code>overrides/</code>). Prism Launcher se chargera de télécharger les mods un par un — pour les mods qui ont opt-out de la distribution tiers, Prism ouvrira le navigateur pour qu'on clique manuellement « Download ».
-        </p>
+        <div className="space-y-2 text-xs leading-relaxed text-fg-dim">
+          <p>
+            📦 Upload un <strong className="text-fg-muted">« fat zip »</strong> contenant l'export CurseForge <em>plus les .jar des mods bundled directement dedans</em>. Le launcher écrit l'instance Prism (instance.cfg + mmc-pack.json) lui-même et copie les mods : <strong className="text-fg-muted">aucune fenêtre Prism, aucun popup navigateur, aucun appel CurseForge</strong> — tes potes voient juste la barre de progression du launcher puis MC qui démarre.
+          </p>
+          <p>
+            Structure attendue à la racine du <code>.zip</code> :
+          </p>
+          <ul className="ml-4 list-disc space-y-0.5 font-mono text-[11px] text-fg-muted">
+            <li><code>manifest.json</code> <span className="font-sans text-fg-dim">— pour la version MC + le mod loader</span></li>
+            <li><code>overrides/mods/*.jar</code> <span className="font-sans text-fg-dim">— les fichiers .jar de tous les mods (à copier depuis ton install qui marche)</span></li>
+            <li><code>overrides/config/</code>, <code>overrides/resourcepacks/</code>, <code>overrides/shaderpacks/</code>… <span className="font-sans text-fg-dim">— le reste du contenu CF normal</span></li>
+          </ul>
+          <p className="text-fg-dim">
+            ⚠ <strong className="text-fg-muted">Les <code>files[]</code> du manifest sont ignorés</strong> en mode manuel : si un mod n'est pas bundled dans <code>overrides/mods/</code>, il sera absent de l'instance.
+          </p>
+        </div>
       ) : (
         <p className="text-xs leading-relaxed text-fg-dim">
-          ⚠ Marche uniquement si <strong className="text-fg-muted">tous</strong> les mods autorisent la distribution tiers. Si tu hits un 403, bascule sur « Upload manuel ».
+          ⚠ Marche uniquement si <strong className="text-fg-muted">tous</strong> les mods autorisent la distribution tiers. Si tu hits un 403, bascule sur « Upload manuel » (fat zip).
         </p>
       )}
     </div>
@@ -949,24 +1066,38 @@ function ModpackZipPicker({
           </div>
         </div>
       ) : currentUrl ? (
-        <div className="flex items-center gap-3">
-          <div className="grid size-10 place-items-center rounded-lg bg-success/15 text-success ring-1 ring-success/30">
+        /* min-w-0 on the flex container itself + on the text wrapper is what
+           lets the row shrink correctly; without it, intrinsic content sizing
+           (especially long Firebase Storage URLs) was forcing the form column
+           to grow past its 7/12 grid track and bleed into the preview. */
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-success/15 text-success ring-1 ring-success/30">
             <CheckCircle2 className="size-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-sm text-fg-primary">Modpack uploadé{currentSize > 0 ? ` (${sizeMb(currentSize)} Mo)` : ""}</div>
-            <div className="truncate font-mono text-[10px] text-fg-dim">{currentUrl}</div>
+            <div className="text-sm text-fg-primary">
+              Modpack uploadé{currentSize > 0 ? ` (${sizeMb(currentSize)} Mo)` : ""}
+            </div>
+            {/* No more raw Firebase URL on screen — that 200-char string was
+                wrecking the layout. The hover-only tooltip keeps it accessible
+                for admins who actually want to copy the URL. */}
+            <div
+              className="truncate text-xs text-fg-muted"
+              title={currentUrl}
+            >
+              hébergé sur Firebase Storage
+            </div>
           </div>
           <label
             htmlFor={id}
-            className="no-drag cursor-pointer rounded-md bg-white/[0.04] px-3 py-1.5 text-xs text-fg-primary ring-1 ring-white/[0.06] transition-colors hover:bg-white/[0.08]"
+            className="no-drag shrink-0 cursor-pointer rounded-md bg-white/[0.04] px-3 py-1.5 text-xs text-fg-primary ring-1 ring-white/[0.06] transition-colors hover:bg-white/[0.08]"
           >
             Remplacer
           </label>
           <button
             onClick={onClear}
             type="button"
-            className="rounded-md bg-white/[0.02] px-2.5 py-1.5 text-xs text-fg-muted ring-1 ring-white/[0.04] transition-colors hover:bg-danger/10 hover:text-danger"
+            className="shrink-0 rounded-md bg-white/[0.02] px-2.5 py-1.5 text-xs text-fg-muted ring-1 ring-white/[0.04] transition-colors hover:bg-danger/10 hover:text-danger"
           >
             Retirer
           </button>
@@ -978,13 +1109,146 @@ function ModpackZipPicker({
               <Upload className="size-5" />
             </div>
             <div>
-              <div className="text-sm text-fg-primary">Upload du modpack .zip</div>
-              <div className="text-xs text-fg-muted">Export CurseForge (manifest.json + overrides)</div>
+              <div className="text-sm text-fg-primary">Upload du fat-zip modpack</div>
+              <div className="text-xs text-fg-muted">manifest.json + overrides/ (mods bundled inclus)</div>
             </div>
           </div>
           <span className="rounded-md bg-white/[0.04] px-3 py-1.5 text-xs text-fg-primary ring-1 ring-white/[0.06]">Parcourir</span>
         </label>
       )}
+    </div>
+  );
+}
+
+/**
+ * Lists all past versions of a hosted module with a one-click rollback to
+ * any prior release. Each row shows the version string + release date +
+ * size; clicking « Rétablir » swaps the parent module doc's `downloadUrl`
+ * / `version` / `sha256` / `size` fields back to that version's blob.
+ *
+ * Users see this as a normal "update available" since the published
+ * version on Firestore changed — they re-download the older binary.
+ */
+function ModuleVersionsPanel({
+  moduleId,
+  currentVersion,
+}: {
+  moduleId: string;
+  currentVersion: string;
+}) {
+  const [versions, setVersions] = useState<ModuleVersionRecord[]>([]);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
+
+  useEffect(() => {
+    if (!moduleId) return;
+    return watchModuleVersions(moduleId, setVersions);
+  }, [moduleId]);
+
+  const handleRollback = async (target: ModuleVersionRecord) => {
+    if (target.version === currentVersion) return;
+    if (
+      !confirm(
+        `Rétablir la version ${target.version} du module ?\n\nTous tes potes verront cette version comme étant l'actuelle au prochain check, et leur launcher proposera la « MAJ » en re-téléchargeant le binaire correspondant.`,
+      )
+    ) {
+      return;
+    }
+    setBusy(target.version);
+    setFeedback(null);
+    try {
+      await rollbackModuleToVersion(moduleId, target.version);
+      setFeedback({
+        kind: "ok",
+        message: `Module rétabli sur la version ${target.version}.`,
+      });
+    } catch (err) {
+      setFeedback({
+        kind: "error",
+        message: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  if (versions.length === 0) {
+    return (
+      <div className="rounded-2xl bg-bg-base/30 p-4 text-xs text-fg-muted ring-1 ring-white/[0.04]">
+        Aucune version archivée pour l'instant. Chaque upload de binaire crée une entrée ici, et tu pourras rétablir une ancienne version en un clic depuis cette liste.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2 rounded-2xl bg-bg-base/30 p-4 ring-1 ring-white/[0.04]">
+      <div className="flex items-center justify-between">
+        <div className="inline-flex items-center gap-1.5 text-xs uppercase tracking-[0.2em] text-accent">
+          <Activity className="size-3" /> Versions publiées
+        </div>
+        <span className="text-[10px] text-fg-dim">{versions.length} archivée{versions.length > 1 ? "s" : ""}</span>
+      </div>
+      {feedback && (
+        <div
+          className={cn(
+            "rounded-lg px-3 py-1.5 text-xs ring-1",
+            feedback.kind === "ok"
+              ? "bg-emerald-500/10 text-emerald-200 ring-emerald-500/20"
+              : "bg-rose-500/10 text-rose-200 ring-rose-500/20",
+          )}
+        >
+          {feedback.message}
+        </div>
+      )}
+      <div className="space-y-1">
+        {versions.map((v) => {
+          const isCurrent = v.version === currentVersion;
+          const isBusy = busy === v.version;
+          return (
+            <div
+              key={v.version}
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2 ring-1 transition-colors",
+                isCurrent
+                  ? "bg-accent/10 ring-accent/30"
+                  : "bg-bg-base/40 ring-white/[0.04]",
+              )}
+            >
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <span className="font-mono text-xs text-fg-primary">v{v.version}</span>
+                {isCurrent && (
+                  <span className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-accent ring-1 ring-accent/30">
+                    Actuelle
+                  </span>
+                )}
+              </div>
+              <span className="shrink-0 text-[10px] text-fg-dim">
+                {v.size > 0 ? `${(v.size / 1_048_576).toFixed(1)} Mo` : "—"}
+              </span>
+              <span className="shrink-0 text-[10px] text-fg-dim">
+                {v.releasedAt
+                  ? new Date(v.releasedAt).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "2-digit" })
+                  : "—"}
+              </span>
+              {!isCurrent && (
+                <button
+                  type="button"
+                  onClick={() => handleRollback(v)}
+                  disabled={isBusy}
+                  className={cn(
+                    "no-drag shrink-0 rounded-md px-2.5 py-1 text-[10px] font-medium ring-1 transition-all",
+                    isBusy
+                      ? "bg-white/[0.04] text-fg-dim ring-white/[0.04] cursor-wait"
+                      : "bg-amber-500/10 text-amber-200 ring-amber-500/30 hover:bg-amber-500/20 hover:shadow-[0_0_12px_rgba(251,191,36,0.3)]",
+                  )}
+                >
+                  {isBusy ? "…" : "Rétablir"}
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1283,11 +1547,13 @@ function ModuleCard({
   active,
   onEdit,
   onDelete,
+  onCustomize,
 }: {
   module: LauncherModule;
   active?: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  onCustomize?: () => void;
 }) {
   const badge = (() => {
     if (module.type === "hosted") {
@@ -1307,9 +1573,9 @@ function ModuleCard({
       exit={{ opacity: 0, scale: 0.96 }}
       onClick={onEdit}
       className={cn(
-        "group flex cursor-pointer items-center gap-4 rounded-2xl glass p-4 transition-all",
+        "group relative flex cursor-pointer items-center gap-4 rounded-2xl glass p-4 transition-all",
         active
-          ? "ring-2 ring-accent shadow-[0_0_24px_var(--color-accent-soft)]"
+          ? "ring-2 ring-accent shadow-[inset_0_0_24px_var(--color-accent-soft)]"
           : "hover:bg-white/[0.03] hover:ring-1 hover:ring-accent/30",
       )}
     >
@@ -1338,16 +1604,30 @@ function ModuleCard({
           )}
         </div>
       </div>
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete();
-        }}
-        className="grid size-9 shrink-0 place-items-center rounded-lg text-fg-muted transition-colors hover:bg-danger/15 hover:text-danger"
-        title="Supprimer"
-      >
-        <Trash2 className="size-4" />
-      </button>
+      <div className="flex shrink-0 items-center gap-1">
+        {onCustomize && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onCustomize();
+            }}
+            className="grid size-9 place-items-center rounded-lg text-fg-muted transition-colors hover:bg-accent/15 hover:text-accent"
+            title="Personnaliser la page"
+          >
+            <Layout className="size-4" />
+          </button>
+        )}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          className="grid size-9 place-items-center rounded-lg text-fg-muted transition-colors hover:bg-danger/15 hover:text-danger"
+          title="Supprimer"
+        >
+          <Trash2 className="size-4" />
+        </button>
+      </div>
     </motion.div>
   );
 }

@@ -1,262 +1,867 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Library, Gamepad2, Zap, Newspaper } from "lucide-react";
+import {
+  Activity,
+  Clock,
+  Flame,
+  Gamepad2,
+  Library,
+  MessageCircle,
+  Play,
+  Users,
+} from "lucide-react";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/auth";
-import { PlayButton } from "@/components/ui/PlayButton";
 import { watchModules } from "@/firebase/modules";
-import { getModuleState, deriveStatus, type DerivedStatus } from "@/lib/modules";
+import { watchPlaytime, formatPlaytime, type PlaytimeEntry } from "@/firebase/playtime";
+import { watchAllUsers, statusFromLastSeen, type UserPresence, type PresenceStatus } from "@/firebase/presence";
+import { watchConversationsFor } from "@/firebase/messaging";
+import { otherParticipant, unreadCount, type Conversation } from "@/types/messaging";
+import { useMinecraftStatus } from "@/lib/minecraftStatus";
+import { Mascot, type MascotMood } from "@/components/ui/Mascot";
 import type { LauncherModule } from "@/types/module";
 import { cn } from "@/lib/cn";
 
+/**
+ * Home page — bento-grid social hub. Surfaces in priority:
+ *  1. Personal greeting (with time-of-day-aware tone)
+ *  2. "Continue playing" card with the user's most recently launched game
+ *  3. Live status of friends + featured Minecraft server
+ *  4. Recent DMs and a few headline stats
+ *  5. Compact activity feed of what the community is up to
+ *
+ * Designed to make the launcher feel alive at a glance — even before
+ * scrolling. Time-of-day greeting picks one of four moods (matin / aprem /
+ * soir / nuit), and the gradient mesh in the hero shifts hue accordingly.
+ */
 export function HomePage() {
   const navigate = useUIStore((s) => s.navigate);
-  const user = useAuthStore((s) => s.user);
+  const me = useAuthStore((s) => s.user);
   const [modules, setModules] = useState<LauncherModule[]>([]);
-  const [installedCount, setInstalledCount] = useState<number>(0);
+  const [users, setUsers] = useState<UserPresence[]>([]);
+  const [playtime, setPlaytime] = useState<PlaytimeEntry[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [, setNow] = useState(Date.now());
 
+  useEffect(() => watchModules(setModules), []);
+  useEffect(() => watchAllUsers(setUsers), []);
   useEffect(() => {
-    return watchModules(setModules);
+    if (!me) return;
+    return watchPlaytime(me.uid, setPlaytime);
+  }, [me?.uid]);
+  useEffect(() => {
+    if (!me) return;
+    return watchConversationsFor(me.uid, setConversations);
+  }, [me?.uid]);
+  // Re-tick every 30s so relative time strings stay fresh
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(t);
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    const hosted = modules.filter((m) => m.type === "hosted");
-    Promise.all(hosted.map((m) => getModuleState(m.id))).then((states) => {
-      if (cancelled) return;
-      const installed = states.filter(Boolean).length;
-      setInstalledCount(installed + modules.filter((m) => m.type === "shortcut").length);
-    });
-    return () => {
-      cancelled = true;
-    };
+  const greeting = useMemo(() => greetingFor(new Date()), []);
+  const firstName = (me?.displayName ?? "").split(" ")[0] || "joueur";
+
+  // The most recent module the user actually played, used as the "continue"
+  // hero card. Falls back to the first available module if no playtime yet.
+  const lastPlayed = useMemo(() => {
+    if (playtime.length === 0) return modules[0] ?? null;
+    const sorted = [...playtime].sort((a, b) => (b.lastPlayedAt ?? 0) - (a.lastPlayedAt ?? 0));
+    for (const entry of sorted) {
+      const mod = modules.find((m) => m.id === entry.moduleId);
+      if (mod) return mod;
+    }
+    return modules[0] ?? null;
+  }, [playtime, modules]);
+
+  const lastPlayedEntry = useMemo(
+    () => playtime.find((p) => p.moduleId === lastPlayed?.id) ?? null,
+    [playtime, lastPlayed],
+  );
+
+  // Total playtime across the last 7 days, used as a "streak / hours" stat.
+  const totalPlaytimeMs = useMemo(
+    () => playtime.reduce((s, p) => s + p.totalMs, 0),
+    [playtime],
+  );
+
+  // Friends online: every user other than me, sorted by status (online > idle > offline)
+  // and presented as a compact list of avatars + activity.
+  const friendsOnline = useMemo(() => {
+    const order: Record<PresenceStatus, number> = { online: 0, idle: 1, offline: 2 };
+    return users
+      .filter((u) => u.uid !== me?.uid)
+      .map((u) => ({ user: u, status: statusFromLastSeen(u.lastSeen) }))
+      .sort((a, b) => {
+        if (order[a.status] !== order[b.status]) return order[a.status] - order[b.status];
+        return (b.user.lastSeen ?? 0) - (a.user.lastSeen ?? 0);
+      });
+  }, [users, me]);
+
+  const onlineCount = friendsOnline.filter((f) => f.status === "online").length;
+
+  // The most-recent unread conversations float to the top of the side panel.
+  const recentConversations = useMemo(() => {
+    return [...conversations]
+      .sort((a, b) => {
+        const aTs = a.lastMessage?.sentAt ?? 0;
+        const bTs = b.lastMessage?.sentAt ?? 0;
+        return bTs - aTs;
+      })
+      .slice(0, 4);
+  }, [conversations]);
+
+  const totalUnread = useMemo(
+    () => (me ? conversations.reduce((s, c) => s + unreadCount(c, me.uid), 0) : 0),
+    [conversations, me],
+  );
+
+  // Find the first module with a Minecraft server configured — that becomes
+  // the "live server" tile on the right side.
+  const featuredServerModule = useMemo(() => {
+    return modules.find((m) => m.server?.type === "minecraft") ?? null;
   }, [modules]);
 
-  const featured = modules.slice(0, 3);
-  const firstName = (user?.displayName ?? "").split(" ")[0] || "joueur";
+  // Decide which mood the mascot should be in. Priority order matters —
+  // the most "in your face" mood wins so the penguin matches the most
+  // significant thing happening in the user's launcher right now.
+  const { mascotMood, mascotTooltip } = useMemo<{ mascotMood: MascotMood; mascotTooltip: string }>(() => {
+    if (totalUnread > 0) {
+      return { mascotMood: "chat", mascotTooltip: `${totalUnread} message(s) non lu(s)` };
+    }
+    const someoneIsPlaying = friendsOnline.some(
+      (f) => f.status === "online" && f.user.currentActivity,
+    );
+    if (someoneIsPlaying) {
+      return { mascotMood: "gaming", mascotTooltip: "Tes potes sont en train de jouer" };
+    }
+    if (onlineCount > 0) {
+      return { mascotMood: "happy", mascotTooltip: `${onlineCount} pote(s) en ligne` };
+    }
+    // No friends + no recent play → mascot dozes off after 24h of inactivity.
+    const lastPlayedTs = lastPlayedEntry?.lastPlayedAt ?? 0;
+    const aDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    if (lastPlayedTs && lastPlayedTs < aDayAgo) {
+      return { mascotMood: "sleeping", mascotTooltip: "Glitch dort… reviens bientôt !" };
+    }
+    return { mascotMood: "idle", mascotTooltip: "Glitch attend à tes côtés" };
+  }, [totalUnread, friendsOnline, onlineCount, lastPlayedEntry]);
 
   return (
-    <div className="relative h-full overflow-y-auto">
-      <section className="relative px-12 pt-12 pb-8">
+    <div className="relative h-full overflow-y-auto px-10 py-10">
+      {/* Time-of-day-tinted halo behind the greeting hero */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-[420px] opacity-60 blur-3xl"
+        style={{
+          background: greeting.heroGradient,
+        }}
+      />
+
+      <div className="relative grid grid-cols-12 gap-5">
+        {/* ─── Greeting + Continue playing — left big block ────────── */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: "easeOut" }}
-          className="max-w-3xl"
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          className="col-span-12 lg:col-span-8"
         >
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full glass px-4 py-1.5 text-xs uppercase tracking-[0.25em] text-accent">
-            <Sparkles className="size-3" />
-            <span>Bienvenue, {firstName}</span>
-          </div>
-
-          <h1 className="font-display text-7xl leading-[0.95] text-fg-primary text-glow-accent">
-            SIMPLE
-            <br />
-            LAUNCHER
-          </h1>
-          <p className="mt-6 max-w-xl text-lg text-fg-muted">
-            Tous tes jeux et serveurs réunis dans une seule interface. Lance, mets à jour, partage avec tes amis.
-          </p>
-
-          <div className="mt-10 flex items-center gap-4">
-            <PlayButton label={modules.length > 0 ? "BIBLIOTHÈQUE" : "COMMENCER"} onClick={() => navigate({ name: "library" })} />
-            {modules.length > 0 && (
-              <button
-                onClick={() => navigate({ name: "module", moduleId: modules[0].id })}
-                className="no-drag rounded-2xl glass px-6 py-5 text-sm font-medium uppercase tracking-[0.18em] text-fg-primary transition-colors hover:bg-white/[0.08]"
-              >
-                Premier jeu
-              </button>
-            )}
-          </div>
+          <GreetingHero
+            firstName={firstName}
+            greetingLabel={greeting.label}
+            greetingEmoji={greeting.emoji}
+            avatar={me?.photoURL ?? null}
+          />
+          {lastPlayed && (
+            <ContinueCard
+              module={lastPlayed}
+              entry={lastPlayedEntry}
+              onPlay={() => navigate({ name: "module", moduleId: lastPlayed.id })}
+            />
+          )}
         </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.25, ease: "easeOut" }}
-          className="mt-12 flex flex-wrap gap-3"
-        >
-          <Stat icon={Library} value={modules.length} label={`Jeu${modules.length > 1 ? "x" : ""} disponible${modules.length > 1 ? "s" : ""}`} />
-          <Stat icon={Gamepad2} value={installedCount} label={`Installé${installedCount > 1 ? "s" : ""} chez toi`} />
-        </motion.div>
-      </section>
-
-      {featured.length > 0 && (
-        <section className="px-12 pb-12">
+        {/* ─── Right column: stats + friends + server ──────────────── */}
+        <div className="col-span-12 space-y-5 lg:col-span-4">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="mb-5 flex items-end justify-between"
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="grid grid-cols-2 gap-3"
           >
-            <div>
-              <p className="text-xs uppercase tracking-[0.25em] text-accent">À l'affiche</p>
-              <h2 className="mt-1 font-display text-3xl text-fg-primary">Modules récents</h2>
-            </div>
-            <button
-              onClick={() => navigate({ name: "library" })}
-              className="no-drag rounded-lg bg-white/[0.04] px-4 py-2 text-xs font-medium text-fg-primary ring-1 ring-white/[0.06] transition-colors hover:bg-white/[0.08]"
-            >
-              Tout voir →
-            </button>
+            <StatTile
+              icon={Library}
+              label="Jeux dispos"
+              value={String(modules.length)}
+              tone="cyan"
+            />
+            <StatTile
+              icon={Clock}
+              label="Total joué"
+              value={totalPlaytimeMs > 0 ? formatPlaytime(totalPlaytimeMs) : "0"}
+              tone="amber"
+            />
+            <StatTile
+              icon={Users}
+              label="En ligne"
+              value={String(onlineCount)}
+              tone="emerald"
+              accent={onlineCount > 0}
+            />
+            <StatTile
+              icon={Flame}
+              label="Sessions"
+              value={String(playtime.reduce((s, p) => s + p.totalLaunches, 0))}
+              tone="rose"
+            />
           </motion.div>
 
-          <div className="grid grid-cols-3 gap-5">
-            {featured.map((m, i) => (
-              <FeaturedCard key={m.id} module={m} index={i} onClick={() => navigate({ name: "module", moduleId: m.id })} />
-            ))}
-          </div>
-        </section>
-      )}
+          <FriendsOnlineTile
+            friends={friendsOnline.slice(0, 6)}
+            totalCount={friendsOnline.length}
+            onClickFriend={(uid) =>
+              me &&
+              navigate({
+                name: "messages",
+                conversationId: [me.uid, uid].sort().join("__"),
+              })
+            }
+            onSeeAll={() => navigate({ name: "community" })}
+          />
 
-      <section className="px-12 pb-16">
+          {featuredServerModule && featuredServerModule.server?.type === "minecraft" && (
+            <ServerHeartbeatTile
+              moduleId={featuredServerModule.id}
+              moduleName={featuredServerModule.name}
+              address={featuredServerModule.server.address}
+              onClick={() =>
+                navigate({ name: "module", moduleId: featuredServerModule.id })
+              }
+            />
+          )}
+        </div>
+
+        {/* ─── Bottom row: conversations + activity feed ─────────── */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="grid grid-cols-3 gap-4"
+          transition={{ duration: 0.5, delay: 0.25 }}
+          className="col-span-12 lg:col-span-5"
         >
-          <FeatureCard
-            icon={Newspaper}
-            title="Auto-update"
-            description="Le launcher se met à jour automatiquement à chaque démarrage."
-          />
-          <FeatureCard
-            icon={Zap}
-            title="Lancement instant"
-            description="Un clic et c'est parti — exécutables locaux ou téléchargements cloud."
-          />
-          <FeatureCard
-            icon={Sparkles}
-            title="Pages custom"
-            description="Chaque jeu a sa propre page stylée avec son thème et ses animations."
+          <ConversationsTile
+            conversations={recentConversations}
+            myUid={me?.uid ?? ""}
+            unreadTotal={totalUnread}
+            onOpen={(cid) => navigate({ name: "messages", conversationId: cid })}
+            onSeeAll={() => navigate({ name: "messages" })}
           />
         </motion.div>
-      </section>
+
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+          className="col-span-12 lg:col-span-7"
+        >
+          <ActivityFeedTile users={friendsOnline} modules={modules} />
+        </motion.div>
+      </div>
+
+      {/* Mascot — context-aware Glitch penguin in the bottom-right that
+          changes mood based on what's happening. See `mascotMood` below. */}
+      <Mascot mood={mascotMood} tooltip={mascotTooltip} />
     </div>
   );
 }
 
-function Stat({ icon: Icon, value, label }: { icon: typeof Library; value: number; label: string }) {
+// ---------------------------------------------------------------------------
+//                              GREETING HERO
+// ---------------------------------------------------------------------------
+
+function GreetingHero({
+  firstName,
+  greetingLabel,
+  greetingEmoji,
+  avatar,
+}: {
+  firstName: string;
+  greetingLabel: string;
+  greetingEmoji: string;
+  avatar: string | null;
+}) {
+  const [time, setTime] = useState(formatHourMinute(new Date()));
+  useEffect(() => {
+    const t = setInterval(() => setTime(formatHourMinute(new Date())), 30_000);
+    return () => clearInterval(t);
+  }, []);
   return (
-    <div className="inline-flex items-center gap-3 rounded-2xl glass px-4 py-3">
-      <div className="grid size-10 place-items-center rounded-xl bg-accent/10 text-accent ring-1 ring-accent/20">
-        <Icon className="size-5" strokeWidth={2} />
+    <div className="mb-5 flex items-center gap-4 rounded-3xl glass-strong p-6">
+      {avatar ? (
+        <img
+          src={avatar}
+          alt=""
+          className="size-14 rounded-2xl object-cover ring-1 ring-accent/30 shadow-[0_0_24px_var(--color-accent-soft)]"
+        />
+      ) : (
+        <div className="grid size-14 place-items-center rounded-2xl bg-accent/15 font-display text-2xl text-accent ring-1 ring-accent/30">
+          {firstName.slice(0, 1).toUpperCase()}
+        </div>
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="inline-flex items-center gap-1.5 text-xs uppercase tracking-[0.25em] text-accent">
+          <span className="text-base leading-none">{greetingEmoji}</span>
+          {greetingLabel}
+        </div>
+        <h1 className="mt-1 truncate font-display text-4xl text-fg-primary">
+          Salut, <span className="text-glow-accent">{firstName}</span>
+        </h1>
       </div>
-      <div>
-        <div className="font-display text-2xl text-fg-primary">{value}</div>
-        <div className="text-xs text-fg-muted">{label}</div>
+      <div className="hidden text-right md:block">
+        <div className="font-display text-2xl tabular-nums text-fg-primary">{time}</div>
+        <div className="text-[10px] uppercase tracking-wider text-fg-dim">
+          {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "short" })}
+        </div>
       </div>
     </div>
   );
 }
 
-function FeaturedCard({
+// ---------------------------------------------------------------------------
+//                          CONTINUE PLAYING CARD
+// ---------------------------------------------------------------------------
+
+function ContinueCard({
   module,
-  index,
-  onClick,
+  entry,
+  onPlay,
 }: {
   module: LauncherModule;
-  index: number;
-  onClick: () => void;
+  entry: PlaytimeEntry | null;
+  onPlay: () => void;
 }) {
-  const [status, setStatus] = useState<DerivedStatus | null>(null);
-
-  useEffect(() => {
-    if (module.type === "shortcut") {
-      setStatus(deriveStatus(module, null));
-      return;
-    }
-    let cancelled = false;
-    getModuleState(module.id).then((s) => {
-      if (!cancelled) setStatus(deriveStatus(module, s));
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [module]);
-
+  const lastWhen = entry?.lastPlayedAt ? formatRelative(entry.lastPlayedAt) : "Jamais joué";
+  const totalSelf = entry ? formatPlaytime(entry.totalMs) : "—";
   return (
     <motion.button
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.5 + index * 0.08 }}
-      whileHover={{ y: -4 }}
-      onClick={onClick}
-      className="no-drag group relative aspect-[16/9] overflow-hidden rounded-2xl glass text-left"
+      whileHover={{ y: -2 }}
+      transition={{ type: "spring", stiffness: 300 }}
+      onClick={onPlay}
+      className="no-drag group relative block aspect-[16/8] w-full overflow-hidden rounded-3xl glass-strong text-left"
     >
       {module.bannerUrl ? (
         <img
           src={module.bannerUrl}
           alt=""
-          className="absolute inset-0 size-full object-cover transition-transform duration-700 group-hover:scale-110"
+          className="absolute inset-0 size-full object-cover transition-transform duration-700 group-hover:scale-105"
         />
       ) : (
         <div className="absolute inset-0 bg-gradient-to-br from-accent/30 via-bg-soft to-fuchsia-500/20" />
       )}
+      <div className="absolute inset-0 bg-gradient-to-t from-bg-base via-bg-base/50 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-r from-bg-base/70 via-transparent to-transparent" />
 
-      <div className="absolute inset-0 bg-gradient-to-t from-bg-base via-bg-base/30 to-transparent" />
+      <div className="absolute inset-0 flex flex-col justify-between p-6">
+        <div className="inline-flex items-center gap-2 self-start rounded-full bg-bg-base/60 px-2.5 py-1 text-[10px] uppercase tracking-wider text-accent ring-1 ring-accent/20 backdrop-blur-md">
+          <Clock className="size-3" /> Continue ici
+        </div>
 
-      <div className="absolute inset-x-0 bottom-0 p-4">
-        <div className="flex items-end gap-3">
-          {module.iconUrl && <img src={module.iconUrl} alt="" className="size-10 rounded-lg ring-1 ring-white/10" />}
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-semibold text-fg-primary">{module.name}</div>
-            <div className="text-xs text-fg-muted line-clamp-1">{module.shortDescription ?? "—"}</div>
+        <div>
+          <div className="flex items-end gap-3">
+            {module.iconUrl && (
+              <img
+                src={module.iconUrl}
+                alt=""
+                className="size-12 shrink-0 rounded-xl object-cover ring-1 ring-white/10"
+              />
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="font-display text-3xl text-fg-primary drop-shadow-lg">
+                {module.name}
+              </div>
+              <div className="mt-0.5 text-xs text-fg-muted">
+                Joué {lastWhen} · {totalSelf} cumulés
+              </div>
+            </div>
+            <div className="grid size-14 shrink-0 place-items-center rounded-2xl bg-accent text-bg-base shadow-[0_0_24px_var(--color-accent-glow)] transition-shadow group-hover:shadow-[0_0_36px_var(--color-accent-glow)]">
+              <Play className="size-6 fill-current" strokeWidth={0} />
+            </div>
           </div>
-          <StatusChip status={status} />
         </div>
       </div>
-
-      <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/[0.04] transition-all group-hover:ring-accent/30 group-hover:shadow-[inset_0_0_30px_var(--color-accent-soft)]" />
+      <div className="pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-inset ring-white/[0.04] transition-all group-hover:ring-accent/30 group-hover:shadow-[inset_0_0_30px_var(--color-accent-soft)]" />
     </motion.button>
   );
 }
 
-function StatusChip({ status }: { status: DerivedStatus | null }) {
-  if (!status) return null;
-  const labels: Record<DerivedStatus["kind"], { text: string; cls: string }> = {
-    shortcut: { text: "Local", cls: "bg-fuchsia-500/15 text-fuchsia-300 ring-fuchsia-500/30" },
-    minecraft: { text: "Minecraft", cls: "bg-emerald-500/15 text-emerald-300 ring-emerald-500/30" },
-    "not-installed": { text: "Installer", cls: "bg-white/[0.05] text-fg-muted ring-white/[0.08]" },
-    installed: { text: "Prêt", cls: "bg-success/15 text-success ring-success/30" },
-    "update-available": { text: "MAJ dispo", cls: "bg-amber-500/15 text-amber-300 ring-amber-500/30" },
-  };
-  const meta = labels[status.kind];
-  if (!meta) return null;
+// ---------------------------------------------------------------------------
+//                                 STAT TILE
+// ---------------------------------------------------------------------------
+
+const STAT_TONES = {
+  cyan: {
+    bg: "bg-accent/10",
+    text: "text-accent",
+    ring: "ring-accent/20",
+  },
+  emerald: {
+    bg: "bg-emerald-500/10",
+    text: "text-emerald-300",
+    ring: "ring-emerald-500/20",
+  },
+  amber: {
+    bg: "bg-amber-500/10",
+    text: "text-amber-300",
+    ring: "ring-amber-500/20",
+  },
+  rose: {
+    bg: "bg-rose-500/10",
+    text: "text-rose-300",
+    ring: "ring-rose-500/20",
+  },
+} as const;
+
+function StatTile({
+  icon: Icon,
+  label,
+  value,
+  tone,
+  accent = false,
+}: {
+  icon: typeof Library;
+  label: string;
+  value: string;
+  tone: keyof typeof STAT_TONES;
+  accent?: boolean;
+}) {
+  const t = STAT_TONES[tone];
   return (
-    <span
+    <div
       className={cn(
-        "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider ring-1",
-        meta.cls,
+        "rounded-2xl glass p-3.5 ring-1 transition-shadow",
+        t.ring,
+        accent && "shadow-[0_0_20px_var(--color-accent-soft)]",
       )}
     >
-      {meta.text}
-    </span>
+      <div className={cn("mb-2 grid size-8 place-items-center rounded-lg", t.bg, t.text)}>
+        <Icon className="size-4" strokeWidth={2} />
+      </div>
+      <div className="font-display text-xl tabular-nums text-fg-primary">{value}</div>
+      <div className="text-[10px] uppercase tracking-wider text-fg-dim">{label}</div>
+    </div>
   );
 }
 
-function FeatureCard({
-  icon: Icon,
-  title,
-  description,
+// ---------------------------------------------------------------------------
+//                          FRIENDS ONLINE TILE
+// ---------------------------------------------------------------------------
+
+function FriendsOnlineTile({
+  friends,
+  totalCount,
+  onClickFriend,
+  onSeeAll,
 }: {
-  icon: typeof Sparkles;
-  title: string;
-  description: string;
+  friends: { user: UserPresence; status: PresenceStatus }[];
+  totalCount: number;
+  onClickFriend: (uid: string) => void;
+  onSeeAll: () => void;
 }) {
   return (
-    <motion.div
-      whileHover={{ y: -4 }}
-      transition={{ type: "spring", stiffness: 300 }}
-      className="group relative overflow-hidden rounded-2xl glass p-6"
-    >
-      <div className="mb-3 grid size-10 place-items-center rounded-xl bg-accent/10 text-accent ring-1 ring-accent/20 transition-shadow group-hover:shadow-[0_0_24px_var(--color-accent-soft)]">
-        <Icon className="size-5" strokeWidth={2} />
+    <div className="rounded-2xl glass p-4">
+      <div className="mb-3 flex items-center justify-between text-xs uppercase tracking-wider">
+        <span className="inline-flex items-center gap-1.5 text-fg-muted">
+          <Users className="size-3" /> Amis en ligne
+        </span>
+        <button
+          onClick={onSeeAll}
+          className="text-fg-dim transition-colors hover:text-fg-primary"
+        >
+          Tout voir →
+        </button>
       </div>
-      <h3 className="font-medium text-fg-primary">{title}</h3>
-      <p className="mt-1 text-sm text-fg-muted">{description}</p>
-    </motion.div>
+      {friends.length === 0 ? (
+        <div className="rounded-xl bg-bg-base/40 p-3 text-center text-xs text-fg-muted">
+          Aucun pote pour l'instant. Invite-en depuis la page Communauté.
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          {friends.map(({ user, status }) => (
+            <button
+              key={user.uid}
+              onClick={() => onClickFriend(user.uid)}
+              className="no-drag group flex w-full items-center gap-3 rounded-xl bg-bg-base/30 p-2 text-left transition-colors hover:bg-bg-base/60"
+            >
+              <div className="relative shrink-0">
+                {user.avatarUrl ? (
+                  <img src={user.avatarUrl} alt="" className="size-9 rounded-lg object-cover ring-1 ring-white/10" />
+                ) : (
+                  <div className="grid size-9 place-items-center rounded-lg bg-accent/15 text-xs font-display text-accent">
+                    {(user.displayName ?? "?").slice(0, 1).toUpperCase()}
+                  </div>
+                )}
+                <span
+                  className={cn(
+                    "absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full ring-2 ring-bg-soft",
+                    status === "online" && "bg-success shadow-[0_0_6px_currentColor]",
+                    status === "idle" && "bg-amber-400",
+                    status === "offline" && "bg-fg-dim",
+                  )}
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-xs font-medium text-fg-primary">
+                  {user.displayName ?? user.username ?? "Anonyme"}
+                </div>
+                <div className="truncate text-[10px] text-fg-dim">
+                  {user.currentActivity && status === "online" ? (
+                    <span className="inline-flex items-center gap-1 text-accent">
+                      <Gamepad2 className="size-2.5" /> {user.currentActivity.moduleName}
+                    </span>
+                  ) : status === "online" ? (
+                    "Dans le menu"
+                  ) : status === "idle" ? (
+                    "Inactif"
+                  ) : (
+                    "Hors ligne"
+                  )}
+                </div>
+              </div>
+              <MessageCircle className="size-3.5 shrink-0 text-fg-dim opacity-0 transition-opacity group-hover:opacity-100" />
+            </button>
+          ))}
+        </div>
+      )}
+      {totalCount > friends.length && (
+        <div className="mt-2 text-center text-[10px] text-fg-dim">
+          +{totalCount - friends.length} autres amis hors ligne
+        </div>
+      )}
+    </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+//                       SERVER HEARTBEAT TILE (live MC)
+// ---------------------------------------------------------------------------
+
+function ServerHeartbeatTile({
+  moduleName,
+  address,
+  onClick,
+}: {
+  moduleId: string;
+  moduleName: string;
+  address: string;
+  onClick: () => void;
+}) {
+  const status = useMinecraftStatus(address);
+  return (
+    <motion.button
+      whileHover={{ y: -2 }}
+      transition={{ type: "spring", stiffness: 300 }}
+      onClick={onClick}
+      className="no-drag relative block w-full overflow-hidden rounded-2xl bg-gradient-to-br from-success/[0.08] via-bg-soft/40 to-emerald-500/[0.08] p-4 text-left ring-1 ring-success/20"
+    >
+      <div className="mb-2 flex items-center justify-between">
+        <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-success">
+          <span
+            className={cn(
+              "size-1.5 rounded-full",
+              status?.online ? "bg-success shadow-[0_0_6px_currentColor]" : "bg-fg-dim",
+            )}
+          />
+          Serveur Minecraft
+        </span>
+        {status?.players && status.online && (
+          <span className="font-display text-xl tabular-nums text-fg-primary">
+            {status.players.online}
+            <span className="text-xs text-fg-muted">/{status.players.max}</span>
+          </span>
+        )}
+      </div>
+      <div className="text-sm font-medium text-fg-primary">{moduleName}</div>
+      <div className="truncate font-mono text-[10px] text-fg-dim">{address}</div>
+      {status?.online && status.players && status.players.online > 0 && status.playersList && (
+        <div className="mt-2 flex items-center gap-1">
+          {status.playersList.slice(0, 5).map((p) => (
+            <img
+              key={p.uuid || p.name}
+              src={
+                p.uuid
+                  ? `https://crafatar.com/avatars/${p.uuid}?size=24&overlay`
+                  : `https://mc-heads.net/avatar/${encodeURIComponent(p.name)}/24`
+              }
+              alt={p.name}
+              title={p.name}
+              className="size-6 rounded-md ring-1 ring-white/10"
+              loading="lazy"
+            />
+          ))}
+          {status.players.online > 5 && (
+            <span className="ml-1 text-[10px] text-fg-dim">+{status.players.online - 5}</span>
+          )}
+        </div>
+      )}
+      {status && !status.online && (
+        <div className="mt-2 text-[10px] text-fg-dim">Serveur hors ligne</div>
+      )}
+    </motion.button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+//                          CONVERSATIONS TILE
+// ---------------------------------------------------------------------------
+
+function ConversationsTile({
+  conversations,
+  myUid,
+  unreadTotal,
+  onOpen,
+  onSeeAll,
+}: {
+  conversations: Conversation[];
+  myUid: string;
+  unreadTotal: number;
+  onOpen: (cid: string) => void;
+  onSeeAll: () => void;
+}) {
+  return (
+    <div className="rounded-2xl glass p-5">
+      <div className="mb-3 flex items-center justify-between text-xs uppercase tracking-wider">
+        <span className="inline-flex items-center gap-1.5 text-fg-muted">
+          <MessageCircle className="size-3" /> Dernières conversations
+          {unreadTotal > 0 && (
+            <span className="ml-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-accent px-1 text-[9px] font-bold text-bg-base">
+              {unreadTotal > 9 ? "9+" : unreadTotal}
+            </span>
+          )}
+        </span>
+        <button onClick={onSeeAll} className="text-fg-dim transition-colors hover:text-fg-primary">
+          Tout voir →
+        </button>
+      </div>
+      {conversations.length === 0 ? (
+        <div className="rounded-xl bg-bg-base/40 p-5 text-center text-xs text-fg-muted">
+          Aucune conversation. Démarre-en une depuis la page Communauté.
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          {conversations.map((c) => {
+            const peerUid = otherParticipant(c, myUid);
+            const peerName = c.participantNames[peerUid] ?? "Inconnu";
+            const peerAvatar = c.participantAvatars[peerUid] ?? null;
+            const last = c.lastMessage;
+            const unread = unreadCount(c, myUid);
+            const isMine = last?.senderUid === myUid;
+            return (
+              <button
+                key={c.id}
+                onClick={() => onOpen(c.id)}
+                className="no-drag flex w-full items-center gap-3 rounded-xl bg-bg-base/30 p-2.5 text-left transition-colors hover:bg-bg-base/60"
+              >
+                {peerAvatar ? (
+                  <img src={peerAvatar} alt="" className="size-9 shrink-0 rounded-lg object-cover ring-1 ring-white/10" />
+                ) : (
+                  <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent/15 font-display text-accent">
+                    {peerName.slice(0, 1).toUpperCase()}
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={cn("truncate text-sm", unread > 0 ? "font-semibold text-fg-primary" : "text-fg-primary")}>
+                      {peerName}
+                    </span>
+                    {last && (
+                      <span className="shrink-0 text-[10px] text-fg-dim">{formatRelative(last.sentAt)}</span>
+                    )}
+                  </div>
+                  <div className={cn("truncate text-xs", unread > 0 ? "text-fg-primary" : "text-fg-muted")}>
+                    {last
+                      ? (isMine ? "Toi : " : "") + last.text
+                      : <span className="italic text-fg-dim">Aucun message</span>}
+                  </div>
+                </div>
+                {unread > 0 && (
+                  <span className="grid size-5 shrink-0 place-items-center rounded-full bg-accent text-[10px] font-bold text-bg-base">
+                    {unread > 9 ? "9+" : unread}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+//                          ACTIVITY FEED TILE
+// ---------------------------------------------------------------------------
+
+/**
+ * Compact rolling activity feed synthesized from the presence + module
+ * snapshots. Shows what users in the launcher are currently up to ("X joue à
+ * Y", "Z est en ligne") with a relative timestamp. Pure derived data — no
+ * extra Firestore subscription, just re-renders when presence updates.
+ */
+function ActivityFeedTile({
+  users,
+  modules,
+}: {
+  users: { user: UserPresence; status: PresenceStatus }[];
+  modules: LauncherModule[];
+}) {
+  const events = useMemo(() => {
+    type Event = {
+      id: string;
+      avatar: string | null;
+      name: string;
+      verb: string;
+      target: string;
+      ts: number;
+      iconColor: string;
+    };
+    const out: Event[] = [];
+    for (const { user, status } of users) {
+      if (status === "online" && user.currentActivity) {
+        const mod = modules.find((m) => m.id === user.currentActivity?.moduleId);
+        out.push({
+          id: `${user.uid}-playing`,
+          avatar: user.avatarUrl,
+          name: user.displayName ?? user.username ?? "Anonyme",
+          verb: "joue à",
+          target: mod?.name ?? user.currentActivity.moduleName,
+          ts: user.currentActivity.startedAt,
+          iconColor: "text-accent",
+        });
+      } else if (status === "online") {
+        out.push({
+          id: `${user.uid}-online`,
+          avatar: user.avatarUrl,
+          name: user.displayName ?? user.username ?? "Anonyme",
+          verb: "est",
+          target: "dans le menu",
+          ts: user.lastSeen ?? 0,
+          iconColor: "text-success",
+        });
+      }
+    }
+    return out
+      .filter((e) => e.ts > 0)
+      .sort((a, b) => b.ts - a.ts)
+      .slice(0, 6);
+  }, [users, modules]);
+
+  return (
+    <div className="h-full rounded-2xl glass p-5">
+      <div className="mb-3 flex items-center justify-between text-xs uppercase tracking-wider">
+        <span className="inline-flex items-center gap-1.5 text-fg-muted">
+          <Activity className="size-3" /> Activité communauté
+        </span>
+        <span className="inline-flex items-center gap-1 text-[10px] text-success">
+          <span className="size-1 rounded-full bg-success shadow-[0_0_6px_currentColor]" /> Live
+        </span>
+      </div>
+      {events.length === 0 ? (
+        <div className="rounded-xl bg-bg-base/40 p-5 text-center text-xs text-fg-muted">
+          Personne n'est en ligne en ce moment. Reviens plus tard 👋
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {events.map((ev) => (
+            <div key={ev.id} className="flex items-center gap-3">
+              {ev.avatar ? (
+                <img src={ev.avatar} alt="" className="size-7 shrink-0 rounded-lg object-cover ring-1 ring-white/10" />
+              ) : (
+                <div className="grid size-7 shrink-0 place-items-center rounded-lg bg-accent/15 text-[10px] font-display text-accent">
+                  {ev.name.slice(0, 1).toUpperCase()}
+                </div>
+              )}
+              <div className="min-w-0 flex-1 text-xs">
+                <span className="font-medium text-fg-primary">{ev.name}</span>{" "}
+                <span className="text-fg-muted">{ev.verb}</span>{" "}
+                <span className={ev.iconColor}>{ev.target}</span>
+              </div>
+              <span className="shrink-0 text-[10px] text-fg-dim">{formatRelative(ev.ts)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+// ---------------------------------------------------------------------------
+//                              TIME OF DAY
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns a contextual greeting + matching emoji + a subtle hue gradient
+ * tinted to the current time of day. Splits the day into four moods:
+ *  - Matin (5h → 12h)    : crisp cyan-orange dawn
+ *  - Après-midi (12 → 18) : warm amber daylight
+ *  - Soir (18 → 22)       : magenta sunset
+ *  - Nuit (22 → 5)        : deep violet moonlight
+ */
+function greetingFor(now: Date): {
+  label: string;
+  emoji: string;
+  /** CSS gradient string applied to the hero halo behind the greeting card. */
+  heroGradient: string;
+} {
+  const h = now.getHours();
+  if (h >= 5 && h < 12) {
+    return {
+      label: "Bon matin",
+      emoji: "☀️",
+      heroGradient:
+        "radial-gradient(ellipse at top left, rgba(56,189,248,0.25), transparent 60%), radial-gradient(ellipse at top right, rgba(251,146,60,0.18), transparent 60%)",
+    };
+  }
+  if (h >= 12 && h < 18) {
+    return {
+      label: "Bon aprem",
+      emoji: "🌤️",
+      heroGradient:
+        "radial-gradient(ellipse at top left, rgba(251,191,36,0.22), transparent 60%), radial-gradient(ellipse at top right, rgba(0,212,255,0.18), transparent 60%)",
+    };
+  }
+  if (h >= 18 && h < 22) {
+    return {
+      label: "Bonsoir",
+      emoji: "🌆",
+      heroGradient:
+        "radial-gradient(ellipse at top left, rgba(244,114,182,0.22), transparent 60%), radial-gradient(ellipse at top right, rgba(251,146,60,0.18), transparent 60%)",
+    };
+  }
+  return {
+    label: "Bonne nuit",
+    emoji: "🌙",
+    heroGradient:
+      "radial-gradient(ellipse at top left, rgba(139,92,246,0.25), transparent 60%), radial-gradient(ellipse at top right, rgba(0,212,255,0.18), transparent 60%)",
+  };
+}
+
+// ---------------------------------------------------------------------------
+//                                HELPERS
+// ---------------------------------------------------------------------------
+
+function formatRelative(ts: number): string {
+  const diff = Date.now() - ts;
+  const sec = Math.floor(diff / 1000);
+  if (sec < 60) return "à l'instant";
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min} min`;
+  const hour = Math.floor(min / 60);
+  if (hour < 24) return `${hour} h`;
+  const day = Math.floor(hour / 24);
+  if (day < 7) return `${day} j`;
+  return new Date(ts).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+}
+
+function formatHourMinute(d: Date): string {
+  return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 }

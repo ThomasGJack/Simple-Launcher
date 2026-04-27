@@ -1,17 +1,47 @@
+import { lazy, Suspense } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { TitleBar } from "@/components/window/TitleBar";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { AnimatedBackground } from "@/components/layout/AnimatedBackground";
+import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
+import { PageSkeleton } from "@/components/ui/Skeleton";
 import { useUIStore, type Route } from "@/store/ui";
+// Home + Library + Login are eagerly imported because they're the first
+// pages a user lands on — paying a Suspense fallback there would feel
+// laggy. Everything else is code-split into its own chunk so the initial
+// JS bundle stays lean (~300 KB gzipped instead of 1+ MB).
 import { HomePage } from "@/pages/HomePage";
 import { LibraryPage } from "@/pages/LibraryPage";
 import { LoginPage } from "@/pages/LoginPage";
-import { SettingsPage } from "@/pages/SettingsPage";
-import { ProfilePage } from "@/pages/ProfilePage";
-import { AdminPage } from "@/pages/AdminPage";
-import { ModuleDetailPage } from "@/pages/ModuleDetailPage";
-import { CommunityPage } from "@/pages/CommunityPage";
 import { UpdateBanner } from "@/components/updater/UpdateBanner";
+
+const SettingsPage = lazy(() =>
+  import("@/pages/SettingsPage").then((m) => ({ default: m.SettingsPage })),
+);
+const ProfilePage = lazy(() =>
+  import("@/pages/ProfilePage").then((m) => ({ default: m.ProfilePage })),
+);
+const AdminPage = lazy(() =>
+  import("@/pages/AdminPage").then((m) => ({ default: m.AdminPage })),
+);
+const AdminPageBuilder = lazy(() =>
+  import("@/pages/AdminPageBuilder").then((m) => ({ default: m.AdminPageBuilder })),
+);
+const AdminLogsPage = lazy(() =>
+  import("@/pages/AdminLogsPage").then((m) => ({ default: m.AdminLogsPage })),
+);
+const ModuleDetailPage = lazy(() =>
+  import("@/pages/ModuleDetailPage").then((m) => ({ default: m.ModuleDetailPage })),
+);
+const CommunityPage = lazy(() =>
+  import("@/pages/CommunityPage").then((m) => ({ default: m.CommunityPage })),
+);
+const MessagesPage = lazy(() =>
+  import("@/pages/MessagesPage").then((m) => ({ default: m.MessagesPage })),
+);
+const PublicProfilePage = lazy(() =>
+  import("@/pages/PublicProfilePage").then((m) => ({ default: m.PublicProfilePage })),
+);
 
 export function AppShell() {
   const route = useUIStore((s) => s.route);
@@ -35,7 +65,9 @@ export function AppShell() {
               transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
               className="relative h-full"
             >
-              {renderRoute(route.name)}
+              <ErrorBoundary scope={`route:${route.name}`}>
+                <Suspense fallback={<PageSkeleton />}>{renderRoute(route.name)}</Suspense>
+              </ErrorBoundary>
             </motion.div>
           </AnimatePresence>
         </main>
@@ -47,7 +79,9 @@ export function AppShell() {
 }
 
 function routeKey(route: Route): string {
-  return route.name === "module" ? `module:${route.moduleId}` : route.name;
+  if (route.name === "module") return `module:${route.moduleId}`;
+  if (route.name === "admin-builder") return `admin-builder:${route.moduleId}`;
+  return route.name;
 }
 
 function renderRoute(name: string) {
@@ -64,8 +98,16 @@ function renderRoute(name: string) {
       return <ProfilePage />;
     case "admin":
       return <AdminPage />;
+    case "admin-builder":
+      return <AdminPageBuilder />;
+    case "admin-logs":
+      return <AdminLogsPage />;
     case "community":
       return <CommunityPage />;
+    case "messages":
+      return <MessagesPage />;
+    case "user-profile":
+      return <PublicProfilePage />;
     case "login":
       return <LoginPage />;
     default:

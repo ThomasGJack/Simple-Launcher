@@ -2,10 +2,15 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   onSnapshot,
+  orderBy,
+  query,
   serverTimestamp,
   setDoc,
+  Timestamp,
   type Unsubscribe,
+  updateDoc,
 } from "firebase/firestore";
 import { deleteObject, getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 import { getFirebase } from "./config";
@@ -129,6 +134,95 @@ export async function uploadHostedModule(
   return fullModule;
 }
 
+/**
+ * Persisted version record for a hosted module — one per upload via
+ * `uploadHostedModule`, used by the admin rollback UI.
+ */
+export type ModuleVersionRecord = {
+  version: string;
+  releasedAt: number | null;
+  sha256: string;
+  size: number;
+  downloadUrl: string;
+};
+
+/**
+ * Subscribes to all the historical versions of a hosted module, sorted by
+ * `releasedAt` descending. Used by the admin "Versions publiées" panel +
+ * the rollback flow.
+ */
+export function watchModuleVersions(
+  moduleId: string,
+  callback: (versions: ModuleVersionRecord[]) => void,
+): Unsubscribe {
+  const fb = getFirebase();
+  if (!fb) {
+    callback([]);
+    return () => {};
+  }
+  const q = query(
+    collection(fb.db, "modules", moduleId, "versions"),
+    orderBy("releasedAt", "desc"),
+  );
+  return onSnapshot(
+    q,
+    (snap) => {
+      const list: ModuleVersionRecord[] = snap.docs.map((d) => {
+        const data = d.data();
+        return {
+          version: typeof data.version === "string" ? data.version : d.id,
+          releasedAt:
+            data.releasedAt instanceof Timestamp ? data.releasedAt.toMillis() : null,
+          sha256: typeof data.sha256 === "string" ? data.sha256 : "",
+          size: typeof data.size === "number" ? data.size : 0,
+          downloadUrl: typeof data.downloadUrl === "string" ? data.downloadUrl : "",
+        };
+      });
+      callback(list);
+    },
+    (err) => {
+      console.warn("[modules] watchModuleVersions failed:", err);
+      callback([]);
+    },
+  );
+}
+
+/**
+ * Atomically swap a hosted module's "current" pointer (its `version` /
+ * `downloadUrl` / `sha256` / `size` fields on the parent doc) back to a
+ * past version. Doesn't touch the binary in Storage — just re-points the
+ * module to the existing version blob, which is still there.
+ *
+ * After this lands, all clients see the older version as "current" and
+ * their `derivedStatus` flips to "update available" (current local !=
+ * remote). They click Update → re-download the older binary. So a "rollback"
+ * is really "advance everyone forward to the older artifact".
+ */
+export async function rollbackModuleToVersion(
+  moduleId: string,
+  targetVersion: string,
+): Promise<void> {
+  const fb = getFirebase();
+  if (!fb) throw new Error("Firebase not configured");
+  const versionRef = doc(fb.db, "modules", moduleId, "versions", targetVersion);
+  const snap = await getDoc(versionRef);
+  if (!snap.exists()) {
+    throw new Error(`Version ${targetVersion} introuvable pour le module ${moduleId}.`);
+  }
+  const data = snap.data() as ModuleVersionRecord;
+  await setDoc(
+    doc(fb.db, "modules", moduleId),
+    {
+      version: data.version,
+      downloadUrl: data.downloadUrl,
+      sha256: data.sha256,
+      size: data.size,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
+}
+
 export async function deleteModule(moduleId: string) {
   const fb = getFirebase();
   if (!fb) throw new Error("Firebase not configured");
@@ -194,7 +288,7 @@ export async function uploadModpackZip(
 
 export async function uploadModuleAsset(
   moduleId: string,
-  kind: "icon" | "banner",
+  kind: string,
   file: File,
 ): Promise<string> {
   const fb = getFirebase();
@@ -207,6 +301,16 @@ export async function uploadModuleAsset(
     customMetadata: { moduleId, kind },
   });
   return getDownloadURL(storageRef);
+}
+
+export async function updateModulePage(
+  moduleId: string,
+  page: import("../types/module").ModulePageV2,
+): Promise<void> {
+  const fb = getFirebase();
+  if (!fb) throw new Error("Firebase not configured");
+  const docRef = doc(fb.db, "modules", moduleId);
+  await updateDoc(docRef, { page });
 }
 
 function inferExt(file: File): string {

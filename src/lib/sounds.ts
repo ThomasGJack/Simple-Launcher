@@ -105,6 +105,24 @@ export const sounds = {
     play({ freq: 1320, duration: 0.08, type: "sine", volume: 0.14 });
     play({ freq: 1760, duration: 0.12, type: "sine", volume: 0.12 }, 0.06);
   },
+  // Soft two-tone chime for a new private message arrival — distinct from
+  // the "update arrived" arpeggio (which is louder + ascending). Goes E5 →
+  // G5 with a tiny attack, low volume so it's not intrusive when chatting.
+  messageReceived() {
+    play({ freq: 660, duration: 0.07, type: "sine", volume: 0.1 });
+    play({ freq: 880, duration: 0.1, type: "sine", volume: 0.09 }, 0.05);
+  },
+  // Cheerful 4-tone arpeggio used when a launcher update is detected in
+  // real-time while the app is open (vs. on startup which uses `notification`).
+  // More attention-grabbing than `notification` to match the centered modal.
+  updateArrived() {
+    play({ freq: 880, duration: 0.09, type: "sine", volume: 0.16 }); // A5
+    play({ freq: 1108, duration: 0.09, type: "sine", volume: 0.16 }, 0.07); // C#6
+    play({ freq: 1318, duration: 0.09, type: "sine", volume: 0.16 }, 0.14); // E6
+    play({ freq: 1760, duration: 0.18, type: "sine", volume: 0.18, release: 0.2 }, 0.21); // A6
+    // Faint shimmer overtone for sparkle
+    play({ freq: 2637, duration: 0.12, type: "sine", volume: 0.06, release: 0.1 }, 0.21);
+  },
 };
 
 // Auto-init enabled flag from storage on import

@@ -7,7 +7,11 @@ export type Route =
   | { name: "settings" }
   | { name: "profile" }
   | { name: "admin" }
+  | { name: "admin-builder"; moduleId: string }
+  | { name: "admin-logs" }
   | { name: "community" }
+  | { name: "messages"; conversationId?: string }
+  | { name: "user-profile"; uid: string }
   | { name: "login" };
 
 type UIState = {

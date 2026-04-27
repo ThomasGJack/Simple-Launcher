@@ -18,6 +18,271 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.04.27.19] - 2026-04-27  · semver `26.427.18`
+
+
+### Ajouté
+
+- **Pages de modules 100 % personnalisables** : nouveau schéma `ModulePageV2` avec un système de blocs (`AnyModuleBlock`) éditables via un builder visuel drag & drop dans l'admin (route `admin-builder`). 19 types de blocs disponibles : `hero-parallax`, `poster`, `gallery` (grid/masonry/carousel-3d + lightbox), `carousel`, `video-embed` (YouTube/Vimeo/Twitch/MP4), `comparison` (slider avant/après), `rich-text` (markdown), `feature-cards`, `quote`, `cta` (avec action `launch`/`url`/`scroll-top`), `divider`, `spacer`, `stats` (avec count-up), `timeline`, `changelog` (manuel ou auto-from-versions), `screenshots-grid`, `mascot-spot`, `particles-band`, `embed-html` (sanitizé via DOMPurify).
+- **Builder admin** : layout 3 colonnes (palette / canvas avec preview live / inspector), drag & drop via `@dnd-kit`, undo/redo (50 niveaux), duplicate/hide par bloc, override de thème par bloc (couleurs, fond glass, padding, alignement, max-width).
+- **Thème module étendu** : `theme.fontDisplayUrl` pour charger une police custom au runtime via `@font-face`. `theme.primary`/`theme.accent` propagés à tous les blocs via les CSS vars `--module-primary`/`--module-accent`.
+- **PlayButton config** : `playButton.label`/`sizeScale`/`style`/`position` (lus dans `ModuleDetailPage`).
+
+### Changé
+
+- `uploadModuleAsset(moduleId, kind, file)` accepte maintenant un `kind: string` arbitraire (anciennement `"icon" | "banner"`) pour supporter les uploads par bloc (`block-{blockId}-{slot}`).
+- Migration V1 → V2 transparente via `migrateModulePage()` : les pages legacy continuent d'afficher `<ModuleSections>` ; ouvrir le builder migre automatiquement à la sauvegarde.
+
+
+
+### Sécurité
+
+- HTML libre des blocs `embed-html` et `rich-text` systématiquement sanitizé via DOMPurify (whitelist iframe YouTube/Vimeo/Twitch, `<script>` et handlers `on*` retirés).
+## [v26.04.27.18] - 2026-04-27  · semver `26.427.17`
+
+
+### Ajouté
+- **Page profil personnelle customisable, accessible depuis la sidebar.** Click sur ton avatar (en bas de la sidebar) → ta propre page profil au lieu de l'ancienne page « Mon compte » minimale. Tu y vois tout ce que voient les autres + tes contrôles d'édition + ton bouton déconnexion :
+  - **Bannière personnalisée** (16:5 recommandé) qu'on uploade en 1 clic depuis la modal d'édition. Stockée dans Firebase Storage à `users/{uid}/profile/banner.{ext}` (public read pour que les autres potes la voient).
+  - **Bio** texte libre (max 300 chars) affichée sous ton nom dans le hero.
+  - **Couleur d'accent perso** : color picker + 5 presets rapides (cyan défaut / rose / violet / vert / or). Override la teinte cyan du launcher uniquement sur ta page profil — ailleurs le launcher reste cyan.
+  - **Jeux épinglés** (jusqu'à 3) — override le top-jeux auto-calculé par playtime. Toggle pin sur chaque jeu de ta bibliothèque, badge épingle cyan sur la card. Quand tu en as moins de 3 mais que tu joues à d'autres, les jeux suivants en playtime complètent automatiquement les places restantes.
+  - **Confidentialité** : 3 toggles indépendants — afficher mon activité « joue à X » live · afficher mes stats de temps de jeu · autoriser les DMs cold (non, les threads existants restent toujours actifs). Désactiver "DMs" cache le bouton « Message » sur ta page profil pour les autres potes.
+  - **Bouton « Modifier mon profil »** + **bouton « Déconnexion »** rouges visibles uniquement quand tu regardes ta propre page (logique `isMe` côté front + isolation Firestore avec `request.auth.uid == uid` pour les writes).
+
+### Changé
+- **Click sur l'avatar dans la sidebar** ouvre maintenant la nouvelle page profil unifiée (`user-profile?uid=meUid`) au lieu de l'ancienne `ProfilePage` minimaliste. L'ancienne route reste enregistrée comme fallback compatible mais n'est plus la cible par défaut.
+- **`UserPresence` étendu** avec `bio` / `bannerUrl` / `accentColor` / `pinnedModuleIds[]` / `privacy{showActivity, showPlaytime, allowDirectMessages}` — nouveau parser `parseUserDoc` partagé qui défensive-default les champs (les vieux docs sans ces fields sont implicitement open et sans bio).
+
+
+
+### Sécurité
+- **Nouvelles règles Firebase Storage pour `users/{uid}/profile/{file}`** : public read (tout authed user peut afficher la bannière sur la page profil), write owner-only (seul toi peux uploader ta bannière).
+## [v26.04.27.17] - 2026-04-27  · semver `26.427.16`
+
+
+### Ajouté
+- **Auto-détection de la version Java requise** par modpack Minecraft. Lors de l'install, le launcher parse `manifest.minecraft.version` et infère la version Java majeure correspondante (1.20.5+ → Java 21, 1.17–1.20.4 → Java 17, 1.16 et plus ancien → Java 8). Stocké dans le state local + affiché en clair dans le panneau Informations de la page module : « Java 21 · auto-installé par Prism si manquant ». Prism gère lui-même le download de la JVM compatible depuis Azul/Mojang à la première run, l'utilisateur n'a rien à faire — le launcher communique juste l'info pour transparence.
+- **Backup / restore cloud des saves Minecraft.** Nouveau panneau « Sauvegardes cloud » sur la page détail des modpacks Minecraft :
+  - **Sauvegarde** : zip côté Rust de `saves/` + `config/` + `screenshots/` + `resourcepacks/` + `shaderpacks/` (les mod jars sont exclus, ils sont reproductibles depuis le modpack source). Upload direct via REST Firebase Storage avec auth `Firebase {idToken}`. Métadonnées Firestore sous `/users/{uid}/minecraftBackups/{id}` avec label custom (« avant raid », « jour 12 »).
+  - **Restauration** : download du zip via reqwest, wipe des saves actuels (l'utilisateur a explicitement choisi), extract avec path-traversal guard. La progression de jeu d'avant le backup est restaurée à l'identique.
+  - **Liste live** des sauvegardes par modpack avec date, taille, label, lien de download direct (zip), bouton Restaurer + Suppression. Tri newest-first.
+  - Chaque pote a ses propres backups privés (rules Firestore + Storage owner-only). Tu peux installer le launcher sur un autre PC et restaurer ta sauvegarde en 2 clics.
+- **Console RCON admin pour les serveurs Minecraft.** Implémentation complète du protocole Source RCON (TCP packet-based) côté Rust avec auth + multiplexing de session. Bouton violet **« Console RCON admin »** sur la page détail des modpacks Minecraft (visible uniquement pour le Discord ID admin). Click → modal :
+  - Form de connexion (port + mot de passe + checkbox « Se souvenir », stocké en localStorage par-host).
+  - Once auth OK, terminal-style monospace : output des commandes en blanc, commandes saisies en cyan préfixées `>`, messages système en italique amber. Auto-scroll, timestamps, gestion des réponses RCON multi-paquets via la trick du sentinel packet.
+  - Commandes Minecraft envoyées sans le `/` initial (ex: `list`, `say Hello`, `whitelist add Notch`).
+  - Auto-disconnect quand le modal se ferme. Le mot de passe RCON n'est **jamais** envoyé à Firestore (que localStorage local).
+
+
+### Corrigé
+- **Toast achievements en boucle infinie + achievements ne s'enregistrant pas sur le profil.** La cause : les règles Firestore pour `/users/{uid}/achievements/{achievementId}` n'étaient pas encore déployées, donc `recordUnlock()` échouait silencieusement (rules denied) et le `watchAchievements` listener errorait → `unlockedSet` restait vide → l'effet de détection re-toastait à chaque snapshot Firestore (modules, playtime, etc.) qui changeait. Double fix appliqué :
+  1. **Garde session-locale** via `useRef<Set<string>>` qui retient les achievements déjà toastés dans la session actuelle. Une fois toasté, ne re-trigger jamais, peu importe l'état Firestore.
+  2. **Règles Firestore déployées** : `/users/{uid}/achievements/{id}` autorise create/update à l'owner, read à tous les authed (pour afficher les badges sur les pages profil public).
+  3. Bonus : l'erreur de `recordUnlock` est maintenant loggée comme `error` au lieu d'être swallowed, donc l'admin la verrait dans le panel Logs si ça re-pète.
+
+
+### Sécurité
+- **Règles Firestore strictes pour `/users/{uid}/minecraftBackups/{id}`** : owner-only en read+write. Combinées avec les règles Storage `users/{uid}/minecraftBackups/**` également owner-only, les saves d'un joueur restent privées même si l'URL de download (qui contient un download-token) fuite — Firebase rules add an extra defense layer.
+- **Règles Firestore + Storage pour les achievements** : voir « Corrigé » ci-dessus.
+## [v26.04.27.16] - 2026-04-27  · semver `26.427.15`
+
+
+### Ajouté
+- **Notifications Windows natives** via `tauri-plugin-notification`. Quand un pote t'envoie un DM ou une invitation gaming et que la fenêtre du launcher n'est PAS focused (minimisée, dans le tray, sur un autre desktop), tu reçois une vraie notification Windows toast (avec son système Windows + bandeau coin écran). Permission demandée une seule fois la première fois, puis silencieux. Helper `notify()` côté lib avec dédup intelligente : skip si la fenêtre est déjà focused (le son in-app + UI suffisent).
+- **Icône système (tray) avec menu contextuel.** Le launcher pose maintenant son icône dans la barre des tâches Windows à côté de l'horloge. Right-click → menu : « Ouvrir Simple Launcher · Naviguer vers (Communauté / Messages / Bibliothèque) · Quitter ». Left-click → toggle visibilité de la fenêtre principale (show / hide / focus selon état). **Fermer la fenêtre ne quitte plus l'app** — elle se cache dans le tray (comme Discord/Steam). Pour vraiment quitter, click droit tray → Quitter. Les notifs continuent à fonctionner pendant que le launcher tourne en arrière-plan.
+- **Game invitations entre potes.** Bouton « Inviter à jouer » sur la page profil public d'un pote → modal avec picker du jeu de ta bibliothèque + champ « petit mot » optionnel. Envoie une `/invitations/{id}` Firestore au pote ciblé, qui voit chez lui un **popup card animé en bas-droite** avec ton avatar, le jeu, ton message, et 2 boutons « Rejoindre » / « Plus tard ». Doublé d'une **notification Windows native** si sa fenêtre n'est pas focused. TTL 30 min : passé ce délai, l'invitation est filtrée côté client (l'audit reste en Firestore et est purgé par le cron 14). Click sur Rejoindre → navigation directe vers la page module pour install/launch.
+- **Module versioning / rollback admin.** Nouveau panneau **« Versions publiées »** dans le formulaire d'édition d'un module hébergé : liste toutes les versions archivées (chaque upload de binaire crée une entrée `/modules/{id}/versions/{version}`), avec date de release + taille + bouton **« Rétablir »** sur chaque ancienne version. Click → atomic swap des champs `version` / `downloadUrl` / `sha256` / `size` du parent doc vers ceux de la version cible. Tes potes voient ça comme un « update available » classique au prochain check de leur launcher → ils re-téléchargent l'ancien binaire en 1 clic. **Rollback en 30 secondes si tu pushes une version cassée.**
+- **Cleanup automatique des données via Cloud Function planifié.** Nouvelle CF `cleanupOldData` qui tourne **toutes les 24h** sur europe-west1 et purge :
+  - Les `/logs` plus vieux que **30 jours** (l'admin garde l'historique du dernier mois pour debug).
+  - Les `/serverStats/{addressKey}/snapshots/*` plus vieux que **14 jours** (la courbe d'activité 24h n'a pas besoin de plus, et le doc parent garde l'all-time peak forever).
+  - Les `/invitations` résolues/déclinées de plus de **7 jours** (les pending sont préservées).
+  - Cap 500 deletes par run pour rester sous le timeout 9 min. Idempotent — la prochaine run prend le relais.
+
+### Changé
+- **Window close → hide instead of quit.** Le `WindowEvent::CloseRequested` du main window est intercepté côté Rust et `prevent_close()` est appelé. Combiné avec le tray icon, ça permet au launcher de tourner en arrière-plan en continu pour : notifications natives, polling messages, invitations live, etc.
+
+
+
+### Sécurité
+- **Règles Firestore strictes pour `/invitations/{id}`** : seuls les 2 participants (`fromUid` et `toUid`) peuvent lire le doc. Le sender peut create + cancel, le recipient peut accept + decline (transitions de status whitelisted dans la rule). Aucun delete autorisé — l'audit trail des invitations stays. Combiné avec le cron 14, les vieilles invitations sont purgées automatiquement après 7 jours.
+## [v26.04.27.15] - 2026-04-27  · semver `26.427.14`
+
+
+### Ajouté
+- **Système d'achievements/badges complet.** 13 achievements répartis sur 4 tiers (bronze / argent / or / platine) débloquables au fil de l'utilisation : « Premier pas » (premier login), « Bibliothèque entamée » (1er install), « Allumage » (1er lancement), « Brise-glace » (1er DM), « Une heure au compteur » / « Dix heures » / « Le marathonien » (100h cumulées), « Collectionneur » (3 jeux installés), « Bibliothèque garnie » (5 jeux), « Cercle social » (3 potes différents en DM), « Mr/Mme Popularité » (100 messages), « Lanceur en série » (50 sessions), « Légende du launcher » (tous les autres = secret platine). Détection client-side automatique à chaque snapshot Firestore, avec persistance par-utilisateur sous `/users/{uid}/achievements/{achievementId}` (immuable, idempotent). **Toast d'unlock** centré en haut de l'écran avec animation spring + son `success` + icône Lucide tier-coloré, auto-dismiss 6s.
+- **Pages de profil public** par utilisateur. Click sur l'avatar ou le nom de n'importe quel pote (page Communauté, header de conversation, mascotte hover, etc.) → page dédiée avec : avatar XL + status dot + activité live, 3 stats hero (temps total, sessions cumulées, achievements débloqués X/Y), top 5 jeux joués (clickables vers la page module), grille de tous les badges débloqués (avec tier glow + grayscale pour les non-débloqués), bouton « Envoyer un message » qui ouvre direct le chat. Routée via le nouveau `user-profile` dans le store UI.
+- **Mascotte Glitch SVG inline réactive selon le contexte.** Remplace l'ancien logo PNG bottom-right par un vrai pingouin custom-drawn (capuche jaune, yeux cyan glowing, bec orange) avec 5 humeurs qui changent automatiquement :
+  - 💬 **chat** : tu as des messages non lus → bulle de chat avec dots animés au-dessus de la tête
+  - 🎮 **gaming** : un pote joue actuellement → manette en bas
+  - ✨ **happy** : des potes en ligne sans jouer → sourire (bec courbé) + sparkles dorés
+  - 😴 **sleeping** : pas joué depuis 24h → yeux fermés + Zzz cyan, bob plus lent
+  - 🪶 **idle** : neutre → yeux qui pulsent doucement
+  
+  Tooltip contextuel au survol expliquant le mood. Bob speed varie aussi par mood.
+- **Empty states avec illustrations Glitch custom-drawn**. Composant `<EmptyState>` réutilisable avec 5 variantes (`library` / `friends` / `messages` / `error` / `search`) — chaque variante a son prop dans la SVG (manette, enveloppe, bulle de chat, loupe, point d'interrogation). Halo cyan blur derrière, animation y-bob 3.6s. Plus de `<icon /> + texte plat` partout.
+- **Loading skeletons réutilisables** (`Skeleton`, `PageSkeleton`, `CardSkeleton`, `LineSkeleton`). Animation `shimmer-sweep` CSS-only (pseudo-element translate-x sweep) — pure GPU, pas de JS. Utilisée comme Suspense fallback pour les routes lazy.
+- **React Error Boundary** au niveau du route renderer. Si une page crashe en render, on affiche un fallback poli (icône AlertTriangle rose + message d'erreur tronqué + boutons « Réessayer » / « Accueil ») au lieu de l'écran blanc complet, **et le bug est auto-shippé au logger** (niveau `bug`) avec stack trace + composantStack pour que l'admin le voie dans le panel Logs.
+
+### Changé
+- **Code splitting des routes via React.lazy.** Les 7 pages les moins critiques (`Settings`, `Profile`, `Admin`, `AdminLogs`, `ModuleDetail`, `Community`, `Messages`, `PublicProfile`) sont maintenant chargées en chunks séparés à la demande. Bundle initial JS attendu en baisse de ~1 MB → ~300 KB gzippé pour les nouveaux installs. Home / Library / Login restent eagerly imported pour pas avoir de Suspense fallback flash au boot.
+## [v26.04.27.14] - 2026-04-27  · semver `26.427.13`
+
+
+### Ajouté
+- **Refonte complète de la page d'accueil en social hub bento-grid.** L'ancienne hero "SIMPLE LAUNCHER" + cartes statiques laisse place à un cockpit vivant qui agrège tout ce qui se passe dans l'écosystème :
+  - **Greeting personnalisé time-of-day-aware** : « Bon matin ☀️ » (5h–12h), « Bon aprem 🌤️ » (12h–18h), « Bonsoir 🌆 » (18h–22h), « Bonne nuit 🌙 » (22h–5h). Le halo cyan derrière le greeting card change de teinte en conséquence (cyan-orange à l'aube, magenta-orange au coucher, violet profond la nuit). Heure live à droite avec re-tick toutes les 30 s.
+  - **Card « Continue ici »** géante (16:8) montrant le **dernier module joué** (calculé depuis la collection Firestore `/users/{uid}/playtime`) avec banner zoom-on-hover, bouton PLAY en disque cyan, durée totale cumulée + relative time du dernier launch (« Joué hier · 12 h cumulés »). Click → page détail du module.
+  - **Stats grid 2×2** : `Jeux dispos`, `Total joué` (formaté `12 h 25 min`), `En ligne` (potes) avec glow accent quand > 0, `Sessions` (nombre de launches all-time). Chacune avec icône Lucide colorée (cyan/amber/emerald/rose) dans une tile glass.
+  - **Tile « Amis en ligne »** : avatars Discord + status dot (online/idle/offline) + activité live (« joue à Glitch's Colony » avec icône Gamepad2 cyan). Click sur un pote → ouvre le DM. Counter « +N autres amis hors ligne » discret.
+  - **Tile « Serveur Minecraft »** live : compteur joueurs en gros, jusqu'à 5 têtes 3D Crafatar des joueurs en ligne, address en mono, badge live qui pulse vert/gris selon état. Click → page détail du module avec card serveur full.
+  - **Tile « Dernières conversations »** avec preview du dernier message, timestamp relatif, badge unread cyan par conversation + total. Click → ouvre directement le chat.
+  - **Tile « Activité communauté »** : feed temps-réel synthétisé depuis les heartbeats de présence — « Theo joue à Glitch's Colony · 2h », « Marie est dans le menu · à l'instant ». Sans abonnement Firestore supplémentaire (pure dérivation depuis la liste users).
+  - **Mascotte logo Glitch** en bottom-right qui idle-bobs (translation Y ±6 px en boucle 3.6 s ease-in-out) avec drop-shadow accent cyan. Pointer-events-none — pure cosmétique.
+## [v26.04.27.13] - 2026-04-27  · semver `26.427.12`
+
+
+### Ajouté
+- **Système de logs / télémétrie complet avec panel admin caché.** Tout ce que les launchers font (actions des utilisateurs, erreurs JS, bugs, navigations, installs/launches, conversations démarrées, messages envoyés, etc.) est désormais loggé en temps réel sur Firestore et consultable depuis un panel admin :
+  - **Logger client** (`src/lib/logger.ts`) avec buffer mémoire 50 entrées flushé toutes les 10 s en `writeBatch` Firestore (un seul commit par fenêtre, pas une écriture par log → économe en quota). 5 niveaux : `info` / `action` / `warn` / `error` / `bug`. Buffer cap à 500 si l'utilisateur est offline pour éviter de bouffer la RAM. Identité bind au login (uid + displayName + avatar) avec backfill des entries logguées en mode anonyme.
+  - **Auto-capture** des erreurs JS via `window.error`, des promesses rejetées via `window.unhandledrejection`, et des appels explicites `console.error()` (patché). Stack traces incluses dans les métadonnées pour les bugs. Best-effort flush sur `beforeunload` pour ne pas perdre les dernières entrées avant fermeture.
+  - **Wiring complet aux actions clés** : navigation entre pages, login/logout, install + uninstall + launch de modules, install de modpacks Minecraft, envoi de message privé, démarrage de conversation. Chaque action loggée avec source + métadonnées identifiantes (moduleId, conversationId, version, etc.).
+  - **Panel admin caché** sous `Logs` dans la sidebar — visible UNIQUEMENT pour le Discord ID admin. Live tail temps-réel via `onSnapshot`, animation slide-in sur chaque nouveau log, border-left coloré par niveau (rose pour erreurs, fuchsia pour bugs, amber pour warnings, emerald pour actions, sky pour info). Filtres chips par niveau avec count, dropdown de filtrage par utilisateur. Click sur une row → expand pour voir UID complet, sessionId, userAgent, métadonnées en JSON pretty-printed. Cap à 200 entries pour pas overcharger.
+  - **SessionId unique par boot** — toutes les entries d'une même session de launcher partagent le même UUID, donc l'admin peut group les logs par session pour reconstituer une chronologie de bug.
+  - **launcherVersion + userAgent** stampés sur chaque entry pour distinguer "ce bug arrive uniquement en `v26.04.27.10` sur Windows 11".
+
+
+### Corrigé
+- **Bug de la conversation qui disparaissait instantanément après clic sur le bouton « Message ».** Trois fixes en cascade : (1) le `setDoc({ "lastReadAt.uid": now }, { merge: true })` créait littéralement un champ top-level `"lastReadAt.uid"` au lieu de nester sous `lastReadAt` (Firestore SDK ne supporte pas les dot-paths avec setDoc-merge, contrairement à `updateDoc`) — switché vers `updateDoc` qui honore les dot-paths. (2) le `orderBy("updatedAt", "desc")` sur la query `array-contains` filtrait temporairement les conversations fraîchement créées dont le `serverTimestamp()` était encore en pending (~500 ms) — la conv flashait visible puis disparaissait le temps que le serveur ack arrive. Drop de l'orderBy serveur-side, sort client-side maintenant. (3) Nouvelle subscription directe `watchConversationById(cid)` en fallback dans `MessagesPage` : la conv s'affiche immédiatement même si la list query lague.
+
+
+### Sécurité
+- **Nouvelle règle Firestore pour `/logs/{logId}`** : chaque utilisateur authentifié peut créer ses propres logs (uid dans le doc body doit matcher l'auth uid) et lire ses propres logs back ; **les admins ont accès en lecture à tous les logs** (pour le panel admin caché). Update/delete interdits → audit trail immuable. Pas de contenu de message privé loggé, pas de tokens — juste des actions et IDs.
+## [v26.04.27.12] - 2026-04-27  · semver `26.427.11`
+
+
+### Ajouté
+- **Refonte complète du rendu des release notes — fini le bloc `whitespace-pre-line` brut, place à un renderer typographique riche.** Les notes affichées dans la bannière de mise à jour (coin bas-droit) et dans le popup centré « Mise à jour fraîche » sont maintenant parsées et stylisées section par section :
+  - **5 catégories typées** avec couleur + icône Lucide + symbole dédiés : `Ajouté` (✨ emerald + `+`), `Changé` (🪄 amber + `~`), `Corrigé` (🐛 rose + `*`), `Supprimé` (🗑 slate + `−`), `Sécurité` (🛡 violet + `🔒`). Border-left coloré sur chaque section, ligne de header avec icône et label en uppercase tracking-[0.2em] dans la couleur catégorie, fond glass avec ring subtil.
+  - **Compteur par catégorie** dans le header de section (« 3 nouveautés », « 2 fixes », « 1 renfort »). Pluriel/singulier géré en français.
+  - **Featured banner** au sommet du popup centré : la première entrée d'`Ajouté` est promue en gros bandeau dégradé cyan→violet avec mention « Cette release apporte » et son emoji auto-détecté en taille XL.
+  - **Mini table-of-contents** cliquable (chips colorés par catégorie + count) qui smooth-scroll vers la section correspondante. Affichée uniquement quand il y a > 1 section ET > 3 entrées totales pour pas saouler les petits releases.
+  - **Stats footer** sous toutes les sections : « Cette release : 5 nouveautés · 2 changements · 1 fix » avec chaque chiffre coloré dans la couleur catégorie.
+  - **Animation stagger** : chaque section fade-in avec un delay décalé (0.06s × index) puis chaque entrée à l'intérieur (0.05s × index) — effet « déroulé » naturel à l'ouverture.
+  - **Auto-emoji par mot-clé** dans le titre + description de chaque entrée : 21 règles regex couvrant Minecraft (🎮), messagerie (💬), serveur (🌐), admin (🛠️), RAM (⚡), sécurité (🛡️), particules (✨), audio (🔊), update (🔔), Discord (🔐), bug (🐛), UI/layout (🎨), favoris (⭐), communauté (👥), drapeau (🏁), Firebase (🔥), Rust (🦀), TypeScript (📘), raccourci (🎯), assets images (🖼️), cache (💾). Première match wins.
+  - **Badge `BREAKING`** rouge avec icône AlertTriangle qui apparaît auto si l'entrée contient les mots-clés "breaking" ou "rupture".
+  - **Date pretty-printed** sous la version : « Sortie aujourd'hui à 14h26 » (< 24 h), « hier à 09h12 » (< 48 h), « il y a 3 j » (< 7 j), sinon « le 27 avril 2026 à 14h26 ». Source = champ `pub_date` de `latest.json` exposé via `Update.date` du plugin Tauri Updater.
+  - **Markdown inline préservé** : `**gras**` rendu en font-semibold blanc primary, `` `code` `` rendu dans une chip mono cyan avec ring subtil. Parser regex single-pass, pas de dépendance markdown lourde.
+- **Messagerie privée 1-on-1 entre potes du launcher.** Nouvelle page `Messages` accessible depuis l'icône `MessageCircle` dans la sidebar, avec layout deux-panes classique (liste des conversations à gauche, chat actif à droite) :
+  - **Bouton « Message »** sur chaque card de la page Communauté → crée la conversation deterministe (id = `[uidA, uidB].sort().join("__")` donc les deux potes atterrissent sur le même doc Firestore peu importe qui DM en premier) et navigue direct vers le chat.
+  - **Liste des conversations** triée par dernier message (le plus récent en haut), avec avatar Discord, preview du dernier message (« Toi : … » si je suis l'auteur), timestamp relatif (« à l'instant », « 3 min », « 2 j »), et **badge unread cyan** quand il y a des messages non lus.
+  - **Chat panel** avec bulles cyan (mes messages) à droite et bulles glass (messages des potes) à gauche, **regroupement automatique** des messages consécutifs du même auteur dans les 2 minutes (avatar/nom suppressé sur les follow-ups), animation `framer-motion` slide-in à chaque nouvelle bulle, auto-scroll vers le bas, input avec bouton Send qui s'éteint quand le draft est vide.
+  - **Read receipts** par participant via `lastReadAt` dans le doc conversation : à chaque ouverture du chat, le timestamp de lecture est mis à jour pour ne plus voir le badge unread sur ce thread.
+  - **Badge unread global dans la sidebar** : la pastille cyan sur l'icône Messages totalise les unreads de toutes les conversations (« 9+ » au-delà de 9), animation spring scale-in à chaque incrément.
+  - **Son `messageReceived`** (chime doux 2 tons E5 → G5, ~150 ms, volume 0.1) qui ding quand un nouveau message arrive d'un pote — joué par le sidebar (peu importe sur quelle page tu es) sauf si tu es déjà sur la page Messages auquel cas c'est le chat panel qui ding.
+- **Card serveur Minecraft entièrement refondue avec 6 nouvelles features.** Sur la page détail d'un module Minecraft qui a un serveur configuré :
+  - **Favicon du serveur** affiché 64×64 à gauche du header (récupéré via mcsrvstat — base64 PNG embarqué dans la réponse, zéro requête supplémentaire). Fallback sur un glyph Server cyan si le serveur n'a pas de favicon.
+  - **Drapeau pays + hébergeur** dans le header. La résolution se fait via ip-api.com (free tier 45 req/min, sans clé) sur l'IPv4 que mcsrvstat renvoie déjà après avoir résolu le SRV record. Cache localStorage 30 jours par IP — un seul appel jamais à chaque ouverture, donc l'API n'est jamais hit après le premier tour.
+  - **Latence en ms** dans le header avec code couleur tonal (vert < 120 ms, ambre < 300 ms, rose au-delà). C'est le RTT vers mcsrvstat, mesuré client-side via `performance.now()` autour du `fetch()` — proxy correct du ping réel pote→serveur.
+  - **Software exact + protocol version + nombre de mods** dans une ligne dédiée. Le parser détecte Paper / Spigot / Forge / NeoForge / Fabric / Velocity / BungeeCord / Vanilla en sniffant la string version, et le badge `47 mods` cyan apparaît automatiquement quand le serveur tourne sous Forge/NeoForge (l'extension SLP des moddeurs renvoie la liste complète).
+  - **Têtes Minecraft 3D des joueurs en ligne**. Pour chaque pseudo dans le sample de 12 que le serveur renvoie via SLP, on rend la tête 3D via crafatar.com (helmet overlay activé, scale 4) directement à partir de l'UUID. Si l'UUID est absent (serveur anonymisé), fallback sur mc-heads.net 2D. Affiché en grille auto-fill, avec le pseudo sous chaque tête + drop-shadow noir pour les rendre crispées sur le fond glass. Compteur « +N non listés » quand le sample n'inclut pas tous les joueurs en ligne.
+  - **Graph d'activité 24h en SVG** sous les têtes. Courbe accent-cyan avec dégradé en aire en dessous, glow drop-shadow, point pulsant à la dernière mesure. Construit en pur SVG (zéro dep), normalisation X sur 24h glissantes et Y sur le pic 24h × 1.0.
+  - **All-time peak** : « All-time peak : 18 le 24 avril à 21:30 » sous le graph. Mis à jour de manière atomique par tous les launchers connectés via Firestore (read-then-write merge).
+
+### Changé
+- **Le popup centré « Mise à jour fraîche » s'affiche maintenant aussi au démarrage du launcher** (avant : seulement la bannière en bas-droit). La bannière coin se ratait trop facilement quand un pote ouvrait le launcher pour cliquer direct sur JOUER ; maintenant le popup centré attention-grabbing apparaît à chaque démarrage tant qu'une update est dispo, donc impossible de la louper. Les sons restent distincts : `notification()` doux au démarrage (pour pas startle), `updateArrived()` arpège festif pour les arrivées mid-session.
+- **Pipeline d'historique d'activité shared via Firestore.** Nouveau collection `/serverStats/{addressKey}/snapshots/{slot}` où chaque launcher actif poste un snapshot du compteur joueurs toutes les 5 minutes max (rate-limit côté client + ID de doc deterministe = `Math.floor(now / 300000) * 300000` → naturellement déduplique entre clients). Le doc parent `/serverStats/{addressKey}` garde l'agrégat all-time (`peakPlayers`, `peakAt`, `lastUpdatedAt`). Visible immédiatement sur la card → plus tes potes ouvrent le launcher, plus la courbe se densifie.
+- **Parser mcsrvstat enrichi** : extraction de la sample players list (avec UUIDs), du software, de la mod list Forge/NeoForge, du protocol version, et de l'IPv4 résolue. Tous typés et exposés via `useMinecraftStatus`. Computer la latence client-side ajouté au passage.
+
+
+
+### Sécurité
+- **Nouvelle règle Firestore pour `/serverStats`** : lecture + écriture autorisées à tout utilisateur authentifié. Pas d'info perso dans ces docs (juste `playersOnline`, `playersMax`, `online`, timestamp, et l'address sanitizée comme clé), donc partagé entre tous les potes du launcher sans risque.
+- **Règles Firestore strictes pour `/conversations/{cid}`** : seuls les deux participants encodés dans l'ID du doc (extraits via `cid.split("__")` quand le doc n'existe pas encore, ou via le champ `participants` une fois créé) peuvent lire, créer et update la conversation. Les messages individuels héritent de cette restriction via un `get()` sur le doc parent. **Aucun edit ni delete autorisé** sur les messages — l'historique est durable et inaltérable côté serveur.
+## [v26.04.27.11] - 2026-04-27  · semver `26.427.10`
+
+
+
+### Changé
+- **Section « Modpack uploadé » du panel admin : on ne bombarde plus l'œil avec l'URL Firebase brute.** Avant : l'URL Firebase Storage complète (200+ caractères, du genre `https://firebasestorage.googleapis.com/v0/b/.../modpack.zip?alt=media&token=...`) s'affichait en `font-mono text-[10px]` à côté du checkmark vert. Sa longueur intrinsèque déjouait le `truncate` (parents flex/grid sans `min-width: 0` partout) et **forçait toute la colonne formulaire à s'élargir au-delà de son grid track 7/12**, ce qui faisait déborder visuellement le formulaire sur la colonne preview. Maintenant on affiche juste « hébergé sur Firebase Storage » avec l'URL en `title` (tooltip au survol) pour les admins qui veulent vraiment la copier — UX plus propre **et** plus de débordement.
+
+### Corrigé
+- **Le débordement de la colonne formulaire admin sur la colonne preview est éradiqué pour de bon.** Triple ceinture-bretelles :
+  1. La motion.div de la colonne formulaire reçoit maintenant `overflow-hidden` en plus de `min-w-0` — c'est le filet de sécurité ultime : peu importe quel élément interne refuse d'honorer `min-width: 0` (un `<select>` avec une option longue, un input avec un placeholder qui ne wrap pas, du contenu intrinsèque indomptable), il est visuellement clipé au rounded-3xl du formulaire, plus aucune fuite possible vers la preview.
+  2. La row « Modpack uploadé » du `ModpackZipPicker` a maintenant `min-w-0` sur le flex container lui-même + `shrink-0` explicite sur le checkmark, le bouton « Remplacer » et le bouton « Retirer ». Avant ces éléments avaient leur `min-width: auto` par défaut et résistaient au shrink quand le contenu central voulait grandir.
+  3. L'URL Firebase brute est remplacée par un libellé court (cf. § Changé), donc même si un futur bug fait que `truncate` ne s'applique plus, il n'y a plus de chaîne 200-char à truncate.
+## [v26.04.27.10] - 2026-04-27  · semver `26.427.9`
+
+
+### Ajouté
+- **Contrôle de la RAM côté joueur (chaque pote choisit la sienne).** Sur la page détail d'un module Minecraft, nouveau panneau `RAM allouée` au-dessus de la card Informations :
+  - Affiche le **défaut configuré par l'admin** (« 8 Go » par exemple) en référence sous la valeur live.
+  - **Slider** identique à celui de l'admin (preset chips Défaut/4/6/8/12 Go, hint coloré selon la zone, animation spring).
+  - Badge **« Réglage perso actif »** (orange) quand le joueur a override le défaut admin, sinon badge **« Défaut admin »** discret.
+  - Bouton **« Appliquer au prochain JOUER »** qui ne s'active que si la valeur a changé, avec son `success` au save. Bouton **« Reset »** pour revenir au défaut admin (visible uniquement quand un override est actif).
+  - Sauvegarde **par-machine via localStorage** (clé `mc-user-ram:<moduleId>`) — chaque pote a son propre réglage qui ne change rien pour les autres.
+  - Pris en compte automatiquement à l'**install** ET au **launch** : la fonction `getEffectiveRam(module)` retourne le user override > admin default > Prism default. Côté Rust, `patch_instance_memory` réécrit l'`instance.cfg` au prochain JOUER si la RAM a changé — pas de reinstall nécessaire pour qu'un changement prenne effet.
+
+### Changé
+- **`RamSlider` extrait dans un composant partagé** (`src/components/library/RamSlider.tsx`) réutilisé identiquement par le panel admin et la page détail module pour une UX visuelle 100 % cohérente entre « réglage admin » et « override pote ».
+## [v26.04.27.9] - 2026-04-27  · semver `26.427.8`
+
+
+
+### Changé
+- **Panel admin : refonte de la zone du haut en mode édition.** Avant : la « row des modules publiés » s'affichait toujours, même en pleine édition d'un module — résultat, on voyait deux fois la même card (une fois en haut dans la liste, une fois implicitement dans le formulaire et la preview à droite), ce qui donnait l'impression de chevauchement. Maintenant, dès qu'on entre en édition, la row se replie en un **chip compact** (« Édition en cours : Glitch's Colony » avec bouton Quitter) et le formulaire respire.
+- **Wrapper de la preview admin allégé** : avant la card de preview vivait dans une box `glass-strong p-5` (donc card-dans-une-card), maintenant la preview flotte directement sur le fond de page sans layer intermédiaire — moins de chrome, plus de focus sur le rendu lui-même.
+
+### Corrigé
+- **Particules WebGL qui débordaient hors des cards de preview/library.** Le composant `<Particles>` de tsParticles rendait son canvas dans son className direct, sans wrapper de containment. Maintenant on l'enveloppe dans un `div pointer-events-none absolute inset-0 overflow-hidden` dédié → quoi que fasse tsparticles avec son canvas interne, les étoiles/lucioles/flocons restent clipées au rectangle du parent.
+## [v26.04.27.8] - 2026-04-27  · semver `26.427.7`
+
+
+### Ajouté
+- **Contrôle de la RAM allouée à Minecraft (jolie UI dans le panel admin).** Nouveau champ `maxRamMb` sur les `MinecraftModule` + composant `RamSlider` dans le formulaire admin :
+  - **Slider neon-cyan** avec gradient de remplissage animé spring, tick marks discrets aux paliers (2 / 4 / 6 / 8 / 10 / 12 / 14 Go), thumb circulaire avec glow accent au hover.
+  - **Chips presets** « Défaut / 4 Go / 6 Go / 8 Go / 12 Go » pour sélection en un clic (le préset actif passe en background accent solide avec son shadow).
+  - **Affichage live** de la valeur en grand format display (`tabular-nums` pour pas de jitter) avec unité Go calculée automatiquement.
+  - **Hint contextuel coloré** sous le slider : amber-ish pour les valeurs trop basses (< 3 Go = warning), neutre pour la zone confortable (4–10 Go), rose-ish pour les valeurs absurdes (> 10 Go = vérifier que les potes ont la RAM physique). Le texte change en fonction de la zone : explique pourquoi c'est trop / juste / trop élevé.
+  - **Default 4 Go** au lieu du défaut Prism (souvent 1–2 Go) — fini les freezes au moindre modpack un peu chargé.
+- **Application de la RAM sans réinstall.** Quand l'admin bump la valeur sur un module déjà installé chez ses potes, le launcher patche le `instance.cfg` au prochain JOUER (helper Rust `patch_instance_memory` qui rewrite uniquement les clés `OverrideMemory` / `MaxMemAlloc` / `MinMemAlloc` / `PermGen` en préservant tout le reste). Pas de re-download du fat-zip nécessaire pour changer la RAM.
+- **Affichage de la RAM allouée dans la page détail du module** (panneau Informations, à côté de Minecraft / Mod loader). Affiché uniquement si `maxRamMb` est défini.
+
+### Changé
+- **Refonte du layout du panel admin pour évacuer le chevauchement visuel avec le formulaire.** Avant : la liste « Modules publiés » vivait dans la colonne droite (col-span-5), à côté du formulaire (col-span-7) — résultat, quand le formulaire affichait ses sections en deux colonnes (icon + banner pickers, version + mod loader), le bandeau de la liste « Modules publiés » se retrouvait au même Y et donnait l'illusion d'un overlap. Maintenant :
+  - **Modules publiés en bandeau plein-largeur au-dessus du grid**, en row horizontale scrollable (chaque card a sa largeur fixe `w-[22rem]`, scrollbar-fine sous la row si débordement).
+  - **Colonne droite réduite à uniquement la preview live**, avec `lg:sticky lg:top-6` pour qu'elle suive le scroll du formulaire — l'admin garde la visualisation de la card côté bibliothèque sous les yeux pendant qu'il édite les sections du bas.
+## [v26.04.27.7] - 2026-04-27  · semver `26.427.6`
+
+
+### Ajouté
+- **Détection en temps réel des mises à jour du launcher.** Avant : `check()` ne tournait qu'une fois au démarrage de l'app — si tu déployais une nouvelle version pendant que tes potes étaient déjà dans le launcher, ils ne la voyaient qu'au prochain redémarrage. Maintenant le launcher re-poll `latest.json` **toutes les 2 minutes** tant qu'il est ouvert. Quand une nouvelle version vient d'arriver mid-session :
+  - **Popup centré attention-grabbing** avec halo cyan pulsant, icône Sparkles qui se balance, glassmorphism strong, version display en gros + notes de release scrollables, boutons « Plus tard » / « Installer maintenant ».
+  - **Son arpège « updateArrived »** : 4 notes A5 → C#6 → E6 → A6 (accord A majeur ascendant, ~0.4 s) avec une harmonique aiguë en shimmer pour la touche festive. Distinct du `notification()` plus discret réservé à la détection au démarrage.
+  - **Banner persistant en bas-droit** qui reste affiché tant que tu n'as pas installé, même si tu fermes le popup.
+  - Le `seenVersion` est tracké dans une ref pour ne pas re-spammer le popup à chaque poll réussi sur la même version pending — il ne re-trigger que si une version *encore plus récente* arrive après.
+
+
+### Corrigé
+- **Panel admin : la card du module actif (ring cyan) débordait sur le formulaire à gauche.** L'ombre extérieure `shadow-[0_0_24px_…]` faisait exactement la largeur de la `gap-6` (24 px) entre les deux colonnes du grid, donc elle léchait le bord droit du formulaire et donnait l'illusion que la card écrasait la section SOURCE DU MODPACK. Passé en `shadow-[inset_0_0_24px_…]` : le glow reste strictement à l'intérieur de la card, plus aucune fuite. Ajouté aussi `relative z-10` + `min-w-0` à la colonne formulaire et `relative z-0` + `min-w-0` à la colonne droite pour blinder l'empilement quoi qu'il arrive.
+## [v26.04.27.6] - 2026-04-27  · semver `26.427.5`
+
+
+### Ajouté
+- **Mode « fat-zip » pour les modpacks Minecraft : zéro UI Prism Launcher pendant l'install ET le lancement.** Quand l'admin uploade un modpack en mode « Upload manuel », le launcher provisionne maintenant l'instance Prism lui-même (écrit `instance.cfg` + `mmc-pack.json`, copie le contenu d'`overrides/` dans `minecraft/`) au lieu d'appeler `prismlauncher --import`. Plus aucune fenêtre Prism qui s'ouvre, plus aucun popup navigateur pour les mods opt-out de la distribution tiers, plus aucun appel à l'API CurseForge — tes potes voient juste la barre de progression du launcher pendant l'install puis MC qui démarre. Les `.jar` des mods doivent être bundled directement dans `overrides/mods/` du `.zip` uploadé (les `files[]` du manifest sont ignorés en mode manuel — c'est le prix à payer pour bypasser CurseForge).
+- **Configuration globale Prism « discrète » sur notre install managé** : à l'extraction de Prism portable (`%APPDATA%\com.simplelaunche.app\prism\`), le launcher écrit un `prismlauncher.cfg` avec `MinimizeOnLaunch=true`, `CloseAfterLaunch=true`, `ShowConsole=false`, `AutoCloseConsole=true`, `Language=fr_FR`. Combiné avec les flags équivalents dans chaque `instance.cfg`, Prism est quasi invisible : il flash à peine pendant que MC démarre, puis se minimise / se ferme. Les installs Prism existants de l'utilisateur ne sont pas touchés.
+
+### Changé
+- **Parsing complet du `manifest.json` CurseForge en Rust** : `mc_install_modpack` extrait désormais le nom du modpack, la version Minecraft, et l'ID + version du mod loader principal (forge / fabric / neoforge / quilt) pour générer le `mmc-pack.json` Prism avec les bons composants (`net.minecraft`, `net.minecraftforge`, `net.fabricmc.fabric-loader`, `net.neoforged`, `org.quiltmc.quilt-loader`).
+- **Détection du dossier de données Prism** : nouvelle fonction `prism_data_dir(prism_exe)` qui distingue les installs portable (présence d'un `portable.txt` à côté de l'exe → instances dans `<exe_dir>/instances/`) des installs standards (instances dans `%APPDATA%\PrismLauncher\instances\`). Garantit que notre install managé reste portable peu importe la version de Prism téléchargée.
+- **UI admin « Upload manuel » réécrite** pour expliquer le format fat-zip attendu, avec la liste explicite des dossiers requis à la racine du zip (`manifest.json`, `overrides/mods/*.jar`, `overrides/config/`…) et un avertissement clair que les `files[]` du manifest sont ignorés.
+
+### Corrigé
+- **Idempotence des updates de modpack en mode manuel** : si l'admin re-uploade une nouvelle version du fat-zip, le launcher wipe l'instance Prism existante avant de l'écrire à nouveau. Avant, en mode `--import` Prism duppliquait l'instance avec un suffixe.
+
+
+### Sécurité
+- **Path traversal guard** dans `extract_modpack_into` : les entrées du zip qui pointent en dehors de `<instance>/minecraft/` sont ignorées.
 ## [v26.04.27.5] - 2026-04-27  · semver `26.427.4`
 
 

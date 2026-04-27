@@ -3,10 +3,13 @@ import { motion } from "framer-motion";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { Newspaper, Image as ImageIcon, Activity, Code } from "lucide-react";
 import { getFirebase } from "@/firebase/config";
-import type { LauncherModule, PageSection } from "@/types/module";
+import type { LauncherModule, ModulePageV1, PageSection } from "@/types/module";
+import { isModulePageV2 } from "@/types/module";
 
 export function ModuleSections({ module }: { module: LauncherModule }) {
-  const sections = module.page?.sections ?? [];
+  const page = module.page;
+  const sections: PageSection[] =
+    page && !isModulePageV2(page) ? ((page as ModulePageV1).sections ?? []) : [];
   const showAutoChangelog = module.type === "hosted";
   if (sections.length === 0 && !showAutoChangelog) return null;
 

@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { logger } from "@/lib/logger";
 import type { LauncherModule } from "@/types/module";
 
 export type ModuleStateLocal = {
@@ -19,12 +20,28 @@ export async function getModuleState(moduleId: string): Promise<ModuleStateLocal
 }
 
 export async function installOrUpdate(module: Extract<LauncherModule, { type: "hosted" }>): Promise<void> {
-  return invoke<void>("module_install_or_update", {
-    moduleId: module.id,
-    version: module.version,
-    downloadUrl: module.downloadUrl,
-    sha256Expected: module.sha256,
+  logger.action("Module install/update started", {
+    source: "modules.installOrUpdate",
+    metadata: { moduleId: module.id, version: module.version, sizeMb: (module.size / 1_048_576).toFixed(1) },
   });
+  try {
+    await invoke<void>("module_install_or_update", {
+      moduleId: module.id,
+      version: module.version,
+      downloadUrl: module.downloadUrl,
+      sha256Expected: module.sha256,
+    });
+    logger.action("Module install/update succeeded", {
+      source: "modules.installOrUpdate",
+      metadata: { moduleId: module.id, version: module.version },
+    });
+  } catch (err) {
+    logger.error(`Module install/update failed: ${err instanceof Error ? err.message : String(err)}`, {
+      source: "modules.installOrUpdate",
+      metadata: { moduleId: module.id, version: module.version },
+    });
+    throw err;
+  }
 }
 
 export async function launchModule(module: LauncherModule): Promise<void> {
@@ -61,6 +78,7 @@ export type ModuleExitEvent = {
 };
 
 export async function uninstallModule(moduleId: string): Promise<void> {
+  logger.action("Module uninstall", { source: "modules.uninstallModule", metadata: { moduleId } });
   return invoke<void>("module_uninstall", { moduleId });
 }
 
