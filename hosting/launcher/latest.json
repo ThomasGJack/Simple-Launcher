@@ -1,12 +1,12 @@
 {
-  "version": "26.427.18",
-  "displayVersion": "v26.04.27.19",
-  "notes": "### Ajouté\n\n- **Pages de modules 100 % personnalisables** : nouveau schéma `ModulePageV2` avec un système de blocs (`AnyModuleBlock`) éditables via un builder visuel drag & drop dans l'admin (route `admin-builder`). 19 types de blocs disponibles : `hero-parallax`, `poster`, `gallery` (grid/masonry/carousel-3d + lightbox), `carousel`, `video-embed` (YouTube/Vimeo/Twitch/MP4), `comparison` (slider avant/après), `rich-text` (markdown), `feature-cards`, `quote`, `cta` (avec action `launch`/`url`/`scroll-top`), `divider`, `spacer`, `stats` (avec count-up), `timeline`, `changelog` (manuel ou auto-from-versions), `screenshots-grid`, `mascot-spot`, `particles-band`, `embed-html` (sanitizé via DOMPurify).\n- **Builder admin** : layout 3 colonnes (palette / canvas avec preview live / inspector), drag & drop via `@dnd-kit`, undo/redo (50 niveaux), duplicate/hide par bloc, override de thème par bloc (couleurs, fond glass, padding, alignement, max-width).\n- **Thème module étendu** : `theme.fontDisplayUrl` pour charger une police custom au runtime via `@font-face`. `theme.primary`/`theme.accent` propagés à tous les blocs via les CSS vars `--module-primary`/`--module-accent`.\n- **PlayButton config** : `playButton.label`/`sizeScale`/`style`/`position` (lus dans `ModuleDetailPage`).\n\n### Changé\n\n- `uploadModuleAsset(moduleId, kind, file)` accepte maintenant un `kind: string` arbitraire (anciennement `\"icon\" | \"banner\"`) pour supporter les uploads par bloc (`block-{blockId}-{slot}`).\n- Migration V1 → V2 transparente via `migrateModulePage()` : les pages legacy continuent d'afficher `<ModuleSections>` ; ouvrir le builder migre automatiquement à la sauvegarde.\n\n\n\n### Sécurité\n\n- HTML libre des blocs `embed-html` et `rich-text` systématiquement sanitizé via DOMPurify (whitelist iframe YouTube/Vimeo/Twitch, `<script>` et handlers `on*` retirés).",
-  "pub_date": "2026-04-27T21:22:16.460Z",
+  "version": "26.427.19",
+  "displayVersion": "v26.04.27.20",
+  "notes": "### Corrigé\n\n- **Hotfix** : la page d'un module (jeu / modpack) crashait depuis la v26.04.27.19 à cause d'une violation des Rules of Hooks (`useEffect` placé après un `return` early). Hook déplacé avant les early returns.",
+  "pub_date": "2026-04-27T21:29:36.702Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReExlbkZGc0Y5eEdaNGwrK21IOEswMmE2T2Q4aGhpUEEyYXV0QlR3cUkxOFV4MHlzVkFReUVSSkFSOElCK2kyb2Q5ZmUybGI0TjluTm9vamxPcWFRbmRyWHlSc1l0MHdvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3MzI0OTM2CWZpbGU6U2ltcGxlIExhdW5jaGVyXzI2LjQyNy4xOF94NjQtc2V0dXAuZXhlCndxNmhKZHpUKzl0M0JNcWdWWC9ON3VJOTc4N0lXMmVLekFpTXVPeW5WaHJvck5ZVnlPY2x3VFNMTnQrSmVac20yMTI1YW9CRkdWVmhqeG5NRThneUFBPT0K",
-      "url": "https://simplelaunche.web.app/releases/26.427.18/Simple Launcher_26.427.18_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReExlbkZGc0Y5eExuOGk4Ym1LM0lNS204K3Jrd002VjVGTmJFUVJzdGQ2eVVXUUhGOTJuT0hQMFpkb2JyUGhSVVhXT2FsS3FIbW9NMFk3clEyU1MrT0FxbS9iZHZMWFFRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3MzI1Mzc2CWZpbGU6U2ltcGxlIExhdW5jaGVyXzI2LjQyNy4xOV94NjQtc2V0dXAuZXhlCmF3dzNMYkdlL0hocU5iV254TkFvbFFxNkdpcG9tQjhKL1dXOHdqbEtUYWMwYVNVMTB6U1pGQVYySWNVS1VURFdoMG1CR08ydHY2RTg2UisvSm9LVkJ3PT0K",
+      "url": "https://simplelaunche.web.app/releases/26.427.19/Simple Launcher_26.427.19_x64-setup.exe"
     }
   }
 }

@@ -18,6 +18,14 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.04.27.20] - 2026-04-27  · semver `26.427.19`
+
+
+
+
+### Corrigé
+
+- **Hotfix** : la page d'un module (jeu / modpack) crashait depuis la v26.04.27.19 à cause d'une violation des Rules of Hooks (`useEffect` placé après un `return` early). Hook déplacé avant les early returns.
 ## [v26.04.27.19] - 2026-04-27  · semver `26.427.18`
 
 

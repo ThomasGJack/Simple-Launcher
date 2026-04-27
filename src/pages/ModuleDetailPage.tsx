@@ -91,6 +91,14 @@ export function ModuleDetailPage() {
 
   useEffect(() => () => cleanupRef.current?.(), []);
 
+  const pageThemeFontDisplay = module?.page?.theme?.fontDisplay;
+  const pageThemeFontDisplayUrl = isModulePageV2(module?.page) ? module?.page?.theme?.fontDisplayUrl : undefined;
+  useEffect(() => {
+    if (pageThemeFontDisplay && pageThemeFontDisplayUrl) {
+      void loadFontFace(pageThemeFontDisplay, pageThemeFontDisplayUrl);
+    }
+  }, [pageThemeFontDisplay, pageThemeFontDisplayUrl]);
+
   if (!moduleId) {
     return null;
   }
@@ -126,14 +134,7 @@ export function ModuleDetailPage() {
   const themePrimary = module.page?.theme?.primary;
   const themeAccent = module.page?.theme?.accent;
   const fontDisplay = module.page?.theme?.fontDisplay;
-  const fontDisplayUrl = isModulePageV2(module.page) ? module.page.theme?.fontDisplayUrl : undefined;
   const heroIsBlock = migratedPage?.blocks[0]?.type === "hero-parallax";
-
-  useEffect(() => {
-    if (fontDisplay && fontDisplayUrl) {
-      void loadFontFace(fontDisplay, fontDisplayUrl);
-    }
-  }, [fontDisplay, fontDisplayUrl]);
 
   const handlePrimary = async () => {
     if (action.kind === "installing" || action.kind === "launching") return;
