@@ -294,18 +294,32 @@ pub async fn mc_install_modpack(
         .send()
         .await
         .map_err(|e| format!("CurseForge API: {}", e))?;
-    if !resp.status().is_success() {
-        return Err(format!(
-            "CurseForge API HTTP {} (vérifie ta clé API et que le fichier autorise les téléchargements tiers)",
-            resp.status()
-        ));
+
+    let status = resp.status();
+    if !status.is_success() {
+        if status == reqwest::StatusCode::FORBIDDEN {
+            return Err(format!(
+                "CurseForge a refusé le téléchargement (HTTP 403). C'est presque toujours parce que ce modpack a « Allow third-party distribution » désactivé sur CurseForge. Si c'est ton projet, va dans Settings → Distribution sur curseforge.com pour l'activer puis re-upload une nouvelle version du fichier (le réglage ne s'applique qu'aux uploads suivants)."
+            ));
+        }
+        if status == reqwest::StatusCode::NOT_FOUND {
+            return Err(format!(
+                "CurseForge a renvoyé HTTP 404 — le Project ID ({}) ou le File ID ({}) sont introuvables. Re-vérifie dans le panel admin.",
+                project_id, file_id
+            ));
+        }
+        if status == reqwest::StatusCode::UNAUTHORIZED {
+            return Err("CurseForge HTTP 401 — la clé API est invalide ou révoquée. Régénère-la sur console.curseforge.com puis met-la à jour dans .env.local.".to_string());
+        }
+        return Err(format!("CurseForge API HTTP {}", status));
     }
+
     let body: serde_json::Value = resp.json().await.map_err(|e| format!("parse JSON: {}", e))?;
     let download_url = body
         .get("data")
         .and_then(|v| v.as_str())
         .ok_or_else(|| {
-            "Le mod-author a désactivé le téléchargement par tiers. Tes potes devront installer le modpack manuellement.".to_string()
+            "L'auteur du modpack a désactivé le téléchargement par tiers (champ `data` null dans la réponse CurseForge). Si c'est ton projet, active « Allow third-party distribution » sur curseforge.com et re-upload une version.".to_string()
         })?
         .to_string();
 
