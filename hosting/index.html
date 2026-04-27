@@ -199,6 +199,53 @@
         color: rgba(151, 163, 182, 0.6);
         letter-spacing: 0.1em;
       }
+      .smartscreen {
+        margin-top: 24px;
+        max-width: 480px;
+        margin-left: auto;
+        margin-right: auto;
+        text-align: left;
+      }
+      .smartscreen summary {
+        cursor: pointer;
+        padding: 12px 18px;
+        border-radius: 12px;
+        background: rgba(255, 200, 80, 0.06);
+        border: 1px solid rgba(255, 200, 80, 0.18);
+        font-size: 13px;
+        color: #ffcd6a;
+        list-style: none;
+        transition: background 0.2s;
+      }
+      .smartscreen summary:hover {
+        background: rgba(255, 200, 80, 0.1);
+      }
+      .smartscreen summary::-webkit-details-marker { display: none; }
+      .smartscreen[open] summary {
+        border-radius: 12px 12px 0 0;
+        border-bottom-color: transparent;
+      }
+      .smartscreen-body {
+        padding: 14px 20px 20px;
+        background: rgba(255, 255, 255, 0.025);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-top: none;
+        border-radius: 0 0 12px 12px;
+        font-size: 13px;
+        color: var(--fg-muted);
+        line-height: 1.55;
+      }
+      .smartscreen-body p { margin: 0 0 10px; }
+      .smartscreen-body ol { margin: 8px 0 12px; padding-left: 18px; }
+      .smartscreen-body li { margin: 4px 0; }
+      .smartscreen-body strong { color: var(--fg); }
+      .smartscreen-note {
+        margin-top: 14px !important;
+        padding-top: 12px;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        font-size: 12px;
+        color: rgba(151, 163, 182, 0.85);
+      }
     </style>
   </head>
   <body>
@@ -219,6 +266,24 @@
       <div class="meta">
         Version <strong id="version">…</strong> · <span id="date">…</span>
       </div>
+
+      <details class="smartscreen">
+        <summary>⚠ Windows affiche "Cette application n'est pas reconnue" ?</summary>
+        <div class="smartscreen-body">
+          <p>
+            Normal — le launcher est signé pour les mises à jour automatiques mais pas avec un certificat
+            payant Microsoft (~300 €/an). Windows met en garde sur tout .exe peu téléchargé.
+          </p>
+          <ol>
+            <li>Sur la fenêtre bleue "Windows a protégé votre ordinateur", clique <strong>"Informations complémentaires"</strong>.</li>
+            <li>Un bouton <strong>"Exécuter quand même"</strong> apparaît en bas — clique dessus.</li>
+            <li>L'install démarre normalement. Tu n'auras à le faire qu'une fois.</li>
+          </ol>
+          <p class="smartscreen-note">
+            Toutes les mises à jour suivantes passent automatiquement sans cette popup, parce qu'elles sont vérifiées par signature ed25519 directement dans le launcher.
+          </p>
+        </div>
+      </details>
 
       <div id="notes-block" class="notes" style="display: none">
         <h3>Notes de version</h3>

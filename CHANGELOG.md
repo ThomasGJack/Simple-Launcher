@@ -18,6 +18,14 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.04.27] - 2026-04-27  · semver `26.427.0`
+
+
+### Ajouté
+- Page de téléchargement : encart pliable expliquant comment passer le warning Windows SmartScreen lors de la première install (clic "Informations complémentaires" → "Exécuter quand même"), avec note expliquant que les mises à jour suivantes sont signées et passent sans popup.
+
+### Changé
+- Refonte des images de l'installeur NSIS (header + sidebar) avec contraste plus fort, logo plus gros, lignes diagonales façon "speed lines", glow cyan + magenta plus saturés, texte épais. Le rendu était trop subtil dans la version précédente, désormais bien visible dans le wizard.
 ## [v26.04.26] - 2026-04-26  · semver `26.426.0`
 
 
