@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import {
   X,
   Folder,
+  FolderOpen,
   Image as ImageIcon,
   Palette,
   Sparkles,
@@ -283,12 +285,11 @@ export function ShortcutForm({
                 />
               </div>
 
-              <Field label="Chemin de l'exécutable" icon={Folder} hint="ex: C:\\Games\\MonJeu\\game.exe">
-                <Input
+              <Field label="Exécutable du jeu" icon={Folder} hint=".exe à lancer">
+                <ExePicker
                   value={form.executablePath}
                   onChange={(v) => update("executablePath", v)}
-                  placeholder="C:\\Games\\..."
-                  mono
+                  defaultName={form.name}
                 />
               </Field>
               <Field label="Arguments (optionnel)" hint="séparés par des espaces">
@@ -529,6 +530,81 @@ function Input({
         mono && "font-mono text-xs",
       )}
     />
+  );
+}
+
+function ExePicker({
+  value,
+  onChange,
+  defaultName,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  defaultName?: string;
+}) {
+  const [picking, setPicking] = useState(false);
+
+  const fileName = value ? value.split(/[\\/]/).pop() : "";
+
+  const pick = async () => {
+    setPicking(true);
+    try {
+      const selected = await openDialog({
+        multiple: false,
+        directory: false,
+        title: defaultName ? `Choisir l'exécutable de ${defaultName}` : "Choisir un exécutable",
+        filters: [
+          { name: "Exécutables Windows", extensions: ["exe", "bat", "cmd", "lnk"] },
+          { name: "Tous les fichiers", extensions: ["*"] },
+        ],
+      });
+      if (typeof selected === "string" && selected.length > 0) {
+        onChange(selected);
+      }
+    } catch (e) {
+      console.warn("[exe picker] failed:", e);
+    } finally {
+      setPicking(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2 rounded-xl border border-dashed border-white/10 bg-bg-base/30 p-3 transition-colors hover:border-accent/40">
+      <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-accent/10 text-accent">
+        <FolderOpen className="size-5" />
+      </div>
+      <div className="min-w-0 flex-1">
+        {value ? (
+          <>
+            <div className="truncate text-sm text-fg-primary">{fileName}</div>
+            <div className="truncate font-mono text-[10px] text-fg-dim">{value}</div>
+          </>
+        ) : (
+          <>
+            <div className="text-sm text-fg-primary">Aucun fichier sélectionné</div>
+            <div className="text-xs text-fg-muted">Clique sur Parcourir pour choisir un .exe</div>
+          </>
+        )}
+      </div>
+      {value && (
+        <button
+          onClick={() => onChange("")}
+          type="button"
+          className="rounded-md bg-white/[0.02] px-2 py-1.5 text-xs text-fg-muted ring-1 ring-white/[0.04] transition-colors hover:bg-danger/10 hover:text-danger"
+        >
+          ×
+        </button>
+      )}
+      <button
+        onClick={pick}
+        disabled={picking}
+        type="button"
+        className="no-drag inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 text-xs font-medium text-bg-base shadow-[0_0_16px_var(--color-accent-soft)] transition-shadow hover:shadow-[0_0_22px_var(--color-accent-glow)] disabled:opacity-60"
+      >
+        <FolderOpen className="size-3.5" />
+        {picking ? "…" : "Parcourir"}
+      </button>
+    </div>
   );
 }
 

@@ -9,6 +9,7 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 ## [Unreleased]
 
 ### Ajouté
+- **Sélecteur de fichier natif** pour le chemin de l'exécutable dans le formulaire d'ajout de raccourci : bouton « Parcourir » qui ouvre le dialog Windows pour choisir le `.exe`, le `.bat`, le `.cmd` ou le `.lnk`. Plus besoin de copier-coller le chemin manuellement. Le nom du fichier s'affiche en gros et le chemin complet en mono dessous.
 - **Bouton « Ajouter un jeu » dans la bibliothèque** : tout utilisateur peut maintenant créer ses propres raccourcis vers des .exe locaux directement depuis la page Bibliothèque, plus besoin de passer par l'admin.
 - **Modal de création/édition** avec formulaire à gauche et **aperçu en temps réel** de la carte à droite : nom, description, icône (upload), bannière (upload), chemin .exe, arguments, couleurs primaire/accent, font display, particules (preset + couleur + densité), serveur Minecraft optionnel. La preview se met à jour à chaque saisie pour visualiser le rendu final avant de valider.
 - **Modification d'un raccourci existant** : crayon ✏ qui apparaît au hover sur tes raccourcis dans la bibliothèque, ouvre la même modal pré-remplie. Permet de changer icône, couleurs, etc., à tout moment.
