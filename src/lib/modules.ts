@@ -35,6 +35,9 @@ export async function launchModule(module: LauncherModule): Promise<void> {
       executable: module.executable,
     });
   }
+  if (module.type === "minecraft") {
+    throw new Error("Use launchMinecraft from lib/minecraft.ts for Minecraft modules");
+  }
   return invoke<void>("module_launch_shortcut", {
     moduleId: module.id,
     moduleName: module.name,
@@ -72,12 +75,14 @@ export function subscribeProgress(
 
 export type DerivedStatus =
   | { kind: "shortcut" }
+  | { kind: "minecraft" }
   | { kind: "not-installed" }
   | { kind: "installed"; localVersion: string }
   | { kind: "update-available"; localVersion: string; remoteVersion: string };
 
 export function deriveStatus(module: LauncherModule, local: ModuleStateLocal | null): DerivedStatus {
   if (module.type === "shortcut") return { kind: "shortcut" };
+  if (module.type === "minecraft") return { kind: "minecraft" };
   if (!local) return { kind: "not-installed" };
   if (local.version !== module.version) {
     return { kind: "update-available", localVersion: local.version, remoteVersion: module.version };

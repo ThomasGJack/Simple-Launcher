@@ -218,6 +218,7 @@ function StatusChip({ status }: { status: DerivedStatus | null }) {
   if (!status) return null;
   const labels: Record<DerivedStatus["kind"], { text: string; cls: string }> = {
     shortcut: { text: "Local", cls: "bg-fuchsia-500/15 text-fuchsia-300 ring-fuchsia-500/30" },
+    minecraft: { text: "Minecraft", cls: "bg-emerald-500/15 text-emerald-300 ring-emerald-500/30" },
     "not-installed": { text: "Installer", cls: "bg-white/[0.05] text-fg-muted ring-white/[0.08]" },
     installed: { text: "Prêt", cls: "bg-success/15 text-success ring-success/30" },
     "update-available": { text: "MAJ dispo", cls: "bg-amber-500/15 text-amber-300 ring-amber-500/30" },

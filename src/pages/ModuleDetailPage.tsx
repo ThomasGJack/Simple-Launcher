@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Play, Download, RefreshCw, Trash2, Folder, Hash, Loader2, AlertTriangle, HardDrive, Clock, Star } from "lucide-react";
+import { ArrowLeft, Play, Download, RefreshCw, Trash2, Folder, Hash, Loader2, AlertTriangle, HardDrive, Clock, Star, ExternalLink, Box } from "lucide-react";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/auth";
 import { useFavoritesStore } from "@/store/favorites";
@@ -22,6 +22,13 @@ import type { LauncherModule } from "@/types/module";
 import { ModuleParticles } from "@/components/ui/Particles";
 import { ModuleSections } from "@/components/library/ModuleSections";
 import { useMinecraftStatus } from "@/lib/minecraftStatus";
+import {
+  deriveMinecraftStatus,
+  installModpack,
+  launchMinecraft,
+  type MinecraftStatus,
+} from "@/lib/minecraft";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
 
@@ -57,7 +64,7 @@ export function ModuleDetailPage() {
 
   useEffect(() => {
     if (!module) return;
-    if (module.type === "shortcut") {
+    if (module.type === "shortcut" || module.type === "minecraft") {
       setStateLoaded(true);
       setLocal(null);
       return;
@@ -225,7 +232,9 @@ export function ModuleDetailPage() {
               )}
 
               <div className="mt-6">
-                {action.kind === "installing" ? (
+                {module.type === "minecraft" ? (
+                  <MinecraftActionPanel module={module} themePrimary={themePrimary} />
+                ) : action.kind === "installing" ? (
                   <ProgressDetailed progress={action.progress} />
                 ) : action.kind === "error" ? (
                   <ErrorBanner message={action.message} onDismiss={() => setAction({ kind: "idle" })} />
@@ -263,7 +272,19 @@ export function ModuleDetailPage() {
               <h3 className="mb-4 text-xs uppercase tracking-[0.2em] text-fg-muted">Informations</h3>
               <div className="grid gap-2.5">
                 <InfoLine icon={Hash} label="ID" value={module.id} mono />
-                {module.type === "hosted" ? (
+                {module.type === "minecraft" ? (
+                  <>
+                    <InfoLine icon={Folder} label="Type" value="Modpack CurseForge" />
+                    {module.minecraftVersion && (
+                      <InfoLine icon={Box} label="Minecraft" value={module.minecraftVersion} />
+                    )}
+                    {module.modLoader && (
+                      <InfoLine icon={Box} label="Mod loader" value={module.modLoader} />
+                    )}
+                    <InfoLine icon={Hash} label="CF Project" value={String(module.curseforgeProjectId)} mono />
+                    <InfoLine icon={Hash} label="CF File" value={String(module.curseforgeFileId)} mono />
+                  </>
+                ) : module.type === "hosted" ? (
                   <>
                     <InfoLine icon={HardDrive} label="Taille" value={`${(module.size / 1_048_576).toFixed(1)} Mo`} />
                     <InfoLine icon={Clock} label="Version" value={`v${module.version}`} />
@@ -381,6 +402,8 @@ function StatusBadge({
   switch (status.kind) {
     case "shortcut":
       return <Pill color="fuchsia">Raccourci local</Pill>;
+    case "minecraft":
+      return <Pill color="emerald">Modpack Minecraft</Pill>;
     case "not-installed":
       return <Pill color="muted">Non installé</Pill>;
     case "installed":
@@ -397,7 +420,7 @@ function Pill({
   pulsing,
   children,
 }: {
-  color: "accent" | "fuchsia" | "muted" | "success" | "amber";
+  color: "accent" | "fuchsia" | "muted" | "success" | "amber" | "emerald";
   pulsing?: boolean;
   children: React.ReactNode;
 }) {
@@ -407,6 +430,7 @@ function Pill({
     muted: "bg-white/[0.05] text-fg-muted ring-white/[0.08]",
     success: "bg-success/15 text-success ring-success/30",
     amber: "bg-amber-500/15 text-amber-300 ring-amber-500/30",
+    emerald: "bg-emerald-500/15 text-emerald-300 ring-emerald-500/30",
   } as const;
   return (
     <span
@@ -524,6 +548,203 @@ function ErrorBanner({ message, onDismiss }: { message: string; onDismiss: () =>
         <span>{message}</span>
       </motion.button>
     </AnimatePresence>
+  );
+}
+
+function MinecraftActionPanel({
+  module,
+  themePrimary,
+}: {
+  module: import("@/types/module").MinecraftModule;
+  themePrimary?: string;
+}) {
+  const [status, setStatus] = useState<MinecraftStatus | null>(null);
+  const [busy, setBusy] = useState<"install" | "launch" | null>(null);
+  const [progress, setProgress] = useState<{ phase: string; bytes: number; total: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = async () => {
+    try {
+      const s = await deriveMinecraftStatus(module);
+      setStatus(s);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  useEffect(() => {
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [module.id, module.curseforgeFileId]);
+
+  useEffect(() => {
+    let cleanup: (() => void) | undefined;
+    import("@tauri-apps/api/event").then(({ listen }) => {
+      listen<{ moduleId: string; phase: string; bytesDownloaded: number; bytesTotal: number }>(
+        "module-progress",
+        (event) => {
+          if (event.payload.moduleId !== module.id) return;
+          setProgress({
+            phase: event.payload.phase,
+            bytes: event.payload.bytesDownloaded,
+            total: event.payload.bytesTotal,
+          });
+        },
+      ).then((u) => {
+        cleanup = u;
+      });
+    });
+    return () => {
+      cleanup?.();
+    };
+  }, [module.id]);
+
+  const handleInstall = async () => {
+    if (status?.kind !== "not-installed" && status?.kind !== "update-available") return;
+    setBusy("install");
+    setError(null);
+    setProgress(null);
+    sounds.click();
+    try {
+      await installModpack(module, status.prismPath);
+      sounds.success();
+      await refresh();
+    } catch (e) {
+      sounds.error();
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+      setProgress(null);
+    }
+  };
+
+  const handleLaunch = async () => {
+    if (status?.kind !== "ready") return;
+    setBusy("launch");
+    setError(null);
+    sounds.launch();
+    try {
+      await launchMinecraft(module, status.prismPath, status.instanceName);
+      setTimeout(() => setBusy(null), 1500);
+    } catch (e) {
+      sounds.error();
+      setError(e instanceof Error ? e.message : String(e));
+      setBusy(null);
+    }
+  };
+
+  if (!status) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-fg-muted">
+        <Loader2 className="size-4 animate-spin" /> Vérification…
+      </div>
+    );
+  }
+
+  if (busy === "install" && progress) {
+    const phaseLabels: Record<string, string> = {
+      resolving: "Résolution CurseForge…",
+      downloading: "Téléchargement du modpack",
+      "reading-manifest": "Analyse du manifest",
+      importing: "Import dans Prism Launcher",
+      ready: "Prêt",
+    };
+    const pct = progress.total > 0 ? Math.round((progress.bytes / progress.total) * 100) : null;
+    return (
+      <div className="rounded-2xl bg-bg-base/80 p-4 ring-1 ring-white/[0.06]">
+        <div className="mb-2 flex items-baseline justify-between">
+          <span className="text-sm font-medium text-fg-primary">{phaseLabels[progress.phase] ?? progress.phase}</span>
+          {pct !== null && progress.total > 0 && (
+            <span className="text-xs text-fg-muted">
+              {(progress.bytes / 1_048_576).toFixed(1)} / {(progress.total / 1_048_576).toFixed(1)} Mo · {pct}%
+            </span>
+          )}
+        </div>
+        <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
+          <motion.div
+            className="h-full bg-emerald-400 shadow-[0_0_18px_rgba(74,222,128,0.6)]"
+            animate={{ width: pct !== null ? `${pct}%` : "30%" }}
+            transition={{ duration: 0.2 }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {status.kind === "no-api-key" && (
+        <ErrorBanner
+          message={"Clé API CurseForge manquante. Inscris-toi gratuitement sur console.curseforge.com puis ajoute VITE_CURSEFORGE_API_KEY dans .env.local et relance le launcher."}
+          onDismiss={() => {}}
+        />
+      )}
+
+      {status.kind === "no-prism" && (
+        <div className="rounded-2xl bg-amber-500/10 p-5 ring-1 ring-amber-500/30">
+          <div className="mb-2 flex items-center gap-2 text-sm font-medium text-amber-200">
+            <AlertTriangle className="size-4" />
+            Prism Launcher requis
+          </div>
+          <p className="text-xs leading-relaxed text-fg-muted">
+            Pour jouer ce modpack, installe Prism Launcher (gratuit, open source). On l'utilise pour gérer Java, Microsoft auth et les mods automatiquement. Une fois installé, relance le check.
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button
+              onClick={() => {
+                sounds.click();
+                openUrl(status.downloadUrl);
+              }}
+              className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-sm font-medium text-bg-base shadow-[0_0_20px_rgba(245,158,11,0.4)]"
+            >
+              <ExternalLink className="size-4" /> Télécharger Prism
+            </button>
+            <button
+              onClick={refresh}
+              className="rounded-xl bg-white/[0.04] px-4 py-2 text-sm font-medium text-fg-primary ring-1 ring-white/[0.06] transition-colors hover:bg-white/[0.08]"
+            >
+              Re-vérifier
+            </button>
+          </div>
+        </div>
+      )}
+
+      {(status.kind === "not-installed" || status.kind === "update-available") && (
+        <button
+          onClick={handleInstall}
+          disabled={busy !== null}
+          className="no-drag flex w-full items-center justify-center gap-3 rounded-2xl px-8 py-4 font-display text-lg tracking-[0.18em] text-bg-base shadow-[0_0_32px_rgba(74,222,128,0.4)] ring-1 ring-white/30 transition-shadow hover:shadow-[0_0_44px_rgba(74,222,128,0.6)] disabled:opacity-60"
+          style={{ background: "linear-gradient(90deg, #22c55e, #4ade80, #22c55e)", backgroundSize: "200% 100%" }}
+        >
+          <Download className="size-5" />
+          {status.kind === "update-available" ? "METTRE À JOUR LE MODPACK" : "INSTALLER LE MODPACK"}
+        </button>
+      )}
+
+      {status.kind === "ready" && (
+        <button
+          onClick={handleLaunch}
+          disabled={busy !== null}
+          className="no-drag flex w-full items-center justify-center gap-3 rounded-2xl px-8 py-4 font-display text-lg tracking-[0.18em] text-bg-base shadow-[0_0_32px_var(--color-accent-glow)] ring-1 ring-white/30 transition-shadow hover:shadow-[0_0_44px_var(--color-accent-glow)] disabled:opacity-60"
+          style={{
+            background: themePrimary
+              ? `linear-gradient(90deg, ${themePrimary}, ${themePrimary}dd, ${themePrimary})`
+              : "linear-gradient(90deg, var(--color-accent), #4ed6ff, var(--color-accent))",
+          }}
+        >
+          <Play className="size-5 fill-bg-base" strokeWidth={0} />
+          {busy === "launch" ? "LANCEMENT…" : "JOUER"}
+        </button>
+      )}
+
+      {status.kind === "ready" && (
+        <div className="text-center text-xs text-fg-muted">
+          Instance Prism : <span className="font-mono text-fg-primary">{status.instanceName}</span>
+        </div>
+      )}
+
+      {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
+    </div>
   );
 }
 

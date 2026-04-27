@@ -1,4 +1,5 @@
 mod discord_rpc;
+mod minecraft;
 mod modules;
 mod oauth;
 
@@ -12,6 +13,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(modules::LaunchTracker::new())
+        .manage(minecraft::McLaunchTracker::new())
         .manage(discord_rpc::DiscordRpc::new())
         .setup(|app| {
             let discord = app.state::<discord_rpc::DiscordRpc>();
@@ -28,6 +30,11 @@ pub fn run() {
             modules::module_launch_hosted,
             modules::module_launch_shortcut,
             modules::module_uninstall,
+            minecraft::mc_find_prism,
+            minecraft::mc_get_state,
+            minecraft::mc_install_modpack,
+            minecraft::mc_launch,
+            minecraft::mc_uninstall,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -94,6 +94,12 @@ export function ModuleCard({
     e?.stopPropagation();
     if (action.kind === "installing" || action.kind === "launching") return;
 
+    // Minecraft modpacks: install flow is complex — open detail page
+    if (module.type === "minecraft") {
+      openDetail();
+      return;
+    }
+
     if (status.kind === "shortcut" || status.kind === "installed") {
       setAction({ kind: "launching" });
       sounds.launch();
@@ -268,6 +274,8 @@ function StatusBadge({
           <Folder className="size-3" /> Local
         </Pill>
       );
+    case "minecraft":
+      return <Pill color="emerald">Minecraft</Pill>;
     case "not-installed":
       return <Pill color="muted">Non installé</Pill>;
     case "installed":
@@ -288,7 +296,7 @@ function Pill({
   pulsing,
   children,
 }: {
-  color: "accent" | "fuchsia" | "muted" | "success" | "amber";
+  color: "accent" | "fuchsia" | "muted" | "success" | "amber" | "emerald";
   pulsing?: boolean;
   children: React.ReactNode;
 }) {
@@ -298,6 +306,7 @@ function Pill({
     muted: "bg-white/[0.05] text-fg-muted ring-white/[0.08]",
     success: "bg-success/15 text-success ring-success/30",
     amber: "bg-amber-500/15 text-amber-300 ring-amber-500/30",
+    emerald: "bg-emerald-500/15 text-emerald-300 ring-emerald-500/30",
   } as const;
   return (
     <span
@@ -334,6 +343,10 @@ function PrimaryButton({
     case "update-available":
       label = "Mettre à jour";
       Icon = RefreshCw;
+      break;
+    case "minecraft":
+      label = "Voir";
+      Icon = Play;
       break;
     case "installed":
     case "shortcut":

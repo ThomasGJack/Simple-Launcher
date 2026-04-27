@@ -39,6 +39,16 @@ export async function saveShortcutModule(module: Extract<LauncherModule, { type:
   );
 }
 
+export async function saveMinecraftModule(module: Extract<LauncherModule, { type: "minecraft" }>) {
+  const fb = getFirebase();
+  if (!fb) throw new Error("Firebase not configured");
+  await setDoc(
+    doc(fb.db, "modules", module.id),
+    { ...module, updatedAt: serverTimestamp() },
+    { merge: true },
+  );
+}
+
 export async function uploadHostedModule(
   module: Omit<Extract<LauncherModule, { type: "hosted" }>, "downloadUrl" | "sha256" | "size">,
   file: File,

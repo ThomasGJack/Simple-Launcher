@@ -22,6 +22,7 @@ import { isAdmin } from "@/lib/admin";
 import {
   deleteHostedZip,
   deleteModule,
+  saveMinecraftModule,
   uploadHostedModule,
   uploadModuleAsset,
   watchModules,
@@ -32,8 +33,11 @@ import { cn } from "@/lib/cn";
 
 type ParticlesPreset = NonNullable<ParticlesConfig["preset"]> | "none";
 type BgType = "none" | "image" | "video";
+type ModuleType = "hosted" | "minecraft";
+type ModLoader = "" | "forge" | "fabric" | "quilt" | "neoforge";
 
 type FormState = {
+  type: ModuleType;
   id: string;
   name: string;
   shortDescription: string;
@@ -52,9 +56,15 @@ type FormState = {
   serverAddress: string;
   screenshots: string;
   stats: string;
+  // Minecraft fields
+  curseforgeProjectId: string;
+  curseforgeFileId: string;
+  minecraftVersion: string;
+  modLoader: ModLoader;
 };
 
 const EMPTY_FORM: FormState = {
+  type: "hosted",
   id: "",
   name: "",
   shortDescription: "",
@@ -73,6 +83,10 @@ const EMPTY_FORM: FormState = {
   serverAddress: "",
   screenshots: "",
   stats: "",
+  curseforgeProjectId: "",
+  curseforgeFileId: "",
+  minecraftVersion: "",
+  modLoader: "",
 };
 
 export function AdminPage() {
@@ -118,9 +132,14 @@ export function AdminPage() {
   const validate = (): string | null => {
     if (!form.id || !/^[a-z0-9-]+$/.test(form.id)) return "ID invalide (lowercase, chiffres, tirets uniquement)";
     if (!form.name) return "Nom obligatoire";
-    if (!file) return "Fichier .zip obligatoire";
-    if (!form.version || !/^\d+\.\d+\.\d+$/.test(form.version)) return "Version semver requise (ex: 1.0.0)";
-    if (!form.executable) return "Nom de l'exécutable requis (ex: MyGame.exe)";
+    if (form.type === "hosted") {
+      if (!file) return "Fichier .zip obligatoire";
+      if (!form.version || !/^\d+\.\d+\.\d+$/.test(form.version)) return "Version semver requise (ex: 1.0.0)";
+      if (!form.executable) return "Nom de l'exécutable requis (ex: MyGame.exe)";
+    } else if (form.type === "minecraft") {
+      if (!/^\d+$/.test(form.curseforgeProjectId)) return "Project ID CurseForge invalide (numérique)";
+      if (!/^\d+$/.test(form.curseforgeFileId)) return "File ID CurseForge invalide (numérique)";
+    }
     return null;
   };
 
@@ -189,22 +208,40 @@ export function AdminPage() {
         form.serverAddress.trim().length > 0
           ? ({ type: "minecraft" as const, address: form.serverAddress.trim() })
           : undefined;
-      await uploadHostedModule(
-        {
-          type: "hosted",
+
+      if (form.type === "minecraft") {
+        await saveMinecraftModule({
+          type: "minecraft",
           id: form.id,
           name: form.name,
           ...(form.shortDescription && { shortDescription: form.shortDescription }),
           ...(form.iconUrl && { iconUrl: form.iconUrl }),
           ...(form.bannerUrl && { bannerUrl: form.bannerUrl }),
-          version: form.version,
-          executable: form.executable,
+          curseforgeProjectId: parseInt(form.curseforgeProjectId, 10),
+          curseforgeFileId: parseInt(form.curseforgeFileId, 10),
+          ...(form.minecraftVersion && { minecraftVersion: form.minecraftVersion }),
+          ...(form.modLoader && { modLoader: form.modLoader }),
           ...(page && { page }),
           ...(server && { server }),
-        },
-        file!,
-        setProgress,
-      );
+        });
+      } else {
+        await uploadHostedModule(
+          {
+            type: "hosted",
+            id: form.id,
+            name: form.name,
+            ...(form.shortDescription && { shortDescription: form.shortDescription }),
+            ...(form.iconUrl && { iconUrl: form.iconUrl }),
+            ...(form.bannerUrl && { bannerUrl: form.bannerUrl }),
+            version: form.version,
+            executable: form.executable,
+            ...(page && { page }),
+            ...(server && { server }),
+          },
+          file!,
+          setProgress,
+        );
+      }
       setFeedback({ kind: "ok", message: `Module "${form.name}" publié.` });
       reset();
     } catch (e) {
@@ -267,12 +304,14 @@ export function AdminPage() {
               <Cloud className="size-5" />
             </div>
             <div>
-              <div className="font-display text-2xl text-fg-primary">Nouveau module hébergé</div>
+              <div className="font-display text-2xl text-fg-primary">Nouveau module</div>
               <div className="text-xs text-fg-muted">
-                Pour les raccourcis locaux (.exe sur ta machine), utilise plutôt « Ajouter un jeu » dans la bibliothèque.
+                Pour les raccourcis locaux, utilise plutôt « Ajouter un jeu » dans la bibliothèque.
               </div>
             </div>
           </div>
+
+          <ModuleTypeSwitch value={form.type} onChange={(v) => updateForm("type", v)} />
 
           <div className="mt-6 grid gap-4">
             <Field label="ID (slug)" hint="minuscules, chiffres, tirets · ex: mancho-land">
@@ -282,9 +321,11 @@ export function AdminPage() {
               <Field label="Nom affiché">
                 <Input value={form.name} onChange={(v) => updateForm("name", v)} placeholder="Mon Jeu" />
               </Field>
-              <Field label="Version" hint="semver">
-                <Input value={form.version} onChange={(v) => updateForm("version", v)} placeholder="1.0.0" />
-              </Field>
+              {form.type === "hosted" && (
+                <Field label="Version" hint="semver">
+                  <Input value={form.version} onChange={(v) => updateForm("version", v)} placeholder="1.0.0" />
+                </Field>
+              )}
             </div>
             <Field label="Description courte">
               <Input
@@ -313,10 +354,16 @@ export function AdminPage() {
               />
             </div>
 
-            <Field label="Nom de l'exécutable dans le zip" hint="ex: MyGame.exe">
-              <Input value={form.executable} onChange={(v) => updateForm("executable", v)} placeholder="MyGame.exe" />
-            </Field>
-            <FilePicker file={file} onChange={setFile} />
+            {form.type === "hosted" ? (
+              <>
+                <Field label="Nom de l'exécutable dans le zip" hint="ex: MyGame.exe">
+                  <Input value={form.executable} onChange={(v) => updateForm("executable", v)} placeholder="MyGame.exe" />
+                </Field>
+                <FilePicker file={file} onChange={setFile} />
+              </>
+            ) : (
+              <MinecraftFields form={form} updateForm={updateForm} />
+            )}
           </div>
 
           <button
@@ -497,6 +544,119 @@ export function AdminPage() {
           </div>
         </motion.div>
       </div>
+    </div>
+  );
+}
+
+function ModuleTypeSwitch({ value, onChange }: { value: ModuleType; onChange: (v: ModuleType) => void }) {
+  const types: { value: ModuleType; label: string; hint: string }[] = [
+    { value: "hosted", label: "Hébergé", hint: "Jeu standalone uploadé sur Firebase" },
+    { value: "minecraft", label: "Minecraft", hint: "Modpack CurseForge via Prism" },
+  ];
+  return (
+    <div className="grid grid-cols-2 gap-2 rounded-xl bg-white/[0.03] p-1.5 ring-1 ring-white/[0.06]">
+      {types.map((t) => (
+        <button
+          key={t.value}
+          onClick={() => onChange(t.value)}
+          className={cn(
+            "relative rounded-lg px-3 py-2.5 text-left transition-colors",
+            value === t.value ? "text-bg-base" : "text-fg-muted hover:text-fg-primary",
+          )}
+        >
+          {value === t.value && (
+            <motion.div
+              layoutId="admin-type-pill"
+              className="absolute inset-0 rounded-lg bg-accent shadow-[0_0_18px_var(--color-accent-soft)]"
+              transition={{ type: "spring", stiffness: 380, damping: 30 }}
+            />
+          )}
+          <span className="relative z-10 block text-sm font-medium">{t.label}</span>
+          <span className={cn("relative z-10 block text-xs", value === t.value ? "text-bg-base/70" : "text-fg-dim")}>
+            {t.hint}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function MinecraftFields({
+  form,
+  updateForm,
+}: {
+  form: FormState;
+  updateForm: <K extends keyof FormState>(key: K, value: FormState[K]) => void;
+}) {
+  const handleUrlPaste = (raw: string) => {
+    // CurseForge URL: https://www.curseforge.com/minecraft/modpacks/<slug>/files/<fileId>
+    const match = /\/files\/(\d+)/.exec(raw);
+    if (match) updateForm("curseforgeFileId", match[1]);
+  };
+
+  const loaders: { value: ModLoader; label: string }[] = [
+    { value: "", label: "—" },
+    { value: "forge", label: "Forge" },
+    { value: "fabric", label: "Fabric" },
+    { value: "neoforge", label: "NeoForge" },
+    { value: "quilt", label: "Quilt" },
+  ];
+
+  return (
+    <div className="grid gap-4 rounded-2xl bg-bg-base/30 p-5 ring-1 ring-white/[0.04]">
+      <div className="flex items-center gap-2 border-b border-white/[0.04] pb-2 text-xs uppercase tracking-[0.2em] text-accent">
+        <Cloud className="size-3" /> Modpack CurseForge
+      </div>
+
+      <Field label="URL du fichier modpack" hint="optionnel · auto-extrait le File ID">
+        <Input
+          value=""
+          onChange={handleUrlPaste}
+          placeholder="https://www.curseforge.com/minecraft/modpacks/.../files/6051892"
+        />
+      </Field>
+
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Project ID" hint="numérique · cf. About Project sur CF">
+          <Input
+            value={form.curseforgeProjectId}
+            onChange={(v) => updateForm("curseforgeProjectId", v.replace(/\D/g, ""))}
+            placeholder="520914"
+            mono
+          />
+        </Field>
+        <Field label="File ID" hint="version spécifique du modpack">
+          <Input
+            value={form.curseforgeFileId}
+            onChange={(v) => updateForm("curseforgeFileId", v.replace(/\D/g, ""))}
+            placeholder="6051892"
+            mono
+          />
+        </Field>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Version Minecraft" hint="affichage uniquement">
+          <Input value={form.minecraftVersion} onChange={(v) => updateForm("minecraftVersion", v)} placeholder="1.20.1" />
+        </Field>
+        <Field label="Mod loader" hint="affichage uniquement">
+          <select
+            value={form.modLoader}
+            onChange={(e) => updateForm("modLoader", e.target.value as ModLoader)}
+            className="no-drag w-full rounded-lg bg-bg-base/40 px-3.5 py-2.5 text-sm text-fg-primary ring-1 ring-white/[0.06] focus:outline-none focus:ring-1 focus:ring-accent/60"
+          >
+            {loaders.map((l) => (
+              <option key={l.value} value={l.value}>
+                {l.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+
+      <p className="text-xs leading-relaxed text-fg-dim">
+        ⚠ Les utilisateurs auront besoin de <strong className="text-fg-muted">Prism Launcher</strong> installé. Le launcher détecte sa présence et propose le téléchargement sinon. La clé API CurseForge se configure dans <code className="rounded bg-white/[0.04] px-1.5 py-0.5 font-mono">.env.local</code> (gratuite sur console.curseforge.com).
+      </p>
     </div>
   );
 }

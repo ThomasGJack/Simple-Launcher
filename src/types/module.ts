@@ -85,4 +85,15 @@ export type ShortcutModule = BaseModule & {
   workingDirectory?: string;
 };
 
-export type LauncherModule = HostedModule | ShortcutModule;
+export type MinecraftModule = BaseModule & {
+  type: "minecraft";
+  curseforgeProjectId: number;
+  curseforgeFileId: number;
+  // Optional metadata, displayed but not required for launching
+  minecraftVersion?: string;
+  modLoader?: "forge" | "fabric" | "quilt" | "neoforge";
+  // Optional override for the Prism instance name (default: from modpack manifest)
+  prismInstanceName?: string;
+};
+
+export type LauncherModule = HostedModule | ShortcutModule | MinecraftModule;
