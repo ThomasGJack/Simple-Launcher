@@ -18,6 +18,12 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.04.27.4] - 2026-04-27  · semver `26.427.3`
+
+
+
+### Changé
+- **Erreurs Minecraft : on récupère désormais le corps de la réponse CurseForge** quand l'API renvoie 403/404/401, et on l'affiche dans le message. CurseForge inclut souvent une explication JSON (`{"error": "..."}`) qui dit pourquoi le download est bloqué — utile quand le code HTTP seul ne suffit pas à diagnostiquer (ex: réglage projet vs fichier, mod interne qui bloque la distribution du modpack entier).
 ## [v26.04.27.3] - 2026-04-27  · semver `26.427.2`
 
 

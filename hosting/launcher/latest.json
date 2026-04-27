@@ -1,12 +1,12 @@
 {
-  "version": "26.427.2",
-  "displayVersion": "v26.04.27.3",
-  "notes": "### Changé\n- **Install Minecraft : un seul appel API au lieu de deux**. On utilisait `/v1/mods/{modId}/files/{fileId}/download-url` pour récupérer l'URL, mais cet endpoint renvoie parfois 403 même quand le fichier autorise les downloads tiers. On lit maintenant directement le champ `downloadUrl` retourné par `/v1/mods/{modId}/files/{fileId}`, ce qui marche dans plus de cas.\n\n### Corrigé\n- **Messages d'erreur Minecraft beaucoup plus précis** : si le fichier ne peut pas être téléchargé, le launcher indique maintenant le **statut CurseForge** du fichier (Approuvé / En cours de revue / Prêt pour revue / Rejeté / etc.). Si le statut n'est pas « Approuvé », c'est que CurseForge n'a pas encore validé le fichier — peut prendre quelques heures pour les modpacks. Si `allowModDistribution: false`, le message rappelle que le réglage se fait au moment de l'upload (ré-uploader le même fichier ne change rien, il faut un nouveau fichier).",
-  "pub_date": "2026-04-27T09:02:24.747Z",
+  "version": "26.427.3",
+  "displayVersion": "v26.04.27.4",
+  "notes": "### Changé\n- **Erreurs Minecraft : on récupère désormais le corps de la réponse CurseForge** quand l'API renvoie 403/404/401, et on l'affiche dans le message. CurseForge inclut souvent une explication JSON (`{\"error\": \"...\"}`) qui dit pourquoi le download est bloqué — utile quand le code HTTP seul ne suffit pas à diagnostiquer (ex: réglage projet vs fichier, mod interne qui bloque la distribution du modpack entier).",
+  "pub_date": "2026-04-27T09:09:43.658Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReExlbkZGc0Y5eEE4Q25QM2lsSUNwaXhaMmFGRTZDYlNmVHJ4TE9UMmpzT282UHl3ckpMdDhreVV6RzJrQ2prbXlENC90cHE0N1dVT1lzNVFkY1gxZVlBQlV6NzRiTlFRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3MjgwNTQ0CWZpbGU6U2ltcGxlIExhdW5jaGVyXzI2LjQyNy4yX3g2NC1zZXR1cC5leGUKU21LK0Nua2VtamFFRGcwdFVpVVhBR2ZkREZnWnhiSm5VQmNXNkg3eEtQVldNUWlkNGxlSGhjRmY0c2JLb3RsOGlhUVpaZUFPMmJVS0duRXAyVVk0Q3c9PQo=",
-      "url": "https://simplelaunche.web.app/releases/26.427.2/Simple Launcher_26.427.2_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReExlbkZGc0Y5eE83RmYvZE40VU9LT0pia2FPZEFEdnRzZktYSnkzTHZQWVBpQWIvUUdqNGNaOFdzQ0oyR0hQdU9kSUF4bzJOc3k4STVwYTNUTld3YVY2eDJvYnZnSUFRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3MjgwOTgzCWZpbGU6U2ltcGxlIExhdW5jaGVyXzI2LjQyNy4zX3g2NC1zZXR1cC5leGUKMWpaODkxdnVCNlZwR3FWeXZUSmJWU3M4cWZ0eTNnZ0IvRldRNWltVTNhTGdiVFdnWmJIeEU5T25QeDhMZkMvWEdDMWV0ZDdMeU5uSWtQck92NG95RGc9PQo=",
+      "url": "https://simplelaunche.web.app/releases/26.427.3/Simple Launcher_26.427.3_x64-setup.exe"
     }
   }
 }
