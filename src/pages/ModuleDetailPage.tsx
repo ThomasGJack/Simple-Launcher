@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Play, Download, RefreshCw, Trash2, Folder, Hash, Loader2, AlertTriangle, HardDrive, Clock } from "lucide-react";
 import { useUIStore } from "@/store/ui";
+import { useAuthStore } from "@/store/auth";
 import { watchModules } from "@/firebase/modules";
+import { watchUserShortcuts } from "@/firebase/shortcuts";
 import {
   deriveStatus,
   getModuleState,
@@ -30,7 +32,10 @@ type Action =
 export function ModuleDetailPage() {
   const route = useUIStore((s) => s.route);
   const navigate = useUIStore((s) => s.navigate);
-  const [allModules, setAllModules] = useState<LauncherModule[]>([]);
+  const user = useAuthStore((s) => s.user);
+  const [hosted, setHosted] = useState<LauncherModule[]>([]);
+  const [shortcuts, setShortcuts] = useState<LauncherModule[]>([]);
+  const allModules = [...shortcuts, ...hosted];
   const [local, setLocal] = useState<ModuleStateLocal | null>(null);
   const [stateLoaded, setStateLoaded] = useState(false);
   const [action, setAction] = useState<Action>({ kind: "idle" });
@@ -40,8 +45,13 @@ export function ModuleDetailPage() {
   const module = allModules.find((m) => m.id === moduleId);
 
   useEffect(() => {
-    return watchModules(setAllModules);
+    return watchModules(setHosted);
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    return watchUserShortcuts(user.uid, setShortcuts);
+  }, [user]);
 
   useEffect(() => {
     if (!module) return;

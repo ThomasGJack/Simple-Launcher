@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Play, Download, RefreshCw, Gamepad2, Trash2, AlertTriangle, Folder } from "lucide-react";
+import { Play, Download, RefreshCw, Gamepad2, Trash2, AlertTriangle, Folder, Pencil } from "lucide-react";
 import {
   deriveStatus,
   getModuleState,
@@ -24,7 +24,15 @@ type Action =
   | { kind: "launching" }
   | { kind: "error"; message: string };
 
-export function ModuleCard({ module, index }: { module: LauncherModule; index: number }) {
+export function ModuleCard({
+  module,
+  index,
+  onEdit,
+}: {
+  module: LauncherModule;
+  index: number;
+  onEdit?: () => void;
+}) {
   const navigate = useUIStore((s) => s.navigate);
   const [local, setLocal] = useState<ModuleStateLocal | null>(null);
   const [stateLoaded, setStateLoaded] = useState(false);
@@ -150,15 +158,29 @@ export function ModuleCard({ module, index }: { module: LauncherModule; index: n
             <MinecraftStatusBadge address={module.server.address} compact />
           )}
         </div>
-        {module.type === "hosted" && status.kind !== "not-installed" && action.kind === "idle" && (
-          <button
-            onClick={handleUninstall}
-            className="rounded-md bg-bg-base/60 p-1.5 text-fg-dim opacity-0 backdrop-blur-md transition-all hover:text-danger group-hover:opacity-100"
-            title="Désinstaller"
-          >
-            <Trash2 className="size-3.5" />
-          </button>
-        )}
+        <div className="flex items-center gap-1">
+          {onEdit && action.kind === "idle" && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit();
+              }}
+              className="rounded-md bg-bg-base/60 p-1.5 text-fg-dim opacity-0 backdrop-blur-md transition-all hover:text-accent group-hover:opacity-100"
+              title="Modifier"
+            >
+              <Pencil className="size-3.5" />
+            </button>
+          )}
+          {module.type === "hosted" && status.kind !== "not-installed" && action.kind === "idle" && (
+            <button
+              onClick={handleUninstall}
+              className="rounded-md bg-bg-base/60 p-1.5 text-fg-dim opacity-0 backdrop-blur-md transition-all hover:text-danger group-hover:opacity-100"
+              title="Désinstaller"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="absolute inset-x-0 bottom-0 p-4">

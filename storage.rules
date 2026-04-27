@@ -18,5 +18,11 @@ service firebase.storage {
       allow read: if true;
       allow write: if request.auth != null && request.auth.uid == uid;
     }
+
+    // Personal shortcut assets — owner-only
+    match /users/{uid}/shortcuts/{shortcutId}/{file} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
   }
 }

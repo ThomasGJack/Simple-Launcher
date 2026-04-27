@@ -18,6 +18,11 @@ service cloud.firestore {
       match /playtime/{moduleId} {
         allow read, write: if request.auth != null && request.auth.uid == uid;
       }
+
+      // Personal shortcuts — private to the owner
+      match /shortcuts/{shortcutId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
     }
 
     // Modules: any authenticated user can read; admins can write.

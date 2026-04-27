@@ -2,11 +2,9 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Cloud,
-  Folder,
   Hash,
   Image as ImageIcon,
   Link as LinkIcon,
-  Plus,
   Trash2,
   Upload,
   AlertTriangle,
@@ -24,7 +22,6 @@ import { isAdmin } from "@/lib/admin";
 import {
   deleteHostedZip,
   deleteModule,
-  saveShortcutModule,
   uploadHostedModule,
   uploadModuleAsset,
   watchModules,
@@ -33,12 +30,10 @@ import {
 import type { LauncherModule, ModulePage, ParticlesConfig, PageSection } from "@/types/module";
 import { cn } from "@/lib/cn";
 
-type ModuleType = "hosted" | "shortcut";
 type ParticlesPreset = NonNullable<ParticlesConfig["preset"]> | "none";
 type BgType = "none" | "image" | "video";
 
 type FormState = {
-  type: ModuleType;
   id: string;
   name: string;
   shortDescription: string;
@@ -46,8 +41,6 @@ type FormState = {
   bannerUrl: string;
   version: string;
   executable: string;
-  executablePath: string;
-  args: string;
   themePrimary: string;
   themeAccent: string;
   fontDisplay: string;
@@ -62,7 +55,6 @@ type FormState = {
 };
 
 const EMPTY_FORM: FormState = {
-  type: "shortcut",
   id: "",
   name: "",
   shortDescription: "",
@@ -70,8 +62,6 @@ const EMPTY_FORM: FormState = {
   bannerUrl: "",
   version: "1.0.0",
   executable: "",
-  executablePath: "",
-  args: "",
   themePrimary: "",
   themeAccent: "",
   fontDisplay: "",
@@ -128,13 +118,9 @@ export function AdminPage() {
   const validate = (): string | null => {
     if (!form.id || !/^[a-z0-9-]+$/.test(form.id)) return "ID invalide (lowercase, chiffres, tirets uniquement)";
     if (!form.name) return "Nom obligatoire";
-    if (form.type === "hosted") {
-      if (!file) return "Fichier .zip obligatoire";
-      if (!form.version || !/^\d+\.\d+\.\d+$/.test(form.version)) return "Version semver requise (ex: 1.0.0)";
-      if (!form.executable) return "Nom de l'exécutable requis (ex: MyGame.exe)";
-    } else {
-      if (!form.executablePath) return "Chemin de l'exécutable requis";
-    }
+    if (!file) return "Fichier .zip obligatoire";
+    if (!form.version || !/^\d+\.\d+\.\d+$/.test(form.version)) return "Version semver requise (ex: 1.0.0)";
+    if (!form.executable) return "Nom de l'exécutable requis (ex: MyGame.exe)";
     return null;
   };
 
@@ -203,38 +189,22 @@ export function AdminPage() {
         form.serverAddress.trim().length > 0
           ? ({ type: "minecraft" as const, address: form.serverAddress.trim() })
           : undefined;
-      if (form.type === "shortcut") {
-        const args = form.args.split(" ").filter(Boolean);
-        await saveShortcutModule({
-          type: "shortcut",
+      await uploadHostedModule(
+        {
+          type: "hosted",
           id: form.id,
           name: form.name,
           ...(form.shortDescription && { shortDescription: form.shortDescription }),
           ...(form.iconUrl && { iconUrl: form.iconUrl }),
           ...(form.bannerUrl && { bannerUrl: form.bannerUrl }),
-          executablePath: form.executablePath,
-          ...(args.length > 0 && { args }),
+          version: form.version,
+          executable: form.executable,
           ...(page && { page }),
           ...(server && { server }),
-        });
-      } else {
-        await uploadHostedModule(
-          {
-            type: "hosted",
-            id: form.id,
-            name: form.name,
-            ...(form.shortDescription && { shortDescription: form.shortDescription }),
-            ...(form.iconUrl && { iconUrl: form.iconUrl }),
-            ...(form.bannerUrl && { bannerUrl: form.bannerUrl }),
-            version: form.version,
-            executable: form.executable,
-            ...(page && { page }),
-            ...(server && { server }),
-          },
-          file!,
-          setProgress,
-        );
-      }
+        },
+        file!,
+        setProgress,
+      );
       setFeedback({ kind: "ok", message: `Module "${form.name}" publié.` });
       reset();
     } catch (e) {
@@ -294,12 +264,15 @@ export function AdminPage() {
         >
           <div className="mb-6 flex items-center gap-3">
             <div className="grid size-10 place-items-center rounded-xl bg-accent/15 text-accent ring-1 ring-accent/30">
-              <Plus className="size-5" />
+              <Cloud className="size-5" />
             </div>
-            <div className="font-display text-2xl text-fg-primary">Nouveau module</div>
+            <div>
+              <div className="font-display text-2xl text-fg-primary">Nouveau module hébergé</div>
+              <div className="text-xs text-fg-muted">
+                Pour les raccourcis locaux (.exe sur ta machine), utilise plutôt « Ajouter un jeu » dans la bibliothèque.
+              </div>
+            </div>
           </div>
-
-          <TypeSwitch value={form.type} onChange={(v) => updateForm("type", v)} />
 
           <div className="mt-6 grid gap-4">
             <Field label="ID (slug)" hint="minuscules, chiffres, tirets · ex: mancho-land">
@@ -309,11 +282,9 @@ export function AdminPage() {
               <Field label="Nom affiché">
                 <Input value={form.name} onChange={(v) => updateForm("name", v)} placeholder="Mon Jeu" />
               </Field>
-              {form.type === "hosted" && (
-                <Field label="Version" hint="semver">
-                  <Input value={form.version} onChange={(v) => updateForm("version", v)} placeholder="1.0.0" />
-                </Field>
-              )}
+              <Field label="Version" hint="semver">
+                <Input value={form.version} onChange={(v) => updateForm("version", v)} placeholder="1.0.0" />
+              </Field>
             </div>
             <Field label="Description courte">
               <Input
@@ -342,28 +313,10 @@ export function AdminPage() {
               />
             </div>
 
-            {form.type === "hosted" ? (
-              <>
-                <Field label="Nom de l'exécutable dans le zip" hint="ex: MyGame.exe">
-                  <Input value={form.executable} onChange={(v) => updateForm("executable", v)} placeholder="MyGame.exe" />
-                </Field>
-                <FilePicker file={file} onChange={setFile} />
-              </>
-            ) : (
-              <>
-                <Field label="Chemin local de l'exécutable" hint="ex: C:\\Games\\Minecraft\\launcher.exe" icon={Folder}>
-                  <Input
-                    value={form.executablePath}
-                    onChange={(v) => updateForm("executablePath", v)}
-                    placeholder="C:\\…"
-                    mono
-                  />
-                </Field>
-                <Field label="Arguments (optionnel)" hint="séparés par des espaces">
-                  <Input value={form.args} onChange={(v) => updateForm("args", v)} placeholder="--fullscreen" />
-                </Field>
-              </>
-            )}
+            <Field label="Nom de l'exécutable dans le zip" hint="ex: MyGame.exe">
+              <Input value={form.executable} onChange={(v) => updateForm("executable", v)} placeholder="MyGame.exe" />
+            </Field>
+            <FilePicker file={file} onChange={setFile} />
           </div>
 
           <button
@@ -510,7 +463,7 @@ export function AdminPage() {
               disabled={submitting}
               className="flex-1 rounded-xl bg-accent px-5 py-3 font-medium text-bg-base shadow-[0_0_24px_var(--color-accent-soft)] transition-shadow hover:shadow-[0_0_36px_var(--color-accent-glow)] disabled:opacity-50"
             >
-              {submitting ? "Publication…" : form.type === "hosted" ? "Uploader & publier" : "Publier"}
+              {submitting ? "Publication…" : "Uploader & publier"}
             </button>
             <button
               onClick={reset}
@@ -544,32 +497,6 @@ export function AdminPage() {
           </div>
         </motion.div>
       </div>
-    </div>
-  );
-}
-
-function TypeSwitch({ value, onChange }: { value: ModuleType; onChange: (v: ModuleType) => void }) {
-  return (
-    <div className="grid grid-cols-2 gap-2 rounded-xl bg-white/[0.03] p-1.5 ring-1 ring-white/[0.06]">
-      {(["shortcut", "hosted"] as const).map((t) => (
-        <button
-          key={t}
-          onClick={() => onChange(t)}
-          className={cn(
-            "relative rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-            value === t ? "text-bg-base" : "text-fg-muted hover:text-fg-primary",
-          )}
-        >
-          {value === t && (
-            <motion.div
-              layoutId="type-pill"
-              className="absolute inset-0 rounded-lg bg-accent shadow-[0_0_18px_var(--color-accent-soft)]"
-              transition={{ type: "spring", stiffness: 380, damping: 30 }}
-            />
-          )}
-          <span className="relative z-10">{t === "shortcut" ? "Raccourci local" : "Hébergé sur Firebase"}</span>
-        </button>
-      ))}
     </div>
   );
 }

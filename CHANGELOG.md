@@ -9,8 +9,16 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 ## [Unreleased]
 
 ### Ajouté
+- **Bouton « Ajouter un jeu » dans la bibliothèque** : tout utilisateur peut maintenant créer ses propres raccourcis vers des .exe locaux directement depuis la page Bibliothèque, plus besoin de passer par l'admin.
+- **Modal de création/édition** avec formulaire à gauche et **aperçu en temps réel** de la carte à droite : nom, description, icône (upload), bannière (upload), chemin .exe, arguments, couleurs primaire/accent, font display, particules (preset + couleur + densité), serveur Minecraft optionnel. La preview se met à jour à chaque saisie pour visualiser le rendu final avant de valider.
+- **Modification d'un raccourci existant** : crayon ✏ qui apparaît au hover sur tes raccourcis dans la bibliothèque, ouvre la même modal pré-remplie. Permet de changer icône, couleurs, etc., à tout moment.
+- **Suppression d'un raccourci** depuis la modal d'édition (bouton Supprimer rouge), avec confirmation.
 
 ### Changé
+- **Refonte de l'architecture des raccourcis** : les raccourcis locaux sont désormais privés à chaque utilisateur (Firestore `/users/{uid}/shortcuts/{id}`, Storage `users/{uid}/shortcuts/{id}/`). Avant, ils étaient stockés dans la collection globale `/modules/*` et visibles par tout le monde — maintenant chacun a sa propre liste perso.
+- **Page Admin simplifiée** : retire le toggle Raccourci/Hébergé. L'admin ne sert plus qu'à publier des modules **hébergés** (jeux à télécharger pour tous). Les raccourcis perso passent par la bibliothèque.
+- **Page de détail module** : supporte aussi les raccourcis perso (auparavant elle ne trouvait que les modules globaux et affichait "introuvable" pour les raccourcis).
+- **Sécurité Firestore + Storage** : nouvelles règles isolant `/users/{uid}/shortcuts/*` à l'utilisateur propriétaire en lecture comme en écriture.
 
 ### Corrigé
 
