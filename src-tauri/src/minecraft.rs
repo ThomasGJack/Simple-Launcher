@@ -97,18 +97,30 @@ fn now_ms() -> u128 {
 }
 
 #[tauri::command]
-pub async fn mc_find_prism() -> Result<Option<String>, String> {
-    let candidates = collect_prism_candidates();
-    for path in candidates {
-        if fs::try_exists(&path).await.unwrap_or(false) {
-            return Ok(Some(path.to_string_lossy().into_owned()));
-        }
+pub async fn mc_find_prism(app: AppHandle) -> Result<Option<String>, String> {
+    if let Some(p) = find_prism_path(&app).await {
+        return Ok(Some(p.to_string_lossy().into_owned()));
     }
     Ok(None)
 }
 
-fn collect_prism_candidates() -> Vec<PathBuf> {
+async fn find_prism_path(app: &AppHandle) -> Option<PathBuf> {
+    let candidates = collect_prism_candidates(app);
+    for path in candidates {
+        if fs::try_exists(&path).await.unwrap_or(false) {
+            return Some(path);
+        }
+    }
+    None
+}
+
+fn collect_prism_candidates(app: &AppHandle) -> Vec<PathBuf> {
     let mut out: Vec<PathBuf> = Vec::new();
+    // 1. Our managed install (auto-downloaded)
+    if let Ok(root) = launcher_root(app) {
+        out.push(root.join("prism").join("prismlauncher.exe"));
+    }
+    // 2. User's existing standard installs
     if let Ok(local) = std::env::var("LOCALAPPDATA") {
         out.push(PathBuf::from(&local).join("Programs\\PrismLauncher\\prismlauncher.exe"));
     }
@@ -119,6 +131,127 @@ fn collect_prism_candidates() -> Vec<PathBuf> {
         out.push(PathBuf::from(&pf86).join("PrismLauncher\\prismlauncher.exe"));
     }
     out
+}
+
+async fn ensure_prism_installed(app: &AppHandle, module_id: &str) -> Result<PathBuf, String> {
+    if let Some(p) = find_prism_path(app).await {
+        return Ok(p);
+    }
+    install_prism_portable(app, module_id).await
+}
+
+async fn install_prism_portable(app: &AppHandle, module_id: &str) -> Result<PathBuf, String> {
+    emit_progress(app, module_id, "fetching-prism-info", 0, 0);
+
+    // 1. Get latest release info from GitHub
+    let resp = reqwest::Client::new()
+        .get("https://api.github.com/repos/PrismLauncher/PrismLauncher/releases/latest")
+        .header("User-Agent", "Simple-Launcher/1.0")
+        .header("Accept", "application/vnd.github+json")
+        .send()
+        .await
+        .map_err(|e| format!("GitHub API: {}", e))?;
+    if !resp.status().is_success() {
+        return Err(format!("GitHub API HTTP {}", resp.status()));
+    }
+    let release: serde_json::Value = resp.json().await.map_err(|e| format!("parse release: {}", e))?;
+    let assets = release
+        .get("assets")
+        .and_then(|a| a.as_array())
+        .ok_or("Release JSON sans champ 'assets'")?;
+
+    // Pick Windows MSVC Portable (most compatible portable build)
+    let asset_url = assets
+        .iter()
+        .find(|a| {
+            let name = a.get("name").and_then(|n| n.as_str()).unwrap_or("");
+            name.contains("Windows-MSVC-Portable") && name.ends_with(".zip")
+        })
+        .and_then(|a| a.get("browser_download_url").and_then(|u| u.as_str()))
+        .ok_or("Aucun build Windows MSVC Portable trouvé sur la dernière release Prism")?
+        .to_string();
+
+    // 2. Download with progress
+    emit_progress(app, module_id, "downloading-prism", 0, 0);
+    let temp_zip = std::env::temp_dir().join("simple-launcher-prism-portable.zip");
+
+    let response = reqwest::get(&asset_url)
+        .await
+        .map_err(|e| format!("download Prism: {}", e))?;
+    if !response.status().is_success() {
+        return Err(format!("download Prism HTTP {}", response.status()));
+    }
+    let total = response.content_length().unwrap_or(0);
+
+    let mut file = fs::File::create(&temp_zip).await.map_err(|e| format!("create temp: {}", e))?;
+    let mut downloaded: u64 = 0;
+    let mut last_emit = Instant::now();
+    let mut stream = response.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| format!("chunk: {}", e))?;
+        file.write_all(&chunk).await.map_err(|e| format!("write: {}", e))?;
+        downloaded += chunk.len() as u64;
+        if last_emit.elapsed() >= Duration::from_millis(100) {
+            emit_progress(app, module_id, "downloading-prism", downloaded, total);
+            last_emit = Instant::now();
+        }
+    }
+    file.flush().await.map_err(|e| e.to_string())?;
+    drop(file);
+    emit_progress(app, module_id, "downloading-prism", downloaded, total);
+
+    // 3. Extract to %APPDATA%\com.simplelaunche.app\prism\
+    emit_progress(app, module_id, "extracting-prism", 0, 0);
+    let prism_dir = launcher_root(app)?.join("prism");
+    if fs::try_exists(&prism_dir).await.unwrap_or(false) {
+        fs::remove_dir_all(&prism_dir).await.map_err(|e| format!("clean prism dir: {}", e))?;
+    }
+    fs::create_dir_all(&prism_dir).await.map_err(|e| format!("mkdir prism: {}", e))?;
+
+    let prism_dir_owned = prism_dir.clone();
+    let temp_zip_owned = temp_zip.clone();
+    tokio::task::spawn_blocking(move || extract_zip(&temp_zip_owned, &prism_dir_owned))
+        .await
+        .map_err(|e| format!("extract task: {}", e))??;
+
+    let _ = fs::remove_file(&temp_zip).await;
+
+    let prism_exe = prism_dir.join("prismlauncher.exe");
+    if !fs::try_exists(&prism_exe).await.unwrap_or(false) {
+        return Err(format!(
+            "prismlauncher.exe introuvable après extraction dans {} — l'archive Prism a peut-être changé de structure",
+            prism_dir.display()
+        ));
+    }
+
+    Ok(prism_exe)
+}
+
+fn extract_zip(zip_path: &Path, dest: &Path) -> Result<(), String> {
+    let file = std::fs::File::open(zip_path).map_err(|e| format!("open zip: {}", e))?;
+    let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("read zip: {}", e))?;
+    for i in 0..archive.len() {
+        let mut entry = archive
+            .by_index(i)
+            .map_err(|e| format!("zip entry {}: {}", i, e))?;
+        let outpath = match entry.enclosed_name() {
+            Some(p) => dest.join(p),
+            None => continue,
+        };
+        if entry.is_dir() {
+            std::fs::create_dir_all(&outpath).map_err(|e| format!("mkdir {}: {}", outpath.display(), e))?;
+        } else {
+            if let Some(parent) = outpath.parent() {
+                std::fs::create_dir_all(parent)
+                    .map_err(|e| format!("mkdir {}: {}", parent.display(), e))?;
+            }
+            let mut outfile = std::fs::File::create(&outpath)
+                .map_err(|e| format!("create {}: {}", outpath.display(), e))?;
+            std::io::copy(&mut entry, &mut outfile)
+                .map_err(|e| format!("write {}: {}", outpath.display(), e))?;
+        }
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -139,11 +272,13 @@ pub async fn mc_install_modpack(
     project_id: u64,
     file_id: u64,
     api_key: String,
-    prism_path: String,
 ) -> Result<MinecraftState, String> {
     if api_key.trim().is_empty() {
         return Err("Clé API CurseForge manquante. Configure VITE_CURSEFORGE_API_KEY dans .env.local.".into());
     }
+
+    // 0. Make sure Prism Launcher is available (auto-install our managed copy if missing)
+    let prism_exe = ensure_prism_installed(&app, &module_id).await?;
 
     emit_progress(&app, &module_id, "resolving", 0, 0);
 
@@ -212,7 +347,7 @@ pub async fn mc_install_modpack(
 
     // 4. Import into Prism Launcher (fire and forget — Prism shows its own progress UI)
     emit_progress(&app, &module_id, "importing", 0, 0);
-    let import_status = Command::new(&prism_path)
+    let import_status = Command::new(&prism_exe)
         .arg("--import")
         .arg(&temp_zip)
         .status()
@@ -249,15 +384,14 @@ pub async fn mc_launch(
     discord: State<'_, DiscordRpc>,
     module_id: String,
     module_name: String,
-    prism_path: String,
     instance_name: String,
     server_address: Option<String>,
 ) -> Result<(), String> {
-    if !fs::try_exists(&prism_path).await.unwrap_or(false) {
-        return Err(format!("Prism Launcher introuvable à : {}", prism_path));
-    }
+    let prism_exe = find_prism_path(&app)
+        .await
+        .ok_or_else(|| "Prism Launcher introuvable. Lance d'abord 'Installer le modpack'.".to_string())?;
 
-    let mut cmd = Command::new(&prism_path);
+    let mut cmd = Command::new(&prism_exe);
     cmd.arg("--launch").arg(&instance_name);
     if let Some(server) = server_address.as_deref().filter(|s| !s.is_empty()) {
         cmd.arg("--server").arg(server);

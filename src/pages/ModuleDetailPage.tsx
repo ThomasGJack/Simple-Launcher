@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Play, Download, RefreshCw, Trash2, Folder, Hash, Loader2, AlertTriangle, HardDrive, Clock, Star, ExternalLink, Box } from "lucide-react";
+import { ArrowLeft, Play, Download, RefreshCw, Trash2, Folder, Hash, Loader2, AlertTriangle, HardDrive, Clock, Star, Box } from "lucide-react";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/auth";
 import { useFavoritesStore } from "@/store/favorites";
@@ -28,7 +28,6 @@ import {
   launchMinecraft,
   type MinecraftStatus,
 } from "@/lib/minecraft";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
 
@@ -606,7 +605,7 @@ function MinecraftActionPanel({
     setProgress(null);
     sounds.click();
     try {
-      await installModpack(module, status.prismPath);
+      await installModpack(module);
       sounds.success();
       await refresh();
     } catch (e) {
@@ -624,7 +623,7 @@ function MinecraftActionPanel({
     setError(null);
     sounds.launch();
     try {
-      await launchMinecraft(module, status.prismPath, status.instanceName);
+      await launchMinecraft(module, status.instanceName);
       setTimeout(() => setBusy(null), 1500);
     } catch (e) {
       sounds.error();
@@ -643,6 +642,9 @@ function MinecraftActionPanel({
 
   if (busy === "install" && progress) {
     const phaseLabels: Record<string, string> = {
+      "fetching-prism-info": "Préparation de Prism Launcher…",
+      "downloading-prism": "Téléchargement de Prism Launcher",
+      "extracting-prism": "Extraction de Prism Launcher",
       resolving: "Résolution CurseForge…",
       downloading: "Téléchargement du modpack",
       "reading-manifest": "Analyse du manifest",
@@ -680,45 +682,23 @@ function MinecraftActionPanel({
         />
       )}
 
-      {status.kind === "no-prism" && (
-        <div className="rounded-2xl bg-amber-500/10 p-5 ring-1 ring-amber-500/30">
-          <div className="mb-2 flex items-center gap-2 text-sm font-medium text-amber-200">
-            <AlertTriangle className="size-4" />
-            Prism Launcher requis
-          </div>
-          <p className="text-xs leading-relaxed text-fg-muted">
-            Pour jouer ce modpack, installe Prism Launcher (gratuit, open source). On l'utilise pour gérer Java, Microsoft auth et les mods automatiquement. Une fois installé, relance le check.
-          </p>
-          <div className="mt-3 flex gap-2">
-            <button
-              onClick={() => {
-                sounds.click();
-                openUrl(status.downloadUrl);
-              }}
-              className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-sm font-medium text-bg-base shadow-[0_0_20px_rgba(245,158,11,0.4)]"
-            >
-              <ExternalLink className="size-4" /> Télécharger Prism
-            </button>
-            <button
-              onClick={refresh}
-              className="rounded-xl bg-white/[0.04] px-4 py-2 text-sm font-medium text-fg-primary ring-1 ring-white/[0.06] transition-colors hover:bg-white/[0.08]"
-            >
-              Re-vérifier
-            </button>
-          </div>
-        </div>
-      )}
-
       {(status.kind === "not-installed" || status.kind === "update-available") && (
-        <button
-          onClick={handleInstall}
-          disabled={busy !== null}
-          className="no-drag flex w-full items-center justify-center gap-3 rounded-2xl px-8 py-4 font-display text-lg tracking-[0.18em] text-bg-base shadow-[0_0_32px_rgba(74,222,128,0.4)] ring-1 ring-white/30 transition-shadow hover:shadow-[0_0_44px_rgba(74,222,128,0.6)] disabled:opacity-60"
-          style={{ background: "linear-gradient(90deg, #22c55e, #4ade80, #22c55e)", backgroundSize: "200% 100%" }}
-        >
-          <Download className="size-5" />
-          {status.kind === "update-available" ? "METTRE À JOUR LE MODPACK" : "INSTALLER LE MODPACK"}
-        </button>
+        <>
+          <button
+            onClick={handleInstall}
+            disabled={busy !== null}
+            className="no-drag flex w-full items-center justify-center gap-3 rounded-2xl px-8 py-4 font-display text-lg tracking-[0.18em] text-bg-base shadow-[0_0_32px_rgba(74,222,128,0.4)] ring-1 ring-white/30 transition-shadow hover:shadow-[0_0_44px_rgba(74,222,128,0.6)] disabled:opacity-60"
+            style={{ background: "linear-gradient(90deg, #22c55e, #4ade80, #22c55e)", backgroundSize: "200% 100%" }}
+          >
+            <Download className="size-5" />
+            {status.kind === "update-available" ? "METTRE À JOUR LE MODPACK" : "INSTALLER LE MODPACK"}
+          </button>
+          {status.kind === "not-installed" && !status.prismDetected && (
+            <p className="text-center text-xs text-fg-muted">
+              Première install : Prism Launcher (~90 Mo) sera téléchargé en plus du modpack. Une seule fois.
+            </p>
+          )}
+        </>
       )}
 
       {status.kind === "ready" && (
