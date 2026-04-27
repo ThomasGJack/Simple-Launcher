@@ -1,12 +1,12 @@
 {
-  "version": "26.427.3",
-  "displayVersion": "v26.04.27.4",
-  "notes": "### Changé\n- **Erreurs Minecraft : on récupère désormais le corps de la réponse CurseForge** quand l'API renvoie 403/404/401, et on l'affiche dans le message. CurseForge inclut souvent une explication JSON (`{\"error\": \"...\"}`) qui dit pourquoi le download est bloqué — utile quand le code HTTP seul ne suffit pas à diagnostiquer (ex: réglage projet vs fichier, mod interne qui bloque la distribution du modpack entier).",
-  "pub_date": "2026-04-27T09:09:43.658Z",
+  "version": "26.427.4",
+  "displayVersion": "v26.04.27.5",
+  "notes": "### Ajouté\n- **Upload manuel des modpacks Minecraft** : nouveau toggle dans le panel admin pour les modules Minecraft. Au lieu de passer par l'API CurseForge (qui peut renvoyer 403 quand un mod du modpack interdit la distribution tiers), l'admin peut désormais uploader directement l'**export CurseForge** du modpack (le `.zip` contenant `manifest.json` + dossier `overrides/`) dans Firebase Storage. Le launcher télécharge depuis Firebase et passe le zip à Prism, qui se charge de récupérer les mods un par un. Pour les ~30% de mods qui ont opté-out de la distribution tiers, Prism ouvre une fenêtre navigateur pour que l'utilisateur clique manuellement « Download » sur la page CF (Prism détecte le téléchargement et continue automatiquement).\n- **Détection des updates en mode upload manuel** : un hash de l'URL Storage sert de version key. Quand l'admin remplace le `.zip` (nouvelle URL), le launcher voit un nouveau hash et propose la mise à jour aux utilisateurs.\n\n### Changé\n- **Suppression de la double tentative CurseForge API** : `mc_install_modpack` accepte maintenant un `customZipUrl` optionnel et bypass complètement la CF API quand il est fourni. Quand on utilise la CF API, la résolution de l'URL est extraite dans un helper dédié `resolve_curseforge_download_url`.",
+  "pub_date": "2026-04-27T09:29:07.160Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReExlbkZGc0Y5eE83RmYvZE40VU9LT0pia2FPZEFEdnRzZktYSnkzTHZQWVBpQWIvUUdqNGNaOFdzQ0oyR0hQdU9kSUF4bzJOc3k4STVwYTNUTld3YVY2eDJvYnZnSUFRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3MjgwOTgzCWZpbGU6U2ltcGxlIExhdW5jaGVyXzI2LjQyNy4zX3g2NC1zZXR1cC5leGUKMWpaODkxdnVCNlZwR3FWeXZUSmJWU3M4cWZ0eTNnZ0IvRldRNWltVTNhTGdiVFdnWmJIeEU5T25QeDhMZkMvWEdDMWV0ZDdMeU5uSWtQck92NG95RGc9PQo=",
-      "url": "https://simplelaunche.web.app/releases/26.427.3/Simple Launcher_26.427.3_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReExlbkZGc0Y5eExuTTh2SjBTTy9la0QyRGFiNTY3Y1pza1FFaHVvTTdJQmg3Vk1vNjhBK0lDKy9pOGQwc0NVVkhFQzNKVWF1OUorTU5XYWRYdUZGS3NPeDRHQWJRWHc0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3MjgyMTQ3CWZpbGU6U2ltcGxlIExhdW5jaGVyXzI2LjQyNy40X3g2NC1zZXR1cC5leGUKTVU2MUhRNFRFQ28vTk1Pd1JWNXEyRWc4dU5wWGtSbmk0QTdZRGJNa2ZoRWxWeGtZWFVkZDRlblpsdzZJYndtRG1Zbi8zZFpiemxjeXovQnI1UStlRGc9PQo=",
+      "url": "https://simplelaunche.web.app/releases/26.427.4/Simple Launcher_26.427.4_x64-setup.exe"
     }
   }
 }

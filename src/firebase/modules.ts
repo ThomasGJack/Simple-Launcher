@@ -151,6 +151,47 @@ async function computeSha256Hex(buffer: ArrayBuffer): Promise<string> {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+/**
+ * Upload a modpack .zip (CurseForge export format: manifest.json + overrides/
+ * at the root) to Firebase Storage. Returns a public download URL that can be
+ * stored as `customZipUrl` on a MinecraftModule.
+ *
+ * Storage path: `modules/{moduleId}/modpack.zip` — same convention as the
+ * other admin-uploaded assets.
+ */
+export async function uploadModpackZip(
+  moduleId: string,
+  file: File,
+  onProgress?: (p: UploadProgress) => void,
+): Promise<{ url: string; size: number }> {
+  const fb = getFirebase();
+  if (!fb) throw new Error("Firebase not configured");
+  const path = `modules/${moduleId}/modpack.zip`;
+  const storageRef = ref(fb.storage, path);
+  const task = uploadBytesResumable(storageRef, file, {
+    contentType: "application/zip",
+    customMetadata: { moduleId, kind: "modpack" },
+  });
+  await new Promise<void>((resolve, reject) => {
+    task.on(
+      "state_changed",
+      (snap) => {
+        if (!onProgress) return;
+        const percent = snap.totalBytes > 0 ? (snap.bytesTransferred / snap.totalBytes) * 100 : 0;
+        onProgress({
+          bytesUploaded: snap.bytesTransferred,
+          bytesTotal: snap.totalBytes,
+          percent,
+        });
+      },
+      reject,
+      () => resolve(),
+    );
+  });
+  const url = await getDownloadURL(storageRef);
+  return { url, size: file.size };
+}
+
 export async function uploadModuleAsset(
   moduleId: string,
   kind: "icon" | "banner",

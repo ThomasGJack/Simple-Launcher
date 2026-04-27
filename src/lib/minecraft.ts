@@ -18,16 +18,26 @@ export async function getMinecraftState(moduleId: string): Promise<MinecraftStat
 }
 
 export async function installModpack(module: MinecraftModule): Promise<MinecraftStateLocal> {
-  if (!CURSEFORGE_API_KEY) {
+  // Two source modes:
+  // - "manual" : module.customZipUrl provided → download directly, skip CF API.
+  // - "curseforge" : use the CF API with the user's key.
+  const useManual = !!module.customZipUrl;
+  if (!useManual && !CURSEFORGE_API_KEY) {
     throw new Error(
-      "Clé API CurseForge manquante. Inscris-toi gratuitement sur https://console.curseforge.com puis ajoute VITE_CURSEFORGE_API_KEY dans .env.local.",
+      "Clé API CurseForge manquante. Inscris-toi gratuitement sur https://console.curseforge.com puis ajoute VITE_CURSEFORGE_API_KEY dans .env.local — OU upload directement le .zip du modpack via l'option « Upload manuel » dans le panel admin.",
     );
   }
+  // In manual mode, use a hash of the URL as a synthetic "file id" so we can
+  // detect updates when the admin uploads a new zip (different URL).
+  const versionKey = useManual
+    ? hashStringFnv32(module.customZipUrl ?? "")
+    : module.curseforgeFileId ?? 0;
   return invoke<MinecraftStateLocal>("mc_install_modpack", {
     moduleId: module.id,
-    projectId: module.curseforgeProjectId,
-    fileId: module.curseforgeFileId,
-    apiKey: CURSEFORGE_API_KEY,
+    projectId: module.curseforgeProjectId ?? null,
+    fileId: versionKey,
+    apiKey: useManual ? "" : CURSEFORGE_API_KEY,
+    customZipUrl: module.customZipUrl ?? null,
   });
 }
 
@@ -51,7 +61,9 @@ export type MinecraftStatus =
   | { kind: "ready"; instanceName: string };
 
 export async function deriveMinecraftStatus(module: MinecraftModule): Promise<MinecraftStatus> {
-  if (!CURSEFORGE_API_KEY) {
+  const useManual = !!module.customZipUrl;
+  // Custom (manual) source doesn't need the CurseForge API key.
+  if (!useManual && !CURSEFORGE_API_KEY) {
     return { kind: "no-api-key" };
   }
   const local = await getMinecraftState(module.id);
@@ -59,13 +71,31 @@ export async function deriveMinecraftStatus(module: MinecraftModule): Promise<Mi
     const prism = await findPrism();
     return { kind: "not-installed", prismDetected: !!prism };
   }
-  if (local.fileId !== module.curseforgeFileId) {
+  // For "update available" detection:
+  //  - CurseForge mode: compare local.fileId against module.curseforgeFileId.
+  //  - Manual mode: use the customZipUrl as the version key (any URL change = new
+  //    upload = an update is available).
+  const remoteKey = useManual
+    ? hashStringFnv32(module.customZipUrl ?? "")
+    : module.curseforgeFileId ?? 0;
+  if (local.fileId !== remoteKey) {
     return {
       kind: "update-available",
       localFileId: local.fileId,
-      remoteFileId: module.curseforgeFileId,
+      remoteFileId: remoteKey,
       instanceName: local.instanceName,
     };
   }
   return { kind: "ready", instanceName: local.instanceName };
+}
+
+// Tiny non-cryptographic hash so that customZipUrl changes are detected as
+// updates, without storing the URL in the local state file.
+function hashStringFnv32(s: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+  }
+  return h;
 }

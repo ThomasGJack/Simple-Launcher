@@ -87,8 +87,18 @@ export type ShortcutModule = BaseModule & {
 
 export type MinecraftModule = BaseModule & {
   type: "minecraft";
-  curseforgeProjectId: number;
-  curseforgeFileId: number;
+  // CurseForge IDs are optional when the modpack is self-hosted (customZipUrl).
+  curseforgeProjectId?: number;
+  curseforgeFileId?: number;
+  /**
+   * Direct download URL to a CurseForge-format modpack .zip
+   * (`manifest.json` + `overrides/` at the root). When set, the launcher
+   * skips the CurseForge API entirely and uses this URL instead.
+   * Typically a Firebase Storage URL produced by the admin UI.
+   */
+  customZipUrl?: string;
+  /** Size in bytes of the custom zip (display only). */
+  customZipSize?: number;
   // Optional metadata, displayed but not required for launching
   minecraftVersion?: string;
   modLoader?: "forge" | "fabric" | "quilt" | "neoforge";

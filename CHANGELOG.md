@@ -18,6 +18,15 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.04.27.5] - 2026-04-27  · semver `26.427.4`
+
+
+### Ajouté
+- **Upload manuel des modpacks Minecraft** : nouveau toggle dans le panel admin pour les modules Minecraft. Au lieu de passer par l'API CurseForge (qui peut renvoyer 403 quand un mod du modpack interdit la distribution tiers), l'admin peut désormais uploader directement l'**export CurseForge** du modpack (le `.zip` contenant `manifest.json` + dossier `overrides/`) dans Firebase Storage. Le launcher télécharge depuis Firebase et passe le zip à Prism, qui se charge de récupérer les mods un par un. Pour les ~30% de mods qui ont opté-out de la distribution tiers, Prism ouvre une fenêtre navigateur pour que l'utilisateur clique manuellement « Download » sur la page CF (Prism détecte le téléchargement et continue automatiquement).
+- **Détection des updates en mode upload manuel** : un hash de l'URL Storage sert de version key. Quand l'admin remplace le `.zip` (nouvelle URL), le launcher voit un nouveau hash et propose la mise à jour aux utilisateurs.
+
+### Changé
+- **Suppression de la double tentative CurseForge API** : `mc_install_modpack` accepte maintenant un `customZipUrl` optionnel et bypass complètement la CF API quand il est fourni. Quand on utilise la CF API, la résolution de l'URL est extraite dans un helper dédié `resolve_curseforge_download_url`.
 ## [v26.04.27.4] - 2026-04-27  · semver `26.427.3`
 
 

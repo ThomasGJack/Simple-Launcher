@@ -25,6 +25,7 @@ import {
   saveMinecraftModule,
   updateHostedModuleMetadata,
   uploadHostedModule,
+  uploadModpackZip,
   uploadModuleAsset,
   watchModules,
   type UploadProgress,
@@ -37,6 +38,7 @@ type ParticlesPreset = NonNullable<ParticlesConfig["preset"]> | "none";
 type BgType = "none" | "image" | "video";
 type ModuleType = "hosted" | "minecraft";
 type ModLoader = "" | "forge" | "fabric" | "quilt" | "neoforge";
+type McSource = "curseforge" | "manual";
 
 type FormState = {
   type: ModuleType;
@@ -59,8 +61,11 @@ type FormState = {
   screenshots: string;
   stats: string;
   // Minecraft fields
+  mcSource: McSource;
   curseforgeProjectId: string;
   curseforgeFileId: string;
+  customZipUrl: string;
+  customZipSize: number;
   minecraftVersion: string;
   modLoader: ModLoader;
 };
@@ -85,8 +90,11 @@ const EMPTY_FORM: FormState = {
   serverAddress: "",
   screenshots: "",
   stats: "",
+  mcSource: "manual",
   curseforgeProjectId: "",
   curseforgeFileId: "",
+  customZipUrl: "",
+  customZipSize: 0,
   minecraftVersion: "",
   modLoader: "",
 };
@@ -101,6 +109,7 @@ export function AdminPage() {
   const [feedback, setFeedback] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
   const [iconUploading, setIconUploading] = useState(false);
   const [bannerUploading, setBannerUploading] = useState(false);
+  const [modpackUploading, setModpackUploading] = useState<{ percent: number; uploaded: number; total: number } | null>(null);
   const [showCustom, setShowCustom] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const isEditing = editingId !== null;
@@ -172,8 +181,11 @@ export function AdminPage() {
         statsSection && statsSection.type === "stats"
           ? statsSection.data.map((s) => `${s.label} = ${s.value}`).join("\n")
           : "",
-      curseforgeProjectId: m.type === "minecraft" ? String(m.curseforgeProjectId) : "",
-      curseforgeFileId: m.type === "minecraft" ? String(m.curseforgeFileId) : "",
+      mcSource: m.type === "minecraft" && m.customZipUrl ? "manual" : "curseforge",
+      curseforgeProjectId: m.type === "minecraft" && m.curseforgeProjectId ? String(m.curseforgeProjectId) : "",
+      curseforgeFileId: m.type === "minecraft" && m.curseforgeFileId ? String(m.curseforgeFileId) : "",
+      customZipUrl: m.type === "minecraft" ? m.customZipUrl ?? "" : "",
+      customZipSize: m.type === "minecraft" ? m.customZipSize ?? 0 : 0,
       minecraftVersion: m.type === "minecraft" ? m.minecraftVersion ?? "" : "",
       modLoader: m.type === "minecraft" ? ((m.modLoader ?? "") as ModLoader) : "",
     });
@@ -195,8 +207,12 @@ export function AdminPage() {
       if (!form.version || !/^\d+\.\d+\.\d+$/.test(form.version)) return "Version semver requise (ex: 1.0.0)";
       if (!form.executable) return "Nom de l'exécutable requis (ex: MyGame.exe)";
     } else if (form.type === "minecraft") {
-      if (!/^\d+$/.test(form.curseforgeProjectId)) return "Project ID CurseForge invalide (numérique)";
-      if (!/^\d+$/.test(form.curseforgeFileId)) return "File ID CurseForge invalide (numérique)";
+      if (form.mcSource === "curseforge") {
+        if (!/^\d+$/.test(form.curseforgeProjectId)) return "Project ID CurseForge invalide (numérique)";
+        if (!/^\d+$/.test(form.curseforgeFileId)) return "File ID CurseForge invalide (numérique)";
+      } else {
+        if (!form.customZipUrl) return "Upload un .zip de modpack ou choisis « API CurseForge »";
+      }
     }
     return null;
   };
@@ -269,6 +285,7 @@ export function AdminPage() {
 
       if (form.type === "minecraft") {
         // Save covers both create and update — Firestore setDoc with merge.
+        const useManual = form.mcSource === "manual";
         await saveMinecraftModule({
           type: "minecraft",
           id: form.id,
@@ -276,8 +293,12 @@ export function AdminPage() {
           ...(form.shortDescription && { shortDescription: form.shortDescription }),
           ...(form.iconUrl && { iconUrl: form.iconUrl }),
           ...(form.bannerUrl && { bannerUrl: form.bannerUrl }),
-          curseforgeProjectId: parseInt(form.curseforgeProjectId, 10),
-          curseforgeFileId: parseInt(form.curseforgeFileId, 10),
+          ...(useManual
+            ? { customZipUrl: form.customZipUrl, customZipSize: form.customZipSize }
+            : {
+                curseforgeProjectId: parseInt(form.curseforgeProjectId, 10),
+                curseforgeFileId: parseInt(form.curseforgeFileId, 10),
+              }),
           ...(form.minecraftVersion && { minecraftVersion: form.minecraftVersion }),
           ...(form.modLoader && { modLoader: form.modLoader }),
           ...(page && { page }),
@@ -333,6 +354,27 @@ export function AdminPage() {
       setFeedback({ kind: "ok", message: `Module "${mod.name}" supprimé.` });
     } catch (e) {
       setFeedback({ kind: "error", message: e instanceof Error ? e.message : String(e) });
+    }
+  };
+
+  const uploadModpack = async (uploadedFile: File) => {
+    if (!form.id) {
+      setFeedback({ kind: "error", message: "Renseigne d'abord l'ID du module avant d'uploader le modpack." });
+      return;
+    }
+    setModpackUploading({ percent: 0, uploaded: 0, total: uploadedFile.size });
+    setFeedback(null);
+    try {
+      const { url, size } = await uploadModpackZip(form.id, uploadedFile, (p) => {
+        setModpackUploading({ percent: p.percent, uploaded: p.bytesUploaded, total: p.bytesTotal });
+      });
+      updateForm("customZipUrl", url);
+      updateForm("customZipSize", size);
+      setFeedback({ kind: "ok", message: `Modpack uploadé (${(size / 1_048_576).toFixed(1)} Mo). Pense à publier pour que tes potes le voient.` });
+    } catch (e) {
+      setFeedback({ kind: "error", message: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setModpackUploading(null);
     }
   };
 
@@ -452,7 +494,12 @@ export function AdminPage() {
                 <FilePicker file={file} onChange={setFile} />
               </>
             ) : (
-              <MinecraftFields form={form} updateForm={updateForm} />
+              <MinecraftFields
+                form={form}
+                updateForm={updateForm}
+                modpackUploading={modpackUploading}
+                onUploadModpack={uploadModpack}
+              />
             )}
           </div>
 
@@ -728,12 +775,15 @@ function ModuleTypeSwitch({ value, onChange }: { value: ModuleType; onChange: (v
 function MinecraftFields({
   form,
   updateForm,
+  modpackUploading,
+  onUploadModpack,
 }: {
   form: FormState;
   updateForm: <K extends keyof FormState>(key: K, value: FormState[K]) => void;
+  modpackUploading: { percent: number; uploaded: number; total: number } | null;
+  onUploadModpack: (file: File) => void;
 }) {
   const handleUrlPaste = (raw: string) => {
-    // CurseForge URL: https://www.curseforge.com/minecraft/modpacks/<slug>/files/<fileId>
     const match = /\/files\/(\d+)/.exec(raw);
     if (match) updateForm("curseforgeFileId", match[1]);
   };
@@ -746,38 +796,82 @@ function MinecraftFields({
     { value: "quilt", label: "Quilt" },
   ];
 
+  const sources: { value: McSource; label: string; hint: string }[] = [
+    { value: "manual", label: "Upload manuel", hint: "Tu héberges le .zip directement" },
+    { value: "curseforge", label: "API CurseForge", hint: "Récupéré via Project + File ID" },
+  ];
+
   return (
     <div className="grid gap-4 rounded-2xl bg-bg-base/30 p-5 ring-1 ring-white/[0.04]">
       <div className="flex items-center gap-2 border-b border-white/[0.04] pb-2 text-xs uppercase tracking-[0.2em] text-accent">
-        <Cloud className="size-3" /> Modpack CurseForge
+        <Cloud className="size-3" /> Source du modpack
       </div>
 
-      <Field label="URL du fichier modpack" hint="optionnel · auto-extrait le File ID">
-        <Input
-          value=""
-          onChange={handleUrlPaste}
-          placeholder="https://www.curseforge.com/minecraft/modpacks/.../files/6051892"
+      <div className="grid grid-cols-2 gap-2 rounded-xl bg-white/[0.03] p-1.5 ring-1 ring-white/[0.06]">
+        {sources.map((s) => (
+          <button
+            key={s.value}
+            onClick={() => updateForm("mcSource", s.value)}
+            className={cn(
+              "relative rounded-lg px-3 py-2.5 text-left transition-colors",
+              form.mcSource === s.value ? "text-bg-base" : "text-fg-muted hover:text-fg-primary",
+            )}
+          >
+            {form.mcSource === s.value && (
+              <motion.div
+                layoutId="mc-source-pill"
+                className="absolute inset-0 rounded-lg bg-accent shadow-[0_0_18px_var(--color-accent-soft)]"
+                transition={{ type: "spring", stiffness: 380, damping: 30 }}
+              />
+            )}
+            <span className="relative z-10 block text-sm font-medium">{s.label}</span>
+            <span className={cn("relative z-10 block text-xs", form.mcSource === s.value ? "text-bg-base/70" : "text-fg-dim")}>
+              {s.hint}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {form.mcSource === "manual" ? (
+        <ModpackZipPicker
+          currentUrl={form.customZipUrl}
+          currentSize={form.customZipSize}
+          uploading={modpackUploading}
+          onPick={onUploadModpack}
+          onClear={() => {
+            updateForm("customZipUrl", "");
+            updateForm("customZipSize", 0);
+          }}
         />
-      </Field>
-
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Project ID" hint="numérique · cf. About Project sur CF">
-          <Input
-            value={form.curseforgeProjectId}
-            onChange={(v) => updateForm("curseforgeProjectId", v.replace(/\D/g, ""))}
-            placeholder="520914"
-            mono
-          />
-        </Field>
-        <Field label="File ID" hint="version spécifique du modpack">
-          <Input
-            value={form.curseforgeFileId}
-            onChange={(v) => updateForm("curseforgeFileId", v.replace(/\D/g, ""))}
-            placeholder="6051892"
-            mono
-          />
-        </Field>
-      </div>
+      ) : (
+        <>
+          <Field label="URL du fichier modpack" hint="optionnel · auto-extrait le File ID">
+            <Input
+              value=""
+              onChange={handleUrlPaste}
+              placeholder="https://www.curseforge.com/minecraft/modpacks/.../files/6051892"
+            />
+          </Field>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Project ID" hint="numérique · cf. About Project sur CF">
+              <Input
+                value={form.curseforgeProjectId}
+                onChange={(v) => updateForm("curseforgeProjectId", v.replace(/\D/g, ""))}
+                placeholder="520914"
+                mono
+              />
+            </Field>
+            <Field label="File ID" hint="version spécifique du modpack">
+              <Input
+                value={form.curseforgeFileId}
+                onChange={(v) => updateForm("curseforgeFileId", v.replace(/\D/g, ""))}
+                placeholder="6051892"
+                mono
+              />
+            </Field>
+          </div>
+        </>
+      )}
 
       <div className="grid grid-cols-2 gap-4">
         <Field label="Version Minecraft" hint="affichage uniquement">
@@ -798,9 +892,99 @@ function MinecraftFields({
         </Field>
       </div>
 
-      <p className="text-xs leading-relaxed text-fg-dim">
-        ⚠ Les utilisateurs auront besoin de <strong className="text-fg-muted">Prism Launcher</strong> installé. Le launcher détecte sa présence et propose le téléchargement sinon. La clé API CurseForge se configure dans <code className="rounded bg-white/[0.04] px-1.5 py-0.5 font-mono">.env.local</code> (gratuite sur console.curseforge.com).
-      </p>
+      {form.mcSource === "manual" ? (
+        <p className="text-xs leading-relaxed text-fg-dim">
+          📦 Upload directement l'export CurseForge du modpack (le `.zip` que tu obtiens via <em>File → Export</em> dans CurseForge desktop, contenant <code>manifest.json</code> + <code>overrides/</code>). Prism Launcher se chargera de télécharger les mods un par un — pour les mods qui ont opt-out de la distribution tiers, Prism ouvrira le navigateur pour qu'on clique manuellement « Download ».
+        </p>
+      ) : (
+        <p className="text-xs leading-relaxed text-fg-dim">
+          ⚠ Marche uniquement si <strong className="text-fg-muted">tous</strong> les mods autorisent la distribution tiers. Si tu hits un 403, bascule sur « Upload manuel ».
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ModpackZipPicker({
+  currentUrl,
+  currentSize,
+  uploading,
+  onPick,
+  onClear,
+}: {
+  currentUrl: string;
+  currentSize: number;
+  uploading: { percent: number; uploaded: number; total: number } | null;
+  onPick: (file: File) => void;
+  onClear: () => void;
+}) {
+  const id = "modpack-zip-input";
+  const sizeMb = (b: number) => (b / 1_048_576).toFixed(1);
+  return (
+    <div className="rounded-xl border border-dashed border-white/10 bg-bg-base/30 p-4 transition-colors hover:border-accent/40">
+      <input
+        type="file"
+        id={id}
+        accept=".zip,application/zip"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) onPick(f);
+        }}
+        className="hidden"
+      />
+      {uploading ? (
+        <div className="space-y-2">
+          <div className="flex items-baseline justify-between text-xs">
+            <span className="font-medium text-fg-primary">Upload du modpack…</span>
+            <span className="text-fg-muted">
+              {sizeMb(uploading.uploaded)} / {sizeMb(uploading.total)} Mo · {uploading.percent.toFixed(0)}%
+            </span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+            <motion.div
+              className="h-full bg-accent shadow-[0_0_12px_var(--color-accent-glow)]"
+              animate={{ width: `${uploading.percent}%` }}
+              transition={{ duration: 0.2 }}
+            />
+          </div>
+        </div>
+      ) : currentUrl ? (
+        <div className="flex items-center gap-3">
+          <div className="grid size-10 place-items-center rounded-lg bg-success/15 text-success ring-1 ring-success/30">
+            <CheckCircle2 className="size-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm text-fg-primary">Modpack uploadé{currentSize > 0 ? ` (${sizeMb(currentSize)} Mo)` : ""}</div>
+            <div className="truncate font-mono text-[10px] text-fg-dim">{currentUrl}</div>
+          </div>
+          <label
+            htmlFor={id}
+            className="no-drag cursor-pointer rounded-md bg-white/[0.04] px-3 py-1.5 text-xs text-fg-primary ring-1 ring-white/[0.06] transition-colors hover:bg-white/[0.08]"
+          >
+            Remplacer
+          </label>
+          <button
+            onClick={onClear}
+            type="button"
+            className="rounded-md bg-white/[0.02] px-2.5 py-1.5 text-xs text-fg-muted ring-1 ring-white/[0.04] transition-colors hover:bg-danger/10 hover:text-danger"
+          >
+            Retirer
+          </button>
+        </div>
+      ) : (
+        <label htmlFor={id} className="no-drag flex cursor-pointer items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="grid size-10 place-items-center rounded-lg bg-accent/10 text-accent">
+              <Upload className="size-5" />
+            </div>
+            <div>
+              <div className="text-sm text-fg-primary">Upload du modpack .zip</div>
+              <div className="text-xs text-fg-muted">Export CurseForge (manifest.json + overrides)</div>
+            </div>
+          </div>
+          <span className="rounded-md bg-white/[0.04] px-3 py-1.5 text-xs text-fg-primary ring-1 ring-white/[0.06]">Parcourir</span>
+        </label>
+      )}
     </div>
   );
 }
