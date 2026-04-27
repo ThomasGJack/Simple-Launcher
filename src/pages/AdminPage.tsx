@@ -471,6 +471,25 @@ export function AdminPage() {
             )}
           </div>
 
+          {isEditing && editingId && (
+            <button
+              type="button"
+              onClick={() => useUIStore.getState().navigate({ name: "admin-builder", moduleId: editingId })}
+              className="mb-6 flex w-full items-center gap-4 rounded-2xl bg-gradient-to-r from-accent/15 via-fuchsia-500/10 to-accent/15 p-5 text-left ring-1 ring-accent/30 transition-all hover:from-accent/25 hover:to-accent/25 hover:ring-accent/50 hover:shadow-[0_0_28px_var(--color-accent-soft)]"
+            >
+              <div className="grid size-12 shrink-0 place-items-center rounded-xl bg-accent text-bg-base shadow-[0_0_20px_var(--color-accent-glow)]">
+                <Layout className="size-6" />
+              </div>
+              <div className="flex-1">
+                <div className="font-display text-lg text-fg-primary">Personnaliser la page du module</div>
+                <div className="mt-0.5 text-xs text-fg-muted">
+                  Builder visuel drag &amp; drop : hero parallax, screenshots, vidéos, textes stylisés, timeline, comparateur avant/après, etc. — 19 types de blocs paramétrables.
+                </div>
+              </div>
+              <div className="shrink-0 text-xs font-semibold uppercase tracking-wider text-accent">Ouvrir →</div>
+            </button>
+          )}
+
           {!isEditing && <ModuleTypeSwitch value={form.type} onChange={(v) => updateForm("type", v)} />}
 
           <div className="mt-6 grid gap-4">

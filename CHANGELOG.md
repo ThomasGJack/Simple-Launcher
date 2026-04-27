@@ -18,6 +18,12 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.04.27.21] - 2026-04-27  · semver `26.427.20`
+
+
+### Ajouté
+
+- **CTA visible « Personnaliser la page du module »** dans le formulaire d'édition admin : gros bouton en haut du form (icône Layout sur fond dégradé accent) qui ouvre directement le builder drag & drop. L'icône Layout discrète sur les ModuleCard reste en place pour l'accès rapide.
 ## [v26.04.27.20] - 2026-04-27  · semver `26.427.19`
 
 

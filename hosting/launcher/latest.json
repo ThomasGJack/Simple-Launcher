@@ -1,12 +1,12 @@
 {
-  "version": "26.427.19",
-  "displayVersion": "v26.04.27.20",
-  "notes": "### Corrigé\n\n- **Hotfix** : la page d'un module (jeu / modpack) crashait depuis la v26.04.27.19 à cause d'une violation des Rules of Hooks (`useEffect` placé après un `return` early). Hook déplacé avant les early returns.",
-  "pub_date": "2026-04-27T21:29:36.702Z",
+  "version": "26.427.20",
+  "displayVersion": "v26.04.27.21",
+  "notes": "### Ajouté\n\n- **CTA visible « Personnaliser la page du module »** dans le formulaire d'édition admin : gros bouton en haut du form (icône Layout sur fond dégradé accent) qui ouvre directement le builder drag & drop. L'icône Layout discrète sur les ModuleCard reste en place pour l'accès rapide.",
+  "pub_date": "2026-04-27T21:33:17.816Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReExlbkZGc0Y5eExuOGk4Ym1LM0lNS204K3Jrd002VjVGTmJFUVJzdGQ2eVVXUUhGOTJuT0hQMFpkb2JyUGhSVVhXT2FsS3FIbW9NMFk3clEyU1MrT0FxbS9iZHZMWFFRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3MzI1Mzc2CWZpbGU6U2ltcGxlIExhdW5jaGVyXzI2LjQyNy4xOV94NjQtc2V0dXAuZXhlCmF3dzNMYkdlL0hocU5iV254TkFvbFFxNkdpcG9tQjhKL1dXOHdqbEtUYWMwYVNVMTB6U1pGQVYySWNVS1VURFdoMG1CR08ydHY2RTg2UisvSm9LVkJ3PT0K",
-      "url": "https://simplelaunche.web.app/releases/26.427.19/Simple Launcher_26.427.19_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReExlbkZGc0Y5eE53YmRSNXRoZXIrMXZKaWJteWQ1SnZDamRHeWVuek5oN1RUQ21hSWY1NTJyZTdOWWdaMTR4ckliUTNITjhRckVLcWxRTm55N3pxK3hEdnFQT2c1RVFvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3MzI1NTk3CWZpbGU6U2ltcGxlIExhdW5jaGVyXzI2LjQyNy4yMF94NjQtc2V0dXAuZXhlCm4zZEFFT0p2Q2VvWVhrT2tqNkYzS29mR3ZFV2MwZ2xiS0JqVm50S3dxa2JKRzRFSnVZRVNIMlNrd0pQTHY5RjU5MVpoOS9BMDN0MkV5TTFPTnJOeUJBPT0K",
+      "url": "https://simplelaunche.web.app/releases/26.427.20/Simple Launcher_26.427.20_x64-setup.exe"
     }
   }
 }
