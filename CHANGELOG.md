@@ -18,6 +18,15 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.04.27.3] - 2026-04-27  · semver `26.427.2`
+
+
+
+### Changé
+- **Install Minecraft : un seul appel API au lieu de deux**. On utilisait `/v1/mods/{modId}/files/{fileId}/download-url` pour récupérer l'URL, mais cet endpoint renvoie parfois 403 même quand le fichier autorise les downloads tiers. On lit maintenant directement le champ `downloadUrl` retourné par `/v1/mods/{modId}/files/{fileId}`, ce qui marche dans plus de cas.
+
+### Corrigé
+- **Messages d'erreur Minecraft beaucoup plus précis** : si le fichier ne peut pas être téléchargé, le launcher indique maintenant le **statut CurseForge** du fichier (Approuvé / En cours de revue / Prêt pour revue / Rejeté / etc.). Si le statut n'est pas « Approuvé », c'est que CurseForge n'a pas encore validé le fichier — peut prendre quelques heures pour les modpacks. Si `allowModDistribution: false`, le message rappelle que le réglage se fait au moment de l'upload (ré-uploader le même fichier ne change rien, il faut un nouveau fichier).
 ## [v26.04.27.2] - 2026-04-27  · semver `26.427.1`
 
 
