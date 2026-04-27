@@ -310,7 +310,22 @@ export async function updateModulePage(
   const fb = getFirebase();
   if (!fb) throw new Error("Firebase not configured");
   const docRef = doc(fb.db, "modules", moduleId);
-  await updateDoc(docRef, { page });
+  await updateDoc(docRef, { page: stripUndefined(page) as Record<string, unknown> });
+}
+
+function stripUndefined<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((v) => stripUndefined(v)) as unknown as T;
+  }
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (v === undefined) continue;
+      out[k] = stripUndefined(v);
+    }
+    return out as T;
+  }
+  return value;
 }
 
 function inferExt(file: File): string {

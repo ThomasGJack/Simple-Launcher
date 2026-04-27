@@ -1,12 +1,12 @@
 {
-  "version": "26.427.20",
-  "displayVersion": "v26.04.27.21",
-  "notes": "### Ajouté\n\n- **CTA visible « Personnaliser la page du module »** dans le formulaire d'édition admin : gros bouton en haut du form (icône Layout sur fond dégradé accent) qui ouvre directement le builder drag & drop. L'icône Layout discrète sur les ModuleCard reste en place pour l'accès rapide.",
-  "pub_date": "2026-04-27T21:33:17.816Z",
+  "version": "26.427.21",
+  "displayVersion": "v26.04.27.22",
+  "notes": "### Corrigé\n\n- **Hotfix sauvegarde du builder** : Firestore rejetait les documents avec des champs `undefined` (ex. `page.theme.fontDisplay` quand non rempli). `updateModulePage()` strip maintenant récursivement tous les `undefined` avant l'écriture.",
+  "pub_date": "2026-04-27T21:36:19.179Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReExlbkZGc0Y5eE53YmRSNXRoZXIrMXZKaWJteWQ1SnZDamRHeWVuek5oN1RUQ21hSWY1NTJyZTdOWWdaMTR4ckliUTNITjhRckVLcWxRTm55N3pxK3hEdnFQT2c1RVFvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3MzI1NTk3CWZpbGU6U2ltcGxlIExhdW5jaGVyXzI2LjQyNy4yMF94NjQtc2V0dXAuZXhlCm4zZEFFT0p2Q2VvWVhrT2tqNkYzS29mR3ZFV2MwZ2xiS0JqVm50S3dxa2JKRzRFSnVZRVNIMlNrd0pQTHY5RjU5MVpoOS9BMDN0MkV5TTFPTnJOeUJBPT0K",
-      "url": "https://simplelaunche.web.app/releases/26.427.20/Simple Launcher_26.427.20_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReExlbkZGc0Y5eEx2KzRGWmpEZXB1NlI1ZnlHZ1M0WDhKZ3FIeE13MkY1Umd2OGNPd3FsUTJlS0xzT2Y0N1FNNGtvVFJLejVJL0M4U2UwUTV5eUF4Mk95aDN0NGMyV0FjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3MzI1Nzc5CWZpbGU6U2ltcGxlIExhdW5jaGVyXzI2LjQyNy4yMV94NjQtc2V0dXAuZXhlCjRUOGRtODNKOXBPd3VneG1aYnR4ZXIvMHQ4ZjlhbmpwQ2tSU1BzZUZwSmI5aGZESjUxVkxHY0pKYnhHRG1vb3NSWnhXV0RqQ3NnMVQvL0NQTWFjQ0NBPT0K",
+      "url": "https://simplelaunche.web.app/releases/26.427.21/Simple Launcher_26.427.21_x64-setup.exe"
     }
   }
 }

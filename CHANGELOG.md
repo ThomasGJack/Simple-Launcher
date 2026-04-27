@@ -18,6 +18,14 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.04.27.22] - 2026-04-27  · semver `26.427.21`
+
+
+
+
+### Corrigé
+
+- **Hotfix sauvegarde du builder** : Firestore rejetait les documents avec des champs `undefined` (ex. `page.theme.fontDisplay` quand non rempli). `updateModulePage()` strip maintenant récursivement tous les `undefined` avant l'écriture.
 ## [v26.04.27.21] - 2026-04-27  · semver `26.427.20`
 
 
