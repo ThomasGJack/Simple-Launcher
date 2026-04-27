@@ -29,6 +29,7 @@ import {
   type UploadProgress,
 } from "@/firebase/modules";
 import type { LauncherModule, ModulePage, ParticlesConfig, PageSection } from "@/types/module";
+import { ModulePreviewCard } from "@/components/library/ModulePreviewCard";
 import { cn } from "@/lib/cn";
 
 type ParticlesPreset = NonNullable<ParticlesConfig["preset"]> | "none";
@@ -526,21 +527,57 @@ export function AdminPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="col-span-12 lg:col-span-5"
+          className="col-span-12 space-y-6 lg:col-span-5"
         >
-          <div className="mb-4 flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-fg-muted">
-            <Cloud className="size-3" />
-            Modules publiés ({modules.length})
-          </div>
-          <div className="space-y-3">
-            {modules.length === 0 && (
-              <div className="rounded-2xl glass p-6 text-center text-sm text-fg-muted">
-                Aucun module pour l'instant. Crée le premier à gauche.
+          <div>
+            <div className="mb-3 flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-accent">
+              <Sparkles className="size-3" />
+              Aperçu en temps réel
+            </div>
+            <div className="rounded-2xl glass-strong p-5">
+              <div className="mx-auto">
+                <ModulePreviewCard
+                  draft={{
+                    type: form.type,
+                    name: form.name,
+                    shortDescription: form.shortDescription,
+                    iconUrl: form.iconUrl,
+                    bannerUrl: form.bannerUrl,
+                    themePrimary: form.themePrimary,
+                    themeAccent: form.themeAccent,
+                    fontDisplay: form.fontDisplay,
+                    particles:
+                      form.particlesPreset !== "none"
+                        ? {
+                            preset: form.particlesPreset,
+                            color: form.particlesColor,
+                            density: form.particlesDensity,
+                          }
+                        : undefined,
+                  }}
+                />
               </div>
-            )}
-            {modules.map((m) => (
-              <ModuleCard key={m.id} module={m} onDelete={() => handleDelete(m)} />
-            ))}
+              <p className="mt-4 text-center text-xs text-fg-muted">
+                Rendu de la carte côté bibliothèque.
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-4 flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-fg-muted">
+              <Cloud className="size-3" />
+              Modules publiés ({modules.length})
+            </div>
+            <div className="space-y-3">
+              {modules.length === 0 && (
+                <div className="rounded-2xl glass p-6 text-center text-sm text-fg-muted">
+                  Aucun module pour l'instant. Crée le premier à gauche.
+                </div>
+              )}
+              {modules.map((m) => (
+                <ModuleCard key={m.id} module={m} onDelete={() => handleDelete(m)} />
+              ))}
+            </div>
           </div>
         </motion.div>
       </div>

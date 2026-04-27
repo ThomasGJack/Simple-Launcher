@@ -9,6 +9,7 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 ## [Unreleased]
 
 ### Ajouté
+- **Aperçu en temps réel dans le panel admin** : la colonne droite (au-dessus de la liste des modules publiés) affiche désormais une carte qui se met à jour en direct à chaque changement (nom, description, icône, bannière, couleur primaire, particules). Le badge de type (Hébergé / Minecraft) suit la sélection et le bouton du bas adopte la couleur primaire du thème.
 - **Modules Minecraft (modpacks CurseForge)** : nouveau type de module dans le panel admin. Tu renseignes le `Project ID` et le `File ID` CurseForge (auto-extraits depuis l'URL collée) + version MC + mod loader optionnels. Les utilisateurs cliquent "Installer le modpack" → le launcher télécharge le `.zip` via l'API CurseForge, lit le `manifest.json` pour récupérer le nom de l'instance Prism, et appelle `prismlauncher --import` pour finaliser. Au prochain clic "JOUER", c'est `prismlauncher --launch <instance> [--server <addr>]` (avec direct-connect au serveur si renseigné). Le suivi du process Prism est branché sur Discord Rich Presence + tracking du temps de jeu, comme les autres modules.
 - **Auto-installation de Prism Launcher** : si Prism n'est pas détecté sur la machine (vérifie d'abord les chemins standard d'install puis notre dossier managé), le launcher télécharge automatiquement la dernière release portable depuis GitHub (~90 Mo) et l'extrait dans `%APPDATA%\com.simplelaunche.app\prism\` à la première install d'un modpack. Tes potes n'ont rien à installer manuellement. Le download est mutualisé avec celui du modpack dans le même flow de progression (phases « Téléchargement de Prism Launcher », « Extraction », puis « Téléchargement du modpack », « Import »).
 - **Clé API CurseForge** : nouvelle variable `VITE_CURSEFORGE_API_KEY` à mettre dans `.env.local`. Inscription gratuite sur https://console.curseforge.com. Sans cette clé, les modules Minecraft affichent un message explicatif au lieu d'essayer de télécharger.
@@ -26,6 +27,7 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 - **Sécurité Firestore + Storage** : nouvelles règles isolant `/users/{uid}/shortcuts/*` à l'utilisateur propriétaire en lecture comme en écriture.
 
 ### Corrigé
+- **Bibliothèque n'affichait pas les modules Minecraft** : le filtre `LibraryPage` ne gardait que les modules de type `hosted`, ce qui excluait les nouveaux modpacks Minecraft créés depuis l'admin. Le filtre exclut désormais uniquement les anciens raccourcis (`shortcut`) qui auraient pu rester dans la collection globale.
 - Page détail module : les chemins longs (ex: `C:\Users\…\CurseForge.lnk`) débordaient hors du panneau Informations de manière disgracieuse. Ils sont maintenant dans une zone scrollable horizontalement avec une mini scrollbar discrète, et le chemin complet s'affiche dans une infobulle au survol.
 - Formulaire d'ajout de raccourci : l'ID auto-généré depuis le nom restait bloqué sur la première lettre tapée (`MineColonies` → `c` au lieu de `minecolonies`). L'ID se synchronise désormais en continu avec le nom tant que le raccourci n'est pas sauvegardé.
 

@@ -17,8 +17,8 @@ export function LibraryPage() {
 
   useEffect(() => {
     return watchModules((mods) => {
-      // Only keep hosted modules in the global list — legacy shortcuts coexist for now
-      setHosted(mods.filter((m) => m.type === "hosted"));
+      // Keep all admin-managed modules (hosted + minecraft); legacy shortcuts in /modules are filtered out (those should now live under /users/{uid}/shortcuts)
+      setHosted(mods.filter((m) => m.type !== "shortcut"));
     });
   }, []);
 
