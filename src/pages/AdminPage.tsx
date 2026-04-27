@@ -23,6 +23,7 @@ import {
   deleteHostedZip,
   deleteModule,
   saveMinecraftModule,
+  updateHostedModuleMetadata,
   uploadHostedModule,
   uploadModuleAsset,
   watchModules,
@@ -101,6 +102,8 @@ export function AdminPage() {
   const [iconUploading, setIconUploading] = useState(false);
   const [bannerUploading, setBannerUploading] = useState(false);
   const [showCustom, setShowCustom] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const isEditing = editingId !== null;
 
   useEffect(() => {
     return watchModules(setModules);
@@ -128,13 +131,67 @@ export function AdminPage() {
     setFile(null);
     setProgress(null);
     setShowCustom(false);
+    setEditingId(null);
+  };
+
+  const startEdit = (m: LauncherModule) => {
+    if (m.type === "shortcut") return; // shortcuts are user-side
+    const page = m.page;
+    const bg = page?.background && "particles" in page.background ? page.background.particles : undefined;
+    const screenshotsSection = page?.sections?.find((s) => s.type === "screenshots-grid");
+    const statsSection = page?.sections?.find((s) => s.type === "stats");
+
+    setForm({
+      type: m.type,
+      id: m.id,
+      name: m.name,
+      shortDescription: m.shortDescription ?? "",
+      iconUrl: m.iconUrl ?? "",
+      bannerUrl: m.bannerUrl ?? "",
+      version: m.type === "hosted" ? m.version : "1.0.0",
+      executable: m.type === "hosted" ? m.executable : "",
+      themePrimary: page?.theme?.primary ?? "",
+      themeAccent: page?.theme?.accent ?? "",
+      fontDisplay: page?.theme?.fontDisplay ?? "",
+      particlesPreset: bg?.preset ?? "none",
+      particlesColor: bg?.color ?? "#00d4ff",
+      particlesDensity: bg?.density ?? 60,
+      bgType:
+        page?.background?.type === "video"
+          ? "video"
+          : page?.background?.type === "image"
+            ? "image"
+            : "none",
+      bgUrl: page?.background && "url" in page.background ? page.background.url : "",
+      serverAddress: m.server?.type === "minecraft" ? m.server.address : "",
+      screenshots:
+        screenshotsSection && screenshotsSection.type === "screenshots-grid"
+          ? screenshotsSection.images.join("\n")
+          : "",
+      stats:
+        statsSection && statsSection.type === "stats"
+          ? statsSection.data.map((s) => `${s.label} = ${s.value}`).join("\n")
+          : "",
+      curseforgeProjectId: m.type === "minecraft" ? String(m.curseforgeProjectId) : "",
+      curseforgeFileId: m.type === "minecraft" ? String(m.curseforgeFileId) : "",
+      minecraftVersion: m.type === "minecraft" ? m.minecraftVersion ?? "" : "",
+      modLoader: m.type === "minecraft" ? ((m.modLoader ?? "") as ModLoader) : "",
+    });
+    setFile(null);
+    setProgress(null);
+    setShowCustom(true);
+    setEditingId(m.id);
+    setFeedback(null);
+    // Scroll to top of form
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const validate = (): string | null => {
     if (!form.id || !/^[a-z0-9-]+$/.test(form.id)) return "ID invalide (lowercase, chiffres, tirets uniquement)";
     if (!form.name) return "Nom obligatoire";
     if (form.type === "hosted") {
-      if (!file) return "Fichier .zip obligatoire";
+      // In create mode, the .zip is required. In edit mode, it's optional (only needed if you want to push a new version).
+      if (!isEditing && !file) return "Fichier .zip obligatoire";
       if (!form.version || !/^\d+\.\d+\.\d+$/.test(form.version)) return "Version semver requise (ex: 1.0.0)";
       if (!form.executable) return "Nom de l'exécutable requis (ex: MyGame.exe)";
     } else if (form.type === "minecraft") {
@@ -211,6 +268,7 @@ export function AdminPage() {
           : undefined;
 
       if (form.type === "minecraft") {
+        // Save covers both create and update — Firestore setDoc with merge.
         await saveMinecraftModule({
           type: "minecraft",
           id: form.id,
@@ -225,7 +283,18 @@ export function AdminPage() {
           ...(page && { page }),
           ...(server && { server }),
         });
+      } else if (isEditing && !file) {
+        // Hosted module being edited without re-uploading the binary: just patch the metadata.
+        await updateHostedModuleMetadata(form.id, {
+          name: form.name,
+          ...(form.shortDescription !== undefined && { shortDescription: form.shortDescription || undefined }),
+          ...(form.iconUrl !== undefined && { iconUrl: form.iconUrl || undefined }),
+          ...(form.bannerUrl !== undefined && { bannerUrl: form.bannerUrl || undefined }),
+          ...(page && { page }),
+          ...(server && { server }),
+        });
       } else {
+        // Create OR new version of an existing hosted module — full upload.
         await uploadHostedModule(
           {
             type: "hosted",
@@ -243,7 +312,10 @@ export function AdminPage() {
           setProgress,
         );
       }
-      setFeedback({ kind: "ok", message: `Module "${form.name}" publié.` });
+      setFeedback({
+        kind: "ok",
+        message: isEditing ? `Module "${form.name}" mis à jour.` : `Module "${form.name}" publié.`,
+      });
       reset();
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
@@ -304,19 +376,36 @@ export function AdminPage() {
             <div className="grid size-10 place-items-center rounded-xl bg-accent/15 text-accent ring-1 ring-accent/30">
               <Cloud className="size-5" />
             </div>
-            <div>
-              <div className="font-display text-2xl text-fg-primary">Nouveau module</div>
+            <div className="flex-1">
+              <div className="font-display text-2xl text-fg-primary">
+                {isEditing ? `Modifier « ${form.name || form.id} »` : "Nouveau module"}
+              </div>
               <div className="text-xs text-fg-muted">
-                Pour les raccourcis locaux, utilise plutôt « Ajouter un jeu » dans la bibliothèque.
+                {isEditing
+                  ? "Modifie les champs puis Enregistre. Pour pousser une nouvelle version d'un module hébergé, ajoute un fichier .zip ; sinon les autres champs sont mis à jour seuls."
+                  : "Pour les raccourcis locaux, utilise plutôt « Ajouter un jeu » dans la bibliothèque."}
               </div>
             </div>
+            {isEditing && (
+              <button
+                onClick={reset}
+                className="shrink-0 rounded-lg bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-fg-primary ring-1 ring-white/[0.06] transition-colors hover:bg-white/[0.08]"
+              >
+                Quitter l'édition
+              </button>
+            )}
           </div>
 
-          <ModuleTypeSwitch value={form.type} onChange={(v) => updateForm("type", v)} />
+          {!isEditing && <ModuleTypeSwitch value={form.type} onChange={(v) => updateForm("type", v)} />}
 
           <div className="mt-6 grid gap-4">
-            <Field label="ID (slug)" hint="minuscules, chiffres, tirets · ex: mancho-land">
-              <Input value={form.id} onChange={(v) => updateForm("id", v)} placeholder="mon-jeu" />
+            <Field label="ID (slug)" hint={isEditing ? "non modifiable" : "minuscules, chiffres, tirets · ex: mancho-land"}>
+              <Input
+                value={form.id}
+                onChange={(v) => updateForm("id", v)}
+                placeholder="mon-jeu"
+                disabled={isEditing}
+              />
             </Field>
             <div className="grid grid-cols-2 gap-4">
               <Field label="Nom affiché">
@@ -511,7 +600,19 @@ export function AdminPage() {
               disabled={submitting}
               className="flex-1 rounded-xl bg-accent px-5 py-3 font-medium text-bg-base shadow-[0_0_24px_var(--color-accent-soft)] transition-shadow hover:shadow-[0_0_36px_var(--color-accent-glow)] disabled:opacity-50"
             >
-              {submitting ? "Publication…" : "Uploader & publier"}
+              {submitting
+                ? isEditing
+                  ? "Enregistrement…"
+                  : "Publication…"
+                : isEditing
+                  ? form.type === "minecraft"
+                    ? "Enregistrer les modifications"
+                    : file
+                      ? "Pousser une nouvelle version"
+                      : "Enregistrer les modifications"
+                  : form.type === "minecraft"
+                    ? "Publier le modpack"
+                    : "Uploader & publier"}
             </button>
             <button
               onClick={reset}
@@ -575,7 +676,13 @@ export function AdminPage() {
                 </div>
               )}
               {modules.map((m) => (
-                <ModuleCard key={m.id} module={m} onDelete={() => handleDelete(m)} />
+                <ModuleCard
+                  key={m.id}
+                  module={m}
+                  active={editingId === m.id}
+                  onEdit={() => startEdit(m)}
+                  onDelete={() => handleDelete(m)}
+                />
               ))}
             </div>
           </div>
@@ -831,11 +938,13 @@ function Input({
   onChange,
   placeholder,
   mono,
+  disabled,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   mono?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <input
@@ -843,9 +952,11 @@ function Input({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
+      disabled={disabled}
       className={cn(
         "no-drag w-full rounded-lg bg-bg-base/40 px-3.5 py-2.5 text-sm text-fg-primary placeholder:text-fg-dim ring-1 ring-white/[0.06] transition-shadow focus:outline-none focus:ring-1 focus:ring-accent/60 focus:shadow-[0_0_0_3px_var(--color-accent-soft)]",
         mono && "font-mono text-xs",
+        disabled && "cursor-not-allowed opacity-60",
       )}
     />
   );
@@ -983,14 +1094,40 @@ function FilePicker({ file, onChange }: { file: File | null; onChange: (f: File 
   );
 }
 
-function ModuleCard({ module, onDelete }: { module: LauncherModule; onDelete: () => void }) {
+function ModuleCard({
+  module,
+  active,
+  onEdit,
+  onDelete,
+}: {
+  module: LauncherModule;
+  active?: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const badge = (() => {
+    if (module.type === "hosted") {
+      return { label: `v${module.version}`, cls: "bg-accent/10 text-accent ring-accent/30" };
+    }
+    if (module.type === "minecraft") {
+      return { label: "Modpack", cls: "bg-emerald-500/10 text-emerald-300 ring-emerald-500/30" };
+    }
+    return { label: "Local", cls: "bg-fuchsia-500/10 text-fuchsia-300 ring-fuchsia-500/30" };
+  })();
+
   return (
     <motion.div
       layout
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.96 }}
-      className="group flex items-center gap-4 rounded-2xl glass p-4"
+      onClick={onEdit}
+      className={cn(
+        "group flex cursor-pointer items-center gap-4 rounded-2xl glass p-4 transition-all",
+        active
+          ? "ring-2 ring-accent shadow-[0_0_24px_var(--color-accent-soft)]"
+          : "hover:bg-white/[0.03] hover:ring-1 hover:ring-accent/30",
+      )}
     >
       {module.iconUrl ? (
         <img src={module.iconUrl} alt={module.name} className="size-12 rounded-lg object-cover" />
@@ -1002,15 +1139,8 @@ function ModuleCard({ module, onDelete }: { module: LauncherModule; onDelete: ()
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="truncate font-medium text-fg-primary">{module.name}</span>
-          <span
-            className={cn(
-              "shrink-0 rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider ring-1",
-              module.type === "hosted"
-                ? "bg-accent/10 text-accent ring-accent/30"
-                : "bg-fuchsia-500/10 text-fuchsia-300 ring-fuchsia-500/30",
-            )}
-          >
-            {module.type === "hosted" ? `v${module.version}` : "Local"}
+          <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider ring-1", badge.cls)}>
+            {badge.label}
           </span>
         </div>
         <div className="mt-0.5 flex items-center gap-3 text-xs text-fg-muted">
@@ -1025,8 +1155,12 @@ function ModuleCard({ module, onDelete }: { module: LauncherModule; onDelete: ()
         </div>
       </div>
       <button
-        onClick={onDelete}
-        className="grid size-9 place-items-center rounded-lg text-fg-muted transition-colors hover:bg-danger/15 hover:text-danger"
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete();
+        }}
+        className="grid size-9 shrink-0 place-items-center rounded-lg text-fg-muted transition-colors hover:bg-danger/15 hover:text-danger"
+        title="Supprimer"
       >
         <Trash2 className="size-4" />
       </button>

@@ -49,6 +49,24 @@ export async function saveMinecraftModule(module: Extract<LauncherModule, { type
   );
 }
 
+/**
+ * Update a hosted module's metadata without touching the binary fields
+ * (downloadUrl / sha256 / size / version). Use this when the admin only edits
+ * cosmetic fields (icon, banner, description, theme, etc.).
+ */
+export async function updateHostedModuleMetadata(
+  moduleId: string,
+  patch: Partial<Omit<Extract<LauncherModule, { type: "hosted" }>, "id" | "type" | "downloadUrl" | "sha256" | "size" | "version" | "executable">>,
+) {
+  const fb = getFirebase();
+  if (!fb) throw new Error("Firebase not configured");
+  await setDoc(
+    doc(fb.db, "modules", moduleId),
+    { ...patch, updatedAt: serverTimestamp() },
+    { merge: true },
+  );
+}
+
 export async function uploadHostedModule(
   module: Omit<Extract<LauncherModule, { type: "hosted" }>, "downloadUrl" | "sha256" | "size">,
   file: File,
