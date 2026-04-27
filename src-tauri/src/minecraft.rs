@@ -282,12 +282,68 @@ pub async fn mc_install_modpack(
 
     emit_progress(&app, &module_id, "resolving", 0, 0);
 
-    // 1. Resolve download URL via CurseForge API
+    let client = reqwest::Client::new();
+
+    // 1a. Pre-check: fetch the file metadata to give a precise error if
+    // distribution is disabled for THIS file (per-file flag, not per-project).
+    let info_url = format!(
+        "https://api.curseforge.com/v1/mods/{}/files/{}",
+        project_id, file_id
+    );
+    let info_resp = client
+        .get(&info_url)
+        .header("Accept", "application/json")
+        .header("x-api-key", &api_key)
+        .send()
+        .await
+        .map_err(|e| format!("CurseForge API (file info): {}", e))?;
+    if info_resp.status() == reqwest::StatusCode::NOT_FOUND {
+        return Err(format!(
+            "CurseForge HTTP 404 — Project ID {} ou File ID {} introuvables. Re-vérifie dans le panel admin.",
+            project_id, file_id
+        ));
+    }
+    if info_resp.status() == reqwest::StatusCode::UNAUTHORIZED {
+        return Err("Clé API CurseForge invalide. Régénère-la sur console.curseforge.com.".to_string());
+    }
+    if info_resp.status().is_success() {
+        let info: serde_json::Value = info_resp
+            .json()
+            .await
+            .map_err(|e| format!("parse file info: {}", e))?;
+        let data = info.get("data");
+        let allow = data
+            .and_then(|d| d.get("allowModDistribution"))
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true);
+        let display_name = data
+            .and_then(|d| d.get("displayName"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("(nom inconnu)");
+        let release_type = data
+            .and_then(|d| d.get("releaseType"))
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+        let release_label = match release_type {
+            1 => "Release",
+            2 => "Beta",
+            3 => "Alpha",
+            _ => "Inconnu",
+        };
+        if !allow {
+            return Err(format!(
+                "Le fichier `{}` (File ID {}) a `allowModDistribution: false` côté CurseForge — son auteur a désactivé la distribution par tiers pour CE fichier spécifique. Le réglage est par fichier, pas par projet : tu dois (1) activer Distribution dans Settings du projet sur curseforge.com, PUIS (2) uploader une NOUVELLE version, et enfin (3) mettre à jour le File ID dans le panel admin pour pointer sur la nouvelle version. Type de release actuel : {}.",
+                display_name, file_id, release_label
+            ));
+        }
+    }
+
+    // 1b. Resolve download URL via CurseForge API
     let url = format!(
         "https://api.curseforge.com/v1/mods/{}/files/{}/download-url",
         project_id, file_id
     );
-    let resp = reqwest::Client::new()
+    let resp = client
         .get(&url)
         .header("Accept", "application/json")
         .header("x-api-key", &api_key)
