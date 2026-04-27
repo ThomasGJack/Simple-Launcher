@@ -1,12 +1,12 @@
 {
-  "version": "26.427.21",
-  "displayVersion": "v26.04.27.22",
-  "notes": "### Corrigé\n\n- **Hotfix sauvegarde du builder** : Firestore rejetait les documents avec des champs `undefined` (ex. `page.theme.fontDisplay` quand non rempli). `updateModulePage()` strip maintenant récursivement tous les `undefined` avant l'écriture.",
-  "pub_date": "2026-04-27T21:36:19.179Z",
+  "version": "26.427.22",
+  "displayVersion": "v26.04.27.23",
+  "notes": "### Changé\n\n- **Position des blocs custom dans la page module** : les blocs personnalisés via le builder s'affichent désormais directement sous le bouton « Jouer » (dans la colonne gauche), au lieu d'être tout en bas de la page après la sidebar Minecraft. Layout beaucoup plus naturel à scroller.",
+  "pub_date": "2026-04-27T21:41:29.136Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReExlbkZGc0Y5eEx2KzRGWmpEZXB1NlI1ZnlHZ1M0WDhKZ3FIeE13MkY1Umd2OGNPd3FsUTJlS0xzT2Y0N1FNNGtvVFJLejVJL0M4U2UwUTV5eUF4Mk95aDN0NGMyV0FjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3MzI1Nzc5CWZpbGU6U2ltcGxlIExhdW5jaGVyXzI2LjQyNy4yMV94NjQtc2V0dXAuZXhlCjRUOGRtODNKOXBPd3VneG1aYnR4ZXIvMHQ4ZjlhbmpwQ2tSU1BzZUZwSmI5aGZESjUxVkxHY0pKYnhHRG1vb3NSWnhXV0RqQ3NnMVQvL0NQTWFjQ0NBPT0K",
-      "url": "https://simplelaunche.web.app/releases/26.427.21/Simple Launcher_26.427.21_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReExlbkZGc0Y5eExJc09lcXJ1dEJVcW9ZSHlhZkFESVF4RlR6TVRkZzlQZmxHTmZra0Q0WU1wWUl2WVAzRjRQQnpmR25qakVZWStsbnZzd1dMZDdReTVOV2dXK2hDQmdvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3MzI2MDg5CWZpbGU6U2ltcGxlIExhdW5jaGVyXzI2LjQyNy4yMl94NjQtc2V0dXAuZXhlCmlYUFpocWhBc2poZlFCTW5oTmdweVhiem82YnBzNEhsQlZVaURiVnBBNlpyUzJhRk1INTZEMDNxa1M2M2xKYlZoSjdwT1hzWE5kQkJDWmtydytwakFRPT0K",
+      "url": "https://simplelaunche.web.app/releases/26.427.22/Simple Launcher_26.427.22_x64-setup.exe"
     }
   }
 }

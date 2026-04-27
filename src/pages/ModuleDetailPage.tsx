@@ -288,6 +288,21 @@ export function ModuleDetailPage() {
                 </button>
               )}
             </motion.div>
+
+            {migratedPage && migratedPage.blocks.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="mt-6"
+              >
+                <BlockRenderer
+                  blocks={heroIsBlock ? migratedPage.blocks.slice(1) : migratedPage.blocks}
+                  module={module}
+                  onLaunch={handlePrimary}
+                />
+              </motion.div>
+            )}
           </div>
 
           <div className="col-span-12 space-y-6 lg:col-span-5">
@@ -373,22 +388,16 @@ export function ModuleDetailPage() {
           </div>
         </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="mt-10"
-        >
-          {migratedPage && migratedPage.blocks.length > 0 ? (
-            <BlockRenderer
-              blocks={heroIsBlock ? migratedPage.blocks.slice(1) : migratedPage.blocks}
-              module={module}
-              onLaunch={handlePrimary}
-            />
-          ) : (
+        {(!migratedPage || migratedPage.blocks.length === 0) && (
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="mt-10"
+          >
             <ModuleSections module={module} />
-          )}
-        </motion.div>
+          </motion.div>
+        )}
         </div>
       </div>
     </div>

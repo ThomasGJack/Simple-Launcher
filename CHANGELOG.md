@@ -18,6 +18,13 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.04.27.23] - 2026-04-27  · semver `26.427.22`
+
+
+
+### Changé
+
+- **Position des blocs custom dans la page module** : les blocs personnalisés via le builder s'affichent désormais directement sous le bouton « Jouer » (dans la colonne gauche), au lieu d'être tout en bas de la page après la sidebar Minecraft. Layout beaucoup plus naturel à scroller.
 ## [v26.04.27.22] - 2026-04-27  · semver `26.427.21`
 
 
