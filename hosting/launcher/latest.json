@@ -1,12 +1,12 @@
 {
-  "version": "26.429.8",
-  "displayVersion": "v26.04.29.9",
-  "notes": "### Changé\n\n- **Noms de salons (Clans) en UTF-8 complet** : suppression de la sanitization agressive qui retirait les accents et caractères non-ASCII. Maintenant tu peux nommer tes salons « 🎮 jeux-récents », « café-discu », « événements », etc. — accents, espaces, tirets, emojis acceptés. Limite portée à 50 caractères. Seuls les caractères de contrôle et le `#` (déjà préfixé visuellement) sont strippés.",
-  "pub_date": "2026-04-29T20:42:22.208Z",
+  "version": "26.429.9",
+  "displayVersion": "v26.04.29.10",
+  "notes": "### Corrigé\n\n- **Hotfix navigation bloquée depuis Clans** : un useEffect d'auto-sélection du premier clan/salon se déclenchait même pendant la transition de sortie d'AnimatePresence, ce qui ramenait l'user de force sur la page Clans à chaque clic sur Home/Library/etc. Ajout d'un gate `route.name === \"crews\"` pour ne déclencher la redirection que si on est encore sur la page.",
+  "pub_date": "2026-04-29T20:47:17.661Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReExlbkZGc0Y5eFAvQVhFc2ZLZk9HL3BuMlVyV1BXa3NmZXI0S0ptQkFhV0FrWnpQZjdQT1BsdGZxQVg1UU4zOUlxY25hcWZhUElNYmRHODhCaFdsNTJTSFVvY01TU2c0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3NDk1MzQyCWZpbGU6U2ltcGxlIExhdW5jaGVyXzI2LjQyOS44X3g2NC1zZXR1cC5leGUKcXRlZENlOTNrS2JBakFOQWllN1dMc05IODVLaWp2cEFKeG9UMnlxYzdpQ2Z0SlBSemczUFhzUVYrQ2MxVVMyZ1NjY3NXOU9FWGV4YkR5MG1La01pRGc9PQo=",
-      "url": "https://simplelaunche.web.app/releases/26.429.8/Simple Launcher_26.429.8_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReExlbkZGc0Y5eEJQZmFRWElmWHVEU2dmTTFzQnV6NHkyK3VrSWljd0FqSTNTS2dacTV4cjQrWXg3R2ZjdEFoV2NxV1lYQjhFTnR6ZkJoOWRiSGtjVy9xWFg5N3hFSmdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3NDk1NjM3CWZpbGU6U2ltcGxlIExhdW5jaGVyXzI2LjQyOS45X3g2NC1zZXR1cC5leGUKN1lsNlRGamVFVkxXWGU1Rk13S1F3azdyZ2tPWG5nZ3JqUU1Ob0ZqSHZOQVN4bitYOXh0OXBNWXJiV1UwWE9icXZXQTN0ek12UGJrYjlmaFNSTEpqQ2c9PQo=",
+      "url": "https://simplelaunche.web.app/releases/26.429.9/Simple Launcher_26.429.9_x64-setup.exe"
     }
   }
 }

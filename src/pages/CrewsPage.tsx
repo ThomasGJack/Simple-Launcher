@@ -38,10 +38,14 @@ export function CrewsPage() {
   const selectedChannelId = route.name === "crews" ? route.channelId : undefined;
 
   // Auto-pick the first crew when the user lands without a selection.
+  // Hard-gate on `route.name === "crews"` — otherwise the effect can fire
+  // during the AnimatePresence exit transition and bounce the user right
+  // back here when they click "Home" or any other sidebar entry.
   useEffect(() => {
+    if (route.name !== "crews") return;
     if (selectedCrewId || crews.length === 0) return;
     navigate({ name: "crews", crewId: crews[0].id });
-  }, [crews, selectedCrewId, navigate]);
+  }, [crews, selectedCrewId, navigate, route.name]);
 
   useEffect(() => {
     if (!selectedCrewId) {
@@ -52,11 +56,13 @@ export function CrewsPage() {
   }, [selectedCrewId]);
 
   // Auto-pick the first channel when none selected for the current crew.
+  // Same route gate as above to avoid bouncing back during navigation away.
   useEffect(() => {
+    if (route.name !== "crews") return;
     if (!selectedCrewId) return;
     if (selectedChannelId || channels.length === 0) return;
     navigate({ name: "crews", crewId: selectedCrewId, channelId: channels[0].id });
-  }, [channels, selectedCrewId, selectedChannelId, navigate]);
+  }, [channels, selectedCrewId, selectedChannelId, navigate, route.name]);
 
   const selectedCrew = useMemo(
     () => crews.find((c) => c.id === selectedCrewId) ?? null,

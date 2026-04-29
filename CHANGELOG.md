@@ -18,6 +18,14 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.04.29.10] - 2026-04-29  · semver `26.429.9`
+
+
+
+
+### Corrigé
+
+- **Hotfix navigation bloquée depuis Clans** : un useEffect d'auto-sélection du premier clan/salon se déclenchait même pendant la transition de sortie d'AnimatePresence, ce qui ramenait l'user de force sur la page Clans à chaque clic sur Home/Library/etc. Ajout d'un gate `route.name === "crews"` pour ne déclencher la redirection que si on est encore sur la page.
 ## [v26.04.29.9] - 2026-04-29  · semver `26.429.8`
 
 
