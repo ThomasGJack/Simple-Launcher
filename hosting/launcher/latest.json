@@ -1,12 +1,12 @@
 {
-  "version": "26.429.2",
-  "displayVersion": "v26.04.29.3",
-  "notes": "### Ajouté\n\n- **Auto-installation des mises à jour au démarrage** : si une nouvelle version est détectée dans les 30 s qui suivent le boot du launcher, elle se télécharge et s'installe automatiquement (banner de progression seulement, plus de popup à valider). Les détections en cours de session continuent d'afficher la modal d'invitation pour ne pas redémarrer pendant qu'on joue.\n- **Modal post-update** : au premier lancement après une auto-install, un popup vert affiche le changelog de la version qu'on vient d'installer (sans bouton « Mettre à jour » puisque c'est déjà fait). Le changelog est mis en cache local juste avant le download pour qu'il soit dispo après relaunch.",
-  "pub_date": "2026-04-29T19:08:03.400Z",
+  "version": "26.429.3",
+  "displayVersion": "v26.04.29.4",
+  "notes": "### Ajouté\n\n- **HomePage plus vivante** : ajout de particules animées en fond (preset selon l'heure : étincelles le matin/aprem, lucioles le soir, étoiles la nuit), deux orbes colorés flottants en arrière-plan (animation lente), et un rail « Lancement rapide » sous la card Continue ici qui affiche tes 4 jeux les plus joués avec entrée animée en stagger.\n\n### Changé\n\n- **HomePage : retrait de la mascotte Glitch** en bas à droite (jugée disgracieuse). Allègement de la page : plus de listeners pour les amis en ligne / conversations / messages non lus puisque la mascotte n'en a plus besoin.",
+  "pub_date": "2026-04-29T19:27:31.206Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReExlbkZGc0Y5eENjSmFYZGVlazNFSmp4czcwZmtpMUdQR1Q1L2U2VlpXaGY4TEg0c3RtVDdTRlhiTVgrTVdPbXRXZG9VTXB3Wi84dFMreFd0T0liTU84MlhMK2ZoZGdjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3NDg5NjgzCWZpbGU6U2ltcGxlIExhdW5jaGVyXzI2LjQyOS4yX3g2NC1zZXR1cC5leGUKQTlYaDJ4L0QxSVFXWXI1a3JlWnVYczIzT2xTUHJwWXBFYU5mdjVUNkI5NE9mRDc2dDVjRUtGbmYzU2srQjlPaElHOUpId05EZkk2NG1zSVJEcnpKQ2c9PQo=",
-      "url": "https://simplelaunche.web.app/releases/26.429.2/Simple Launcher_26.429.2_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReExlbkZGc0Y5eEZSa05ETndBYXRZelM3ZEpnYjArc0F6M0RNMFlrNWlSeEZLWUxuOElZdnYzcjI3aWhtVHZSbmpFWG1oaWNLQVRtV25jTjNxNHN3elhHZEJSOXlzZWdzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3NDkwODUxCWZpbGU6U2ltcGxlIExhdW5jaGVyXzI2LjQyOS4zX3g2NC1zZXR1cC5leGUKOUFmSjZTalpheVQvYWl3YWxYL0I0VEIwSmNuM3UxelZHOURqVzhONG5QSWI3ZXREY1FWbGQ4TXdxcmNrZG9iUG1ad1piSVdLb0FOQys0dk14Z2JRRFE9PQo=",
+      "url": "https://simplelaunche.web.app/releases/26.429.3/Simple Launcher_26.429.3_x64-setup.exe"
     }
   }
 }

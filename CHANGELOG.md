@@ -18,6 +18,16 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.04.29.4] - 2026-04-29  · semver `26.429.3`
+
+
+### Ajouté
+
+- **HomePage plus vivante** : ajout de particules animées en fond (preset selon l'heure : étincelles le matin/aprem, lucioles le soir, étoiles la nuit), deux orbes colorés flottants en arrière-plan (animation lente), et un rail « Lancement rapide » sous la card Continue ici qui affiche tes 4 jeux les plus joués avec entrée animée en stagger.
+
+### Changé
+
+- **HomePage : retrait de la mascotte Glitch** en bas à droite (jugée disgracieuse). Allègement de la page : plus de listeners pour les amis en ligne / conversations / messages non lus puisque la mascotte n'en a plus besoin.
 ## [v26.04.29.3] - 2026-04-29  · semver `26.429.2`
 
 

@@ -1,14 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Clock, Play } from "lucide-react";
+import { Clock, Play, Gamepad2 } from "lucide-react";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/auth";
 import { watchModules } from "@/firebase/modules";
 import { watchPlaytime, formatPlaytime, type PlaytimeEntry } from "@/firebase/playtime";
-import { watchAllUsers, statusFromLastSeen, type UserPresence, type PresenceStatus } from "@/firebase/presence";
-import { watchConversationsFor } from "@/firebase/messaging";
-import { unreadCount, type Conversation } from "@/types/messaging";
-import { Mascot, type MascotMood } from "@/components/ui/Mascot";
+import { ModuleParticles } from "@/components/ui/Particles";
 import type { LauncherModule } from "@/types/module";
 
 /**
@@ -27,20 +24,13 @@ export function HomePage() {
   const navigate = useUIStore((s) => s.navigate);
   const me = useAuthStore((s) => s.user);
   const [modules, setModules] = useState<LauncherModule[]>([]);
-  const [users, setUsers] = useState<UserPresence[]>([]);
   const [playtime, setPlaytime] = useState<PlaytimeEntry[]>([]);
-  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [, setNow] = useState(Date.now());
 
   useEffect(() => watchModules(setModules), []);
-  useEffect(() => watchAllUsers(setUsers), []);
   useEffect(() => {
     if (!me) return;
     return watchPlaytime(me.uid, setPlaytime);
-  }, [me?.uid]);
-  useEffect(() => {
-    if (!me) return;
-    return watchConversationsFor(me.uid, setConversations);
   }, [me?.uid]);
   // Re-tick every 30s so relative time strings stay fresh
   useEffect(() => {
@@ -68,50 +58,16 @@ export function HomePage() {
     [playtime, lastPlayed],
   );
 
-  // Friends online: every user other than me, sorted by status (online > idle > offline)
-  // and presented as a compact list of avatars + activity.
-  const friendsOnline = useMemo(() => {
-    const order: Record<PresenceStatus, number> = { online: 0, idle: 1, offline: 2 };
-    return users
-      .filter((u) => u.uid !== me?.uid)
-      .map((u) => ({ user: u, status: statusFromLastSeen(u.lastSeen) }))
-      .sort((a, b) => {
-        if (order[a.status] !== order[b.status]) return order[a.status] - order[b.status];
-        return (b.user.lastSeen ?? 0) - (a.user.lastSeen ?? 0);
-      });
-  }, [users, me]);
-
-  const onlineCount = friendsOnline.filter((f) => f.status === "online").length;
-
-  const totalUnread = useMemo(
-    () => (me ? conversations.reduce((s, c) => s + unreadCount(c, me.uid), 0) : 0),
-    [conversations, me],
-  );
-
-  // Decide which mood the mascot should be in. Priority order matters —
-  // the most "in your face" mood wins so the penguin matches the most
-  // significant thing happening in the user's launcher right now.
-  const { mascotMood, mascotTooltip } = useMemo<{ mascotMood: MascotMood; mascotTooltip: string }>(() => {
-    if (totalUnread > 0) {
-      return { mascotMood: "chat", mascotTooltip: `${totalUnread} message(s) non lu(s)` };
-    }
-    const someoneIsPlaying = friendsOnline.some(
-      (f) => f.status === "online" && f.user.currentActivity,
-    );
-    if (someoneIsPlaying) {
-      return { mascotMood: "gaming", mascotTooltip: "Tes potes sont en train de jouer" };
-    }
-    if (onlineCount > 0) {
-      return { mascotMood: "happy", mascotTooltip: `${onlineCount} pote(s) en ligne` };
-    }
-    // No friends + no recent play → mascot dozes off after 24h of inactivity.
-    const lastPlayedTs = lastPlayedEntry?.lastPlayedAt ?? 0;
-    const aDayAgo = Date.now() - 24 * 60 * 60 * 1000;
-    if (lastPlayedTs && lastPlayedTs < aDayAgo) {
-      return { mascotMood: "sleeping", mascotTooltip: "Glitch dort… reviens bientôt !" };
-    }
-    return { mascotMood: "idle", mascotTooltip: "Glitch attend à tes côtés" };
-  }, [totalUnread, friendsOnline, onlineCount, lastPlayedEntry]);
+  // Quick-launch rail : top 4 modules par playtime, en excluant le "Continue ici"
+  // pour ne pas dupliquer. Si playtime vide, on prend les 4 premiers modules.
+  const quickLaunch = useMemo(() => {
+    const byTime = [...playtime]
+      .sort((a, b) => (b.lastPlayedAt ?? 0) - (a.lastPlayedAt ?? 0))
+      .map((p) => modules.find((m) => m.id === p.moduleId))
+      .filter((m): m is LauncherModule => !!m && m.id !== lastPlayed?.id);
+    const filler = modules.filter((m) => m.id !== lastPlayed?.id && !byTime.includes(m));
+    return [...byTime, ...filler].slice(0, 4);
+  }, [playtime, modules, lastPlayed]);
 
   return (
     <div className="relative h-full overflow-y-auto px-10 py-10">
@@ -123,6 +79,21 @@ export function HomePage() {
           background: greeting.heroGradient,
         }}
       />
+
+      {/* Subtle ambient particles tinted to time-of-day */}
+      <div aria-hidden className="pointer-events-none absolute inset-0">
+        <ModuleParticles
+          config={{
+            preset: greeting.particles,
+            color: greeting.particleColor,
+            density: 50,
+          }}
+        />
+      </div>
+
+      {/* Floating colored orbs (slow, blurry, soft) — adds life without
+          distracting from the content. Two orbs in opposite quadrants. */}
+      <FloatingOrbs accent={greeting.particleColor} />
 
       <motion.div
         initial={{ opacity: 0, y: 16 }}
@@ -143,12 +114,101 @@ export function HomePage() {
             onPlay={() => navigate({ name: "module", moduleId: lastPlayed.id })}
           />
         )}
-      </motion.div>
 
-      {/* Mascot — context-aware Glitch penguin in the bottom-right that
-          changes mood based on what's happening. See `mascotMood` below. */}
-      <Mascot mood={mascotMood} tooltip={mascotTooltip} />
+        {quickLaunch.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2, ease: "easeOut" }}
+            className="mt-6"
+          >
+            <div className="mb-3 flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-fg-muted">
+              <Gamepad2 className="size-3" />
+              Lancement rapide
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {quickLaunch.map((mod, i) => (
+                <QuickLaunchCard
+                  key={mod.id}
+                  module={mod}
+                  delay={0.25 + i * 0.05}
+                  onClick={() => navigate({ name: "module", moduleId: mod.id })}
+                />
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </motion.div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+//                              FLOATING ORBS
+// ---------------------------------------------------------------------------
+
+function FloatingOrbs({ accent }: { accent: string }) {
+  return (
+    <>
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute size-[420px] rounded-full opacity-25 blur-3xl"
+        style={{ background: accent, top: "8%", left: "-10%" }}
+        animate={{ x: [0, 60, 20, 0], y: [0, 30, 80, 0] }}
+        transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute size-[360px] rounded-full opacity-20 blur-3xl"
+        style={{ background: "#a855f7", bottom: "5%", right: "-8%" }}
+        animate={{ x: [0, -50, -20, 0], y: [0, -40, -10, 0] }}
+        transition={{ duration: 28, repeat: Infinity, ease: "easeInOut" }}
+      />
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+//                          QUICK LAUNCH CARD
+// ---------------------------------------------------------------------------
+
+function QuickLaunchCard({
+  module,
+  delay,
+  onClick,
+}: {
+  module: LauncherModule;
+  delay: number;
+  onClick: () => void;
+}) {
+  return (
+    <motion.button
+      initial={{ opacity: 0, scale: 0.94, y: 8 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ duration: 0.45, delay, ease: [0.22, 1, 0.36, 1] }}
+      whileHover={{ y: -3, scale: 1.02 }}
+      onClick={onClick}
+      className="no-drag group relative aspect-[4/3] overflow-hidden rounded-2xl ring-1 ring-white/[0.06] text-left transition-shadow hover:ring-accent/40 hover:shadow-[0_0_24px_var(--color-accent-soft)]"
+    >
+      {module.bannerUrl || module.iconUrl ? (
+        <img
+          src={module.bannerUrl ?? module.iconUrl ?? ""}
+          alt=""
+          className="absolute inset-0 size-full object-cover transition-transform duration-500 group-hover:scale-110"
+        />
+      ) : (
+        <div className="absolute inset-0 bg-gradient-to-br from-accent/20 via-bg-soft to-fuchsia-500/20" />
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-bg-base/95 via-bg-base/30 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 p-3">
+        <span className="line-clamp-1 text-sm font-semibold text-fg-primary drop-shadow-md">
+          {module.name}
+        </span>
+        <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-accent/90 text-bg-base shadow-[0_0_12px_var(--color-accent-soft)] transition-shadow group-hover:shadow-[0_0_20px_var(--color-accent-glow)]">
+          <Play className="size-3.5 fill-current" strokeWidth={0} />
+        </span>
+      </div>
+    </motion.button>
   );
 }
 
@@ -289,6 +349,10 @@ function greetingFor(now: Date): {
   emoji: string;
   /** CSS gradient string applied to the hero halo behind the greeting card. */
   heroGradient: string;
+  /** tsparticles preset matching the time-of-day vibe. */
+  particles: "stars" | "fireflies" | "sparkles" | "snow";
+  /** Tint applied to the particles (also used by the floating orbs). */
+  particleColor: string;
 } {
   const h = now.getHours();
   if (h >= 5 && h < 12) {
@@ -297,6 +361,8 @@ function greetingFor(now: Date): {
       emoji: "☀️",
       heroGradient:
         "radial-gradient(ellipse at top left, rgba(56,189,248,0.25), transparent 60%), radial-gradient(ellipse at top right, rgba(251,146,60,0.18), transparent 60%)",
+      particles: "sparkles",
+      particleColor: "#38bdf8",
     };
   }
   if (h >= 12 && h < 18) {
@@ -305,6 +371,8 @@ function greetingFor(now: Date): {
       emoji: "🌤️",
       heroGradient:
         "radial-gradient(ellipse at top left, rgba(251,191,36,0.22), transparent 60%), radial-gradient(ellipse at top right, rgba(0,212,255,0.18), transparent 60%)",
+      particles: "sparkles",
+      particleColor: "#fbbf24",
     };
   }
   if (h >= 18 && h < 22) {
@@ -313,6 +381,8 @@ function greetingFor(now: Date): {
       emoji: "🌆",
       heroGradient:
         "radial-gradient(ellipse at top left, rgba(244,114,182,0.22), transparent 60%), radial-gradient(ellipse at top right, rgba(251,146,60,0.18), transparent 60%)",
+      particles: "fireflies",
+      particleColor: "#f472b6",
     };
   }
   return {
@@ -320,6 +390,8 @@ function greetingFor(now: Date): {
     emoji: "🌙",
     heroGradient:
       "radial-gradient(ellipse at top left, rgba(139,92,246,0.25), transparent 60%), radial-gradient(ellipse at top right, rgba(0,212,255,0.18), transparent 60%)",
+    particles: "stars",
+    particleColor: "#8b5cf6",
   };
 }
 
