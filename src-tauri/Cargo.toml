@@ -1,6 +1,6 @@
 [package]
 name = "simple-launcher"
-version = "26.429.3"
+version = "26.429.4"
 description = "Simple Launcher — multi-game launcher"
 authors = ["goule"]
 edition = "2021"

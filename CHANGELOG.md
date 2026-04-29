@@ -18,6 +18,13 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.04.29.5] - 2026-04-29  · semver `26.429.4`
+
+
+### Ajouté
+
+- **Bandeau « Amis en ligne » sur l'accueil** : pastille pulsante verte + 4 avatars + résumé d'activité (« Sarah joue à Glitch's Colony »). Cliquable, ouvre la page Communauté. Caché automatiquement quand personne n'est en ligne.
+- **Système News live** : nouvelle collection Firestore `/news` avec broadcast temps-réel. Chaque admin peut publier, modifier, épingler, masquer ou supprimer une news depuis la page Admin — les modifs apparaissent **instantanément** sur tous les launchers connectés sans relaunch (Firestore `onSnapshot`). Card hero sur l'accueil avec accent customisable, support markdown dans le corps, pin (badge ambré), drawer pour les news plus anciennes. HTML sanitizé via DOMPurify.
 ## [v26.04.29.4] - 2026-04-29  · semver `26.429.3`
 
 

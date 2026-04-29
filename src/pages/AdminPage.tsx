@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/auth";
+import { NewsManager } from "@/components/admin/NewsManager";
 import { isAdmin } from "@/lib/admin";
 import {
   deleteHostedZip,
@@ -433,6 +434,19 @@ export function AdminPage() {
         />
       ) : (
         <EditingChip name={form.name || form.id} onExit={reset} />
+      )}
+
+      {/* News broadcast manager — admin-only, edits propagate live to every
+          launcher home page via Firestore onSnapshot. */}
+      {!isEditing && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="my-8"
+        >
+          <NewsManager />
+        </motion.div>
       )}
 
       <div className="grid grid-cols-12 gap-6">

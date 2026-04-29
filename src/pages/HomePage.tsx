@@ -6,6 +6,8 @@ import { useAuthStore } from "@/store/auth";
 import { watchModules } from "@/firebase/modules";
 import { watchPlaytime, formatPlaytime, type PlaytimeEntry } from "@/firebase/playtime";
 import { ModuleParticles } from "@/components/ui/Particles";
+import { FriendsOnlineStrip } from "@/components/home/FriendsOnlineStrip";
+import { NewsCard } from "@/components/home/NewsCard";
 import type { LauncherModule } from "@/types/module";
 
 /**
@@ -107,6 +109,8 @@ export function HomePage() {
           greetingEmoji={greeting.emoji}
           avatar={me?.photoURL ?? null}
         />
+        <FriendsOnlineStrip />
+        <NewsCard />
         {lastPlayed && (
           <ContinueCard
             module={lastPlayed}

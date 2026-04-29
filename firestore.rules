@@ -33,6 +33,15 @@ service cloud.firestore {
       }
     }
 
+    // News broadcast on the home page — any authed launcher reads, only
+    // admins can create/edit/delete. Updates propagate live via onSnapshot
+    // so changes published from the admin panel show up on every launcher
+    // without requiring a relaunch.
+    match /news/{newsId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
     // Modules: any authenticated user can read; admins can write.
     match /modules/{moduleId} {
       allow read: if request.auth != null;

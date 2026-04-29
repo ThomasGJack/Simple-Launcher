@@ -1,12 +1,12 @@
 {
-  "version": "26.429.3",
-  "displayVersion": "v26.04.29.4",
-  "notes": "### Ajouté\n\n- **HomePage plus vivante** : ajout de particules animées en fond (preset selon l'heure : étincelles le matin/aprem, lucioles le soir, étoiles la nuit), deux orbes colorés flottants en arrière-plan (animation lente), et un rail « Lancement rapide » sous la card Continue ici qui affiche tes 4 jeux les plus joués avec entrée animée en stagger.\n\n### Changé\n\n- **HomePage : retrait de la mascotte Glitch** en bas à droite (jugée disgracieuse). Allègement de la page : plus de listeners pour les amis en ligne / conversations / messages non lus puisque la mascotte n'en a plus besoin.",
-  "pub_date": "2026-04-29T19:27:31.206Z",
+  "version": "26.429.4",
+  "displayVersion": "v26.04.29.5",
+  "notes": "### Ajouté\n\n- **Bandeau « Amis en ligne » sur l'accueil** : pastille pulsante verte + 4 avatars + résumé d'activité (« Sarah joue à Glitch's Colony »). Cliquable, ouvre la page Communauté. Caché automatiquement quand personne n'est en ligne.\n- **Système News live** : nouvelle collection Firestore `/news` avec broadcast temps-réel. Chaque admin peut publier, modifier, épingler, masquer ou supprimer une news depuis la page Admin — les modifs apparaissent **instantanément** sur tous les launchers connectés sans relaunch (Firestore `onSnapshot`). Card hero sur l'accueil avec accent customisable, support markdown dans le corps, pin (badge ambré), drawer pour les news plus anciennes. HTML sanitizé via DOMPurify.",
+  "pub_date": "2026-04-29T19:46:00.192Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReExlbkZGc0Y5eEZSa05ETndBYXRZelM3ZEpnYjArc0F6M0RNMFlrNWlSeEZLWUxuOElZdnYzcjI3aWhtVHZSbmpFWG1oaWNLQVRtV25jTjNxNHN3elhHZEJSOXlzZWdzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3NDkwODUxCWZpbGU6U2ltcGxlIExhdW5jaGVyXzI2LjQyOS4zX3g2NC1zZXR1cC5leGUKOUFmSjZTalpheVQvYWl3YWxYL0I0VEIwSmNuM3UxelZHOURqVzhONG5QSWI3ZXREY1FWbGQ4TXdxcmNrZG9iUG1ad1piSVdLb0FOQys0dk14Z2JRRFE9PQo=",
-      "url": "https://simplelaunche.web.app/releases/26.429.3/Simple Launcher_26.429.3_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReExlbkZGc0Y5eEZCQVd6TThZcGxYdjIrTnZkcCtiQWlTVkpsdDZMeVcrNzBQVlluKzIwdVBkSTZIN1Uva3VsM1RTMU9teFJEMTRSMHV6aGhJZUFMcllibHBScFpKalE4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3NDkxOTYwCWZpbGU6U2ltcGxlIExhdW5jaGVyXzI2LjQyOS40X3g2NC1zZXR1cC5leGUKS3JkYzVxWnlXMGZRT2Q0dUZJWXJOQlJjbjA5bzR3Vm1NajdERnV3cjNHcjZSYk5PTGhFd3RKRWFrdXhQc3JZcWhHYkVMWERhbk5UVVNwRGY3cmRmRHc9PQo=",
+      "url": "https://simplelaunche.web.app/releases/26.429.4/Simple Launcher_26.429.4_x64-setup.exe"
     }
   }
 }
