@@ -1,4 +1,3 @@
-mod backup;
 mod discord_rpc;
 mod minecraft;
 mod modules;
@@ -57,8 +56,6 @@ pub fn run() {
             minecraft::mc_install_modpack,
             minecraft::mc_launch,
             minecraft::mc_uninstall,
-            backup::mc_backup_save,
-            backup::mc_restore_backup,
             rcon::rcon_connect,
             rcon::rcon_send,
             rcon::rcon_close,

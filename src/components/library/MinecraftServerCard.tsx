@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Cpu, Globe, Server, Users, Wifi } from "lucide-react";
 import { useMinecraftStatus, type SamplePlayer } from "@/lib/minecraftStatus";
@@ -312,27 +312,46 @@ function PlayersOnline({ list, totalOnline }: { list: SamplePlayer[]; totalOnlin
 }
 
 function PlayerHead({ player }: { player: SamplePlayer }) {
-  // Crafatar serves 3D rendered heads with the helmet overlay enabled by
-  // default. Falls back to MinoTar's 2D avatar when there's no UUID (server
-  // anonymized the sample list).
-  const headUrl = useMemo(() => {
+  // Try a chain of head services, falling back when the previous one fails.
+  // Each entry returns null when not applicable (e.g. UUID-only services
+  // when we don't have a UUID).
+  const candidates = useMemo(() => {
+    const list: string[] = [];
     if (player.uuid) {
-      return `https://crafatar.com/renders/head/${player.uuid}?overlay&scale=4`;
+      list.push(`https://crafatar.com/avatars/${player.uuid}?overlay&size=56`);
+      list.push(`https://mc-heads.net/avatar/${player.uuid}/56`);
     }
-    return `https://mc-heads.net/avatar/${encodeURIComponent(player.name)}/56`;
+    list.push(`https://mc-heads.net/avatar/${encodeURIComponent(player.name)}/56`);
+    list.push(`https://minotar.net/helm/${encodeURIComponent(player.name)}/56.png`);
+    list.push(`https://api.mineatar.io/face/${encodeURIComponent(player.name)}?scale=8`);
+    return list;
   }, [player.uuid, player.name]);
+
+  const [idx, setIdx] = useState(0);
+  const headUrl = candidates[idx];
+  const exhausted = idx >= candidates.length - 1;
 
   return (
     <div
       className="flex flex-col items-center gap-1 rounded-lg bg-bg-base/40 p-1.5 ring-1 ring-white/[0.04] transition-colors hover:bg-bg-base/60 hover:ring-accent/20"
       title={player.name}
     >
-      <img
-        src={headUrl}
-        alt={player.name}
-        className="size-10 rounded-md drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]"
-        loading="lazy"
-      />
+      {headUrl ? (
+        <img
+          src={headUrl}
+          alt={player.name}
+          referrerPolicy="no-referrer"
+          className="size-10 rounded-md drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]"
+          loading="lazy"
+          onError={() => {
+            if (!exhausted) setIdx((i) => i + 1);
+          }}
+        />
+      ) : (
+        <div className="grid size-10 place-items-center rounded-md bg-bg-elevated text-[9px] uppercase text-fg-dim">
+          {player.name.slice(0, 2)}
+        </div>
+      )}
       <div className="w-full truncate text-center text-[10px] text-fg-muted">
         {player.name}
       </div>

@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
  */
 export type SamplePlayer = {
   name: string;
-  uuid: string;
+  uuid?: string;
 };
 
 /** Server software fingerprint — `name` is a coarse family (Paper / Spigot /
@@ -57,11 +57,12 @@ export async function fetchMinecraftStatus(address: string): Promise<MinecraftSt
     const rawList: unknown[] = Array.isArray(data?.players?.list) ? data.players.list : [];
     const playersList: SamplePlayer[] = rawList
       .map((item): SamplePlayer | null => {
-        if (typeof item === "string") return { name: item, uuid: "" };
+        if (typeof item === "string") return { name: item };
         if (item && typeof item === "object") {
           const obj = item as { name?: unknown; uuid?: unknown };
           if (typeof obj.name === "string") {
-            return { name: obj.name, uuid: typeof obj.uuid === "string" ? obj.uuid : "" };
+            const uuid = typeof obj.uuid === "string" && obj.uuid.length > 0 ? obj.uuid : undefined;
+            return { name: obj.name, uuid };
           }
         }
         return null;

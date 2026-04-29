@@ -24,13 +24,6 @@ service cloud.firestore {
         allow read, write: if request.auth != null && request.auth.uid == uid;
       }
 
-      // Minecraft backup metadata — private to the owner. Stores the URL
-      // and storage path of a per-instance world/save backup zip; the
-      // actual binary lives in Firebase Storage at the path stored here.
-      match /minecraftBackups/{backupId} {
-        allow read, write: if request.auth != null && request.auth.uid == uid;
-      }
-
       // Per-user achievements — private to the owner (write) but readable
       // by any authed user so the public profile page can display badges.
       match /achievements/{achievementId} {

@@ -27,7 +27,6 @@ import { isModulePageV2 } from "@/types/module";
 import { loadFontFace } from "@/lib/dynamicFont";
 import { MinecraftRamControl } from "@/components/library/MinecraftRamControl";
 import { MinecraftServerCard } from "@/components/library/MinecraftServerCard";
-import { MinecraftBackups } from "@/components/library/MinecraftBackups";
 import { RconConsoleModal } from "@/components/admin/RconConsole";
 import { isAdmin } from "@/lib/admin";
 import {
@@ -321,7 +320,6 @@ export function ModuleDetailPage() {
               </>
             )}
             {module.type === "minecraft" && <MinecraftRamControl module={module} />}
-            {module.type === "minecraft" && <MinecraftBackups moduleId={module.id} />}
             <motion.div
               initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}

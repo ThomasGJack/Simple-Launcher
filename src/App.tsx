@@ -180,6 +180,10 @@ function App() {
   const [playtime, setPlaytime] = useState<PlaytimeEntry[]>([]);
   const [conversations, setConversations] = useState<ConversationT[]>([]);
   const [unlockedSet, setUnlockedSet] = useState<Set<string>>(new Set());
+  // Tracks whether the Firestore listener has delivered its first snapshot.
+  // Until then, `unlockedSet` is empty and we MUST NOT evaluate achievements,
+  // otherwise every already-unlocked achievement gets toasted on each boot.
+  const [unlockedSetPrimed, setUnlockedSetPrimed] = useState(false);
   const [allUsers, setAllUsers] = useState<UserPresenceT[]>([]);
   // Session-level guard against re-toasting an achievement multiple times.
   // The Firestore-derived `unlockedSet` should already prevent this, but if
@@ -200,14 +204,23 @@ function App() {
     return watchConversationsFor(user.uid, setConversations);
   }, [user]);
   useEffect(() => {
-    if (!user) return;
-    return watchAchievements(user.uid, (list) =>
-      setUnlockedSet(new Set(list.map((u) => u.id))),
-    );
+    if (!user) {
+      setUnlockedSetPrimed(false);
+      return;
+    }
+    setUnlockedSetPrimed(false);
+    return watchAchievements(user.uid, (list) => {
+      setUnlockedSet(new Set(list.map((u) => u.id)));
+      setUnlockedSetPrimed(true);
+    });
   }, [user]);
 
   useEffect(() => {
     if (!user) return;
+    // Hard gate: don't even *consider* toasting achievements before we know
+    // which ones are already unlocked in Firestore. Otherwise the catalog
+    // gets re-toasted on every launch.
+    if (!unlockedSetPrimed) return;
     // Build context fresh from the latest snapshots
     const distinctChatPartners = new Set(
       conversations.flatMap((c) => c.participants.filter((p) => p && p !== user.uid)),
@@ -257,7 +270,7 @@ function App() {
         });
       }
     }
-  }, [user, allModules, allUsers, playtime, conversations, unlockedSet]);
+  }, [user, allModules, allUsers, playtime, conversations, unlockedSet, unlockedSetPrimed]);
 
   if (loading) {
     return (

@@ -1,12 +1,12 @@
 {
-  "version": "26.427.22",
-  "displayVersion": "v26.04.27.23",
-  "notes": "### Changé\n\n- **Position des blocs custom dans la page module** : les blocs personnalisés via le builder s'affichent désormais directement sous le bouton « Jouer » (dans la colonne gauche), au lieu d'être tout en bas de la page après la sidebar Minecraft. Layout beaucoup plus naturel à scroller.",
-  "pub_date": "2026-04-27T21:41:29.136Z",
+  "version": "26.429.0",
+  "displayVersion": "v26.04.29",
+  "notes": "### Ajouté\n\n- **Thèmes de profil prédéfinis** (8 ambiances : Cyan/Violet, Rouge/Violet, Rouge/Bleu, Vert/Jaune, Ambre/Rose, Cyan/Menthe, Violet/Fuchsia, Or/Rouge + option Custom). Chaque thème colorise le hero du profil + l'avatar. Édition dans la modal « Modifier le profil ».\n- **Fallback chain robuste pour les têtes Minecraft** : si Crafatar échoue, le launcher tente automatiquement mc-heads.net puis minotar.net puis mineatar.io. Plus de placeholders gris.\n\n### Changé\n\n- **HomePage simplifiée** : ne reste que le greeting (avec heure du jour + mascotte mood-aware) et la card « Continue ici ». Retrait des stat tiles, friends online tile, server heartbeat, conversations tile et activity feed pour une page minimaliste.\n\n### Corrigé\n\n- **Toasts d'achievements spammés à chaque démarrage** : ajout d'un flag `unlockedSetPrimed` qui gate l'évaluation des conditions de déverrouillage tant que le snapshot Firestore initial n'est pas arrivé. Plus de re-toast pour des succès déjà débloqués.\n\n### Supprimé\n\n- **Feature « Sauvegardes cloud Minecraft »** entièrement retirée (UI, code Rust, Cloud Functions, rules Firestore et Storage). Décision : pas de cas d'usage stable pour l'instant, on reverra plus tard.",
+  "pub_date": "2026-04-29T16:21:55.801Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReExlbkZGc0Y5eExJc09lcXJ1dEJVcW9ZSHlhZkFESVF4RlR6TVRkZzlQZmxHTmZra0Q0WU1wWUl2WVAzRjRQQnpmR25qakVZWStsbnZzd1dMZDdReTVOV2dXK2hDQmdvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3MzI2MDg5CWZpbGU6U2ltcGxlIExhdW5jaGVyXzI2LjQyNy4yMl94NjQtc2V0dXAuZXhlCmlYUFpocWhBc2poZlFCTW5oTmdweVhiem82YnBzNEhsQlZVaURiVnBBNlpyUzJhRk1INTZEMDNxa1M2M2xKYlZoSjdwT1hzWE5kQkJDWmtydytwakFRPT0K",
-      "url": "https://simplelaunche.web.app/releases/26.427.22/Simple Launcher_26.427.22_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReExlbkZGc0Y5eEx5Q05EeE5Jc2VtME1Wbi9PZGtQbDh4YjhJV1QxWmlnd0dFaDBYRUNWazlJSlJVc0NDMXFDenBRMFNSS09mSStOMXlJbkNpYTVlRUswd3FCdXVFYVFjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3NDc5NzE1CWZpbGU6U2ltcGxlIExhdW5jaGVyXzI2LjQyOS4wX3g2NC1zZXR1cC5leGUKekVqZ2NKQUo4alhRdVZNaGJlQ0h1RlZ2VEtZOUtadHIySWl3NGc2d3ZaeVZSam1VRURnOE1OTVVCaGtXTXlGcUVSdzRBQmY3b0N3R0J5dCs3T2hZRHc9PQo=",
+      "url": "https://simplelaunche.web.app/releases/26.429.0/Simple Launcher_26.429.0_x64-setup.exe"
     }
   }
 }

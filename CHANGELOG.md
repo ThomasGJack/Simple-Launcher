@@ -18,6 +18,25 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.04.29] - 2026-04-29  · semver `26.429.0`
+
+
+### Ajouté
+
+- **Thèmes de profil prédéfinis** (8 ambiances : Cyan/Violet, Rouge/Violet, Rouge/Bleu, Vert/Jaune, Ambre/Rose, Cyan/Menthe, Violet/Fuchsia, Or/Rouge + option Custom). Chaque thème colorise le hero du profil + l'avatar. Édition dans la modal « Modifier le profil ».
+- **Fallback chain robuste pour les têtes Minecraft** : si Crafatar échoue, le launcher tente automatiquement mc-heads.net puis minotar.net puis mineatar.io. Plus de placeholders gris.
+
+### Changé
+
+- **HomePage simplifiée** : ne reste que le greeting (avec heure du jour + mascotte mood-aware) et la card « Continue ici ». Retrait des stat tiles, friends online tile, server heartbeat, conversations tile et activity feed pour une page minimaliste.
+
+### Corrigé
+
+- **Toasts d'achievements spammés à chaque démarrage** : ajout d'un flag `unlockedSetPrimed` qui gate l'évaluation des conditions de déverrouillage tant que le snapshot Firestore initial n'est pas arrivé. Plus de re-toast pour des succès déjà débloqués.
+
+### Supprimé
+
+- **Feature « Sauvegardes cloud Minecraft »** entièrement retirée (UI, code Rust, Cloud Functions, rules Firestore et Storage). Décision : pas de cas d'usage stable pour l'instant, on reverra plus tard.
 ## [v26.04.27.23] - 2026-04-27  · semver `26.427.22`
 
 

@@ -49,8 +49,11 @@ export type UserPresence = {
    *  `users/{uid}/profile/banner.{ext}` via Firebase Storage. */
   bannerUrl: string | null;
   /** Hex color string ("#00d4ff") that overrides the cyan accent on the
-   *  user's profile page only. */
+   *  user's profile page only. Used when `profileTheme === "custom"`. */
   accentColor: string | null;
+  /** Predefined visual theme id for the profile page (gradient + accent).
+   *  When null, falls back to "default" (cyan/violet). */
+  profileTheme: import("@/lib/profileThemes").ProfileThemeId | null;
   /** Module ids pinned by the user — overrides the auto-computed
    *  "top games by playtime" on the profile page. Max 3. */
   pinnedModuleIds: string[];
@@ -134,6 +137,9 @@ export function parseUserDoc(uid: string, data: Record<string, unknown>): UserPr
     bio: typeof data.bio === "string" ? data.bio : null,
     bannerUrl: typeof data.bannerUrl === "string" ? data.bannerUrl : null,
     accentColor: typeof data.accentColor === "string" ? data.accentColor : null,
+    profileTheme: typeof data.profileTheme === "string"
+      ? (data.profileTheme as import("@/lib/profileThemes").ProfileThemeId)
+      : null,
     pinnedModuleIds: pinned,
     privacy: {
       // Defaults open since older docs don't have the field.

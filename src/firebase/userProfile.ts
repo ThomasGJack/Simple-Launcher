@@ -2,6 +2,7 @@ import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { getFirebase } from "./config";
 import type { UserPrivacy } from "./presence";
+import type { ProfileThemeId } from "@/lib/profileThemes";
 
 /**
  * Persists user-editable profile fields to `/users/{uid}`. The presence
@@ -14,6 +15,7 @@ export async function saveProfileCustomization(
     bio: string | null;
     bannerUrl: string | null;
     accentColor: string | null;
+    profileTheme: ProfileThemeId | null;
     pinnedModuleIds: string[];
     privacy: UserPrivacy;
   }>,

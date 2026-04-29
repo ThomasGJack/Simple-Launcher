@@ -24,6 +24,11 @@ import { watchAchievements, type UnlockedAchievement } from "@/firebase/achievem
 import { watchModules } from "@/firebase/modules";
 import { sendGameInvitation } from "@/firebase/invitations";
 import { saveProfileCustomization, uploadProfileBanner } from "@/firebase/userProfile";
+import {
+  PROFILE_THEME_LIST,
+  profileThemeStyle,
+  type ProfileThemeId,
+} from "@/lib/profileThemes";
 import { signOut } from "@/firebase/auth";
 import { ACHIEVEMENTS, TIER_STYLES } from "@/lib/achievements";
 import { conversationIdFor } from "@/types/messaging";
@@ -119,11 +124,17 @@ export function PublicProfilePage() {
   const isMe = me?.uid === targetUid;
   const [editing, setEditing] = useState(false);
 
-  // Apply the user's custom accent color as a CSS variable scoped to this
-  // page only. Other pages keep the default cyan.
-  const accentStyle: React.CSSProperties | undefined = profile?.accentColor
-    ? ({ ["--color-accent" as string]: profile.accentColor } as React.CSSProperties)
-    : undefined;
+  // Apply the user's chosen profile theme (predefined preset OR custom hex)
+  // as scoped CSS vars. The legacy `--color-accent` override is kept for
+  // backward compat with components that still read that var directly.
+  const themeId = profile?.profileTheme ?? "default";
+  const themeStyle = profileThemeStyle(themeId, profile?.accentColor);
+  const accentStyle: React.CSSProperties = {
+    ...themeStyle,
+    ...(profile?.accentColor
+      ? ({ ["--color-accent" as string]: profile.accentColor } as React.CSSProperties)
+      : {}),
+  };
 
   // Visibility flags driven by the profile owner's privacy settings. Only
   // applies when viewing someone else — your own profile always shows
@@ -210,7 +221,13 @@ export function PublicProfilePage() {
             <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-bg-soft/95 to-transparent" />
           </div>
         ) : (
-          <div className="h-16 bg-gradient-to-r from-accent/15 via-bg-soft/40 to-violet-500/10" />
+          <div
+            className="h-16"
+            style={{
+              background:
+                "linear-gradient(90deg, color-mix(in srgb, var(--profile-gradient-from, var(--color-accent)) 22%, transparent) 0%, color-mix(in srgb, var(--profile-gradient-via, var(--color-bg-soft)) 50%, transparent) 50%, color-mix(in srgb, var(--profile-gradient-to, #a855f7) 22%, transparent) 100%)",
+            }}
+          />
         )}
         <div className="flex items-center gap-5 p-6 pt-3">
         <div className="relative">
@@ -218,7 +235,11 @@ export function PublicProfilePage() {
             <img
               src={profile.avatarUrl}
               alt=""
-              className="size-20 rounded-2xl object-cover ring-2 ring-accent/40 shadow-[0_0_28px_var(--color-accent-glow)]"
+              className="size-20 rounded-2xl object-cover ring-2"
+              style={{
+                boxShadow: "0 0 28px color-mix(in srgb, var(--profile-accent, var(--color-accent)) 50%, transparent)",
+                ["--tw-ring-color" as string]: "color-mix(in srgb, var(--profile-accent, var(--color-accent)) 40%, transparent)",
+              } as React.CSSProperties}
             />
           ) : (
             <div className="grid size-20 place-items-center rounded-2xl bg-accent/15 font-display text-3xl text-accent ring-2 ring-accent/40">
@@ -475,6 +496,7 @@ function EditProfileModal({
 }) {
   const [bio, setBio] = useState(profile.bio ?? "");
   const [accentColor, setAccentColor] = useState(profile.accentColor ?? "");
+  const [profileTheme, setProfileTheme] = useState<ProfileThemeId>(profile.profileTheme ?? "default");
   const [bannerUrl, setBannerUrl] = useState(profile.bannerUrl ?? "");
   const [pinned, setPinned] = useState<string[]>(profile.pinnedModuleIds);
   const [privacy, setPrivacy] = useState<UserPrivacy>(profile.privacy);
@@ -517,6 +539,7 @@ function EditProfileModal({
       await saveProfileCustomization(profile.uid, {
         bio: bio.trim() ? bio.trim() : null,
         accentColor: accentColor || null,
+        profileTheme,
         bannerUrl: bannerUrl || null,
         pinnedModuleIds: pinned,
         privacy,
@@ -628,48 +651,66 @@ function EditProfileModal({
             <div className="mt-1 text-right text-[10px] text-fg-dim">{bio.length}/300</div>
           </Section>
 
-          {/* Accent color */}
-          <Section icon={Sparkles} title="Couleur d'accent perso">
-            <p className="mb-2 text-xs text-fg-muted">
-              Override la couleur cyan par défaut sur ta page profil. Vide = couleur du launcher.
+          {/* Profile theme presets */}
+          <Section icon={Sparkles} title="Thème de profil">
+            <p className="mb-3 text-xs text-fg-muted">
+              Choisis une ambiance de couleurs pour ton profil. Tes potes verront tout de suite ta touche perso.
             </p>
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={accentColor || "#00d4ff"}
-                onChange={(e) => setAccentColor(e.target.value)}
-                className="size-10 cursor-pointer rounded-lg border-0 bg-transparent"
-              />
-              <input
-                type="text"
-                value={accentColor}
-                onChange={(e) => setAccentColor(e.target.value)}
-                placeholder="#00d4ff"
-                className="no-drag flex-1 rounded-xl bg-bg-base/40 px-3 py-2 font-mono text-xs text-fg-primary ring-1 ring-white/[0.06] focus:outline-none focus:ring-1 focus:ring-accent/60"
-              />
-              {accentColor && (
-                <button
-                  type="button"
-                  onClick={() => setAccentColor("")}
-                  className="no-drag rounded-lg bg-white/[0.04] px-3 py-2 text-[10px] text-fg-muted hover:bg-white/[0.08]"
-                >
-                  Reset
-                </button>
-              )}
-              {/* Quick palette presets */}
-              <div className="flex items-center gap-1.5">
-                {["#00d4ff", "#f472b6", "#a78bfa", "#34d399", "#fbbf24"].map((c) => (
+            <div className="grid grid-cols-4 gap-2">
+              {PROFILE_THEME_LIST.map((t) => {
+                const active = profileTheme === t.id;
+                return (
                   <button
-                    key={c}
+                    key={t.id}
                     type="button"
-                    onClick={() => setAccentColor(c)}
-                    className="size-6 rounded-md ring-1 ring-white/10 hover:scale-110 transition-transform"
-                    style={{ backgroundColor: c }}
-                    title={c}
-                  />
-                ))}
-              </div>
+                    onClick={() => setProfileTheme(t.id)}
+                    title={t.label}
+                    className={
+                      "no-drag relative h-16 overflow-hidden rounded-xl ring-1 transition-all " +
+                      (active
+                        ? "ring-2 ring-accent shadow-[0_0_18px_var(--color-accent-soft)]"
+                        : "ring-white/10 hover:ring-white/30")
+                    }
+                    style={{
+                      background: `linear-gradient(135deg, ${t.gradientFrom} 0%, ${t.gradientVia} 50%, ${t.gradientTo} 100%)`,
+                    }}
+                  >
+                    <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-bg-base/80 px-1.5 py-1 text-center text-[10px] font-medium text-fg-primary backdrop-blur-sm">
+                      {t.label}
+                    </span>
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => setProfileTheme("custom")}
+                className={
+                  "no-drag relative flex h-16 items-center justify-center rounded-xl bg-bg-base/40 ring-1 transition-all " +
+                  (profileTheme === "custom"
+                    ? "ring-2 ring-accent shadow-[0_0_18px_var(--color-accent-soft)]"
+                    : "ring-white/10 hover:ring-white/30")
+                }
+              >
+                <span className="text-[10px] uppercase tracking-wider text-fg-muted">Custom</span>
+              </button>
             </div>
+            {profileTheme === "custom" && (
+              <div className="mt-3 flex items-center gap-2">
+                <input
+                  type="color"
+                  value={accentColor || "#00d4ff"}
+                  onChange={(e) => setAccentColor(e.target.value)}
+                  className="size-10 cursor-pointer rounded-lg border-0 bg-transparent"
+                />
+                <input
+                  type="text"
+                  value={accentColor}
+                  onChange={(e) => setAccentColor(e.target.value)}
+                  placeholder="#00d4ff"
+                  className="no-drag flex-1 rounded-xl bg-bg-base/40 px-3 py-2 font-mono text-xs text-fg-primary ring-1 ring-white/[0.06] focus:outline-none focus:ring-1 focus:ring-accent/60"
+                />
+              </div>
+            )}
           </Section>
 
           {/* Pinned games */}
