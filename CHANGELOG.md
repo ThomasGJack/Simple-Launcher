@@ -18,6 +18,14 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.04.29.6] - 2026-04-29  · semver `26.429.5`
+
+
+
+
+### Corrigé
+
+- **Logger : fix complet du flush vers Firestore**. Firestore rejetait les batches contenant `undefined` (ex. `metadata` pas fourni, ou champ optionnel undefined dans metadata) → tous les logs en attente échouaient en silence. Ajout d'un `stripUndefined` récursif qui nettoie chaque entrée avant `batch.set`. Les `null` sont préservés (valides côté Firestore). Les logs des amis et du launcher remontent enfin dans la console admin.
 ## [v26.04.29.5] - 2026-04-29  · semver `26.429.4`
 
 

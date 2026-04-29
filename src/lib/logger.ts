@@ -192,12 +192,17 @@ class Logger {
       const colRef = collection(fb.db, "logs");
       for (const entry of drained) {
         const ref = doc(colRef);
-        batch.set(ref, {
+        // Firestore rejects writes containing `undefined` anywhere in the
+        // payload. Strip recursively so optional fields like `source` and
+        // `metadata` (or undefined values inside metadata) don't blow up
+        // the entire batch.
+        const cleaned = stripUndefined({
           ...entry,
           // Server-side timestamp lets the admin panel sort consistently
           // even if user clocks are skewed. We still keep the client `ts`.
           serverTs: serverTimestamp(),
         });
+        batch.set(ref, cleaned as Record<string, unknown>);
       }
       await batch.commit();
       this.lastFlushedAt = Date.now();
@@ -225,6 +230,32 @@ class Logger {
 function truncate(s: string, max: number): string {
   if (s.length <= max) return s;
   return s.slice(0, max - 3) + "…";
+}
+
+/**
+ * Recursively removes `undefined` values from an object tree. Firestore
+ * rejects writes that contain `undefined` anywhere — even nested inside
+ * optional metadata. We replace them with absent keys (Firestore handles
+ * missing fields gracefully). `null` is preserved (it's a valid Firestore
+ * value, distinct from `undefined`).
+ *
+ * Returns the same shape as input, just with `undefined` keys filtered.
+ * Doesn't mutate the original.
+ */
+function stripUndefined<T>(value: T): T {
+  if (value === null) return value;
+  if (Array.isArray(value)) {
+    return value.map((v) => stripUndefined(v)) as unknown as T;
+  }
+  if (typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (v === undefined) continue;
+      out[k] = stripUndefined(v);
+    }
+    return out as T;
+  }
+  return value;
 }
 
 export const logger = new Logger();

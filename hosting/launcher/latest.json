@@ -1,12 +1,12 @@
 {
-  "version": "26.429.4",
-  "displayVersion": "v26.04.29.5",
-  "notes": "### Ajouté\n\n- **Bandeau « Amis en ligne » sur l'accueil** : pastille pulsante verte + 4 avatars + résumé d'activité (« Sarah joue à Glitch's Colony »). Cliquable, ouvre la page Communauté. Caché automatiquement quand personne n'est en ligne.\n- **Système News live** : nouvelle collection Firestore `/news` avec broadcast temps-réel. Chaque admin peut publier, modifier, épingler, masquer ou supprimer une news depuis la page Admin — les modifs apparaissent **instantanément** sur tous les launchers connectés sans relaunch (Firestore `onSnapshot`). Card hero sur l'accueil avec accent customisable, support markdown dans le corps, pin (badge ambré), drawer pour les news plus anciennes. HTML sanitizé via DOMPurify.",
-  "pub_date": "2026-04-29T19:46:00.192Z",
+  "version": "26.429.5",
+  "displayVersion": "v26.04.29.6",
+  "notes": "### Corrigé\n\n- **Logger : fix complet du flush vers Firestore**. Firestore rejetait les batches contenant `undefined` (ex. `metadata` pas fourni, ou champ optionnel undefined dans metadata) → tous les logs en attente échouaient en silence. Ajout d'un `stripUndefined` récursif qui nettoie chaque entrée avant `batch.set`. Les `null` sont préservés (valides côté Firestore). Les logs des amis et du launcher remontent enfin dans la console admin.",
+  "pub_date": "2026-04-29T19:51:54.983Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReExlbkZGc0Y5eEZCQVd6TThZcGxYdjIrTnZkcCtiQWlTVkpsdDZMeVcrNzBQVlluKzIwdVBkSTZIN1Uva3VsM1RTMU9teFJEMTRSMHV6aGhJZUFMcllibHBScFpKalE4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3NDkxOTYwCWZpbGU6U2ltcGxlIExhdW5jaGVyXzI2LjQyOS40X3g2NC1zZXR1cC5leGUKS3JkYzVxWnlXMGZRT2Q0dUZJWXJOQlJjbjA5bzR3Vm1NajdERnV3cjNHcjZSYk5PTGhFd3RKRWFrdXhQc3JZcWhHYkVMWERhbk5UVVNwRGY3cmRmRHc9PQo=",
-      "url": "https://simplelaunche.web.app/releases/26.429.4/Simple Launcher_26.429.4_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReExlbkZGc0Y5eEJxLzE1TmlNTHlwZE1IOW5lQzBSR3dzRlNaNGh2c0U1T0szeWhZN09BN2dYNzJrTTdDNDlmVnZlZEZZWU1YRlByb0NmbzhMc2pUVFdpUitHcUZ3SXc0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3NDkyMzE0CWZpbGU6U2ltcGxlIExhdW5jaGVyXzI2LjQyOS41X3g2NC1zZXR1cC5leGUKM2VydWFWWFgvUW9VUmdNMDdqdDB4S0FHKzlMa0lEakVEV2tDbHpjQnhGUFhGajNyQy84TW5UTDdveHhSVUN5Qnd2NSttYkFaVmhNckdKNnZORGx4RFE9PQo=",
+      "url": "https://simplelaunche.web.app/releases/26.429.5/Simple Launcher_26.429.5_x64-setup.exe"
     }
   }
 }
