@@ -399,7 +399,15 @@ function ChannelEditor({
   const [error, setError] = useState<string | null>(null);
 
   const handleSave = async () => {
-    const cleanName = name.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+    // Accept any UTF-8 letter/digit + accents + spaces + tirets/underscores.
+    // Strip only control chars (\p{C}) and the hash sign (already prefixed
+    // visually by the UI). Collapse runs of whitespace to a single space.
+    const cleanName = name
+      .normalize("NFC")
+      .replace(/[\p{C}#]+/gu, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 50);
     if (!cleanName) {
       setError("Le nom est requis");
       return;
@@ -439,8 +447,8 @@ function ChannelEditor({
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="nom-du-salon"
-          maxLength={32}
+          placeholder="Nom du salon (accents, tirets, etc. autorisés)"
+          maxLength={50}
           className="col-span-2 rounded-lg bg-bg-elevated px-3 py-1.5 text-sm ring-1 ring-white/[0.06] focus:outline-none focus:ring-accent/50"
         />
         <input

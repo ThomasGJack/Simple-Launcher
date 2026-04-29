@@ -1,12 +1,12 @@
 {
-  "version": "26.429.7",
-  "displayVersion": "v26.04.29.8",
-  "notes": "### Ajouté\n\n- **Sessions de jeu coordonnées** : nouvel onglet « Sessions » dans la sidebar. N'importe quel user peut créer une session (jeu + date + note), tes potes RSVPent en un clic (✅ Là / ❓ Peut-être / ❌ Pas dispo). Compteurs et avatars live, badge « Maintenant » + bouton Lancer quand l'heure est venue. Sessions passées affichées en compact en bas. Sub-collection `/sessions/{id}/rsvps/{uid}` avec rules par-utilisateur.\n- **Clans / Crews (Discord-like textuel)** : nouvel onglet « Clans » avec layout 3 colonnes (rail clans / rail salons / messages). L'admin crée les clans (nom, emblème emoji, couleur, ordre) et leurs salons textuels depuis le panel admin. Tous les users authentifiés peuvent envoyer des messages, regroupement par auteur si messages successifs sous 5 min. Architecture Firestore: `/crews/{id}/channels/{id}/messages/{id}`.\n- **Sondages dans les News** : option « Ajouter un sondage » dans l'éditeur de news admin (question + 2-6 options). Sur l'accueil, chaque news avec sondage affiche les options en boutons cliquables avec barre de progression live + pourcentage par option + total des votes. Toggle son vote en cliquant à nouveau. Sub-collection `/news/{id}/votes/{uid}`.",
-  "pub_date": "2026-04-29T20:33:25.167Z",
+  "version": "26.429.8",
+  "displayVersion": "v26.04.29.9",
+  "notes": "### Changé\n\n- **Noms de salons (Clans) en UTF-8 complet** : suppression de la sanitization agressive qui retirait les accents et caractères non-ASCII. Maintenant tu peux nommer tes salons « 🎮 jeux-récents », « café-discu », « événements », etc. — accents, espaces, tirets, emojis acceptés. Limite portée à 50 caractères. Seuls les caractères de contrôle et le `#` (déjà préfixé visuellement) sont strippés.",
+  "pub_date": "2026-04-29T20:42:22.208Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReExlbkZGc0Y5eEdQQzA4SWdwakxyTSsvenZkRUxHdXE0bStvRkZDSzN4dzFETHNGaGEyNEFBOGZGSk9VTUsrZFN2Z25GaHFRNm1yNGJlbUpOZmllVWk5YUhLTzNYOEFNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3NDk0ODA1CWZpbGU6U2ltcGxlIExhdW5jaGVyXzI2LjQyOS43X3g2NC1zZXR1cC5leGUKMGFFQjFjeGhBNFhLRVBuM25ZTU1acWZ5R2M2YzRrcmFaT3FvMmtYN3h6eHZ2YkE5dUZ6dTZuSVZxK3g3ek5oNE5MMElhTVBGczAxdkp4USttS1RkRGc9PQo=",
-      "url": "https://simplelaunche.web.app/releases/26.429.7/Simple Launcher_26.429.7_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReExlbkZGc0Y5eFAvQVhFc2ZLZk9HL3BuMlVyV1BXa3NmZXI0S0ptQkFhV0FrWnpQZjdQT1BsdGZxQVg1UU4zOUlxY25hcWZhUElNYmRHODhCaFdsNTJTSFVvY01TU2c0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3NDk1MzQyCWZpbGU6U2ltcGxlIExhdW5jaGVyXzI2LjQyOS44X3g2NC1zZXR1cC5leGUKcXRlZENlOTNrS2JBakFOQWllN1dMc05IODVLaWp2cEFKeG9UMnlxYzdpQ2Z0SlBSemczUFhzUVYrQ2MxVVMyZ1NjY3NXOU9FWGV4YkR5MG1La01pRGc9PQo=",
+      "url": "https://simplelaunche.web.app/releases/26.429.8/Simple Launcher_26.429.8_x64-setup.exe"
     }
   }
 }

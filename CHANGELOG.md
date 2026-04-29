@@ -18,6 +18,13 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.04.29.9] - 2026-04-29  · semver `26.429.8`
+
+
+
+### Changé
+
+- **Noms de salons (Clans) en UTF-8 complet** : suppression de la sanitization agressive qui retirait les accents et caractères non-ASCII. Maintenant tu peux nommer tes salons « 🎮 jeux-récents », « café-discu », « événements », etc. — accents, espaces, tirets, emojis acceptés. Limite portée à 50 caractères. Seuls les caractères de contrôle et le `#` (déjà préfixé visuellement) sont strippés.
 ## [v26.04.29.8] - 2026-04-29  · semver `26.429.7`
 
 
