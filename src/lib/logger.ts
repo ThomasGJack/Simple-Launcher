@@ -54,10 +54,32 @@ class Logger {
   private launcherVersion: string =
     (import.meta.env?.VITE_LAUNCHER_VERSION as string | undefined) ?? "dev";
   private flushing = false;
+  private lastFlushedAt: number | null = null;
+  private lastFlushError: string | null = null;
+  private totalShipped = 0;
 
-  private readonly FLUSH_INTERVAL_MS = 10_000;
-  private readonly MAX_BUFFER_SIZE = 50;
+  private readonly FLUSH_INTERVAL_MS = 5_000;
+  private readonly MAX_BUFFER_SIZE = 30;
   private readonly MAX_RETAINED = 500;
+
+  /** Diagnostics surface for the AdminLogsPage debug banner. */
+  diagnostics(): {
+    uid: string | null;
+    bufferSize: number;
+    lastFlushedAt: number | null;
+    lastFlushError: string | null;
+    totalShipped: number;
+    sessionId: string;
+  } {
+    return {
+      uid: this.uid,
+      bufferSize: this.buffer.length,
+      lastFlushedAt: this.lastFlushedAt,
+      lastFlushError: this.lastFlushError,
+      totalShipped: this.totalShipped,
+      sessionId: this.sessionId,
+    };
+  }
 
   /** Called after Discord auth completes — attaches identity to subsequent
    *  log entries and triggers a flush of any logs queued while anonymous. */
@@ -178,9 +200,14 @@ class Logger {
         });
       }
       await batch.commit();
+      this.lastFlushedAt = Date.now();
+      this.lastFlushError = null;
+      this.totalShipped += drained.length;
     } catch (err) {
       // Restore the failed batch at the head so order is preserved.
       this.buffer.unshift(...drained);
+      const msg = err instanceof Error ? err.message : String(err);
+      this.lastFlushError = msg;
       // Avoid recursive logging on a logger failure — just console.warn.
       console.warn("[logger] flush failed, will retry:", err);
     } finally {
@@ -253,6 +280,15 @@ export function installGlobalLoggerHandlers(): void {
     window.addEventListener("beforeunload", () => {
       logger.flushSync();
     });
+
+    // Tauri hides the window on close (system tray UX) instead of unloading,
+    // so beforeunload doesn't fire on close. Flush whenever the window
+    // becomes hidden — covers tray-hide AND tab-switch scenarios.
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) logger.flushSync();
+      });
+    }
   }
 
   // Patch console.error so explicit error logs also reach Firestore.

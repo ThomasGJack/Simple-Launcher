@@ -17,7 +17,7 @@ import { useAuthStore } from "@/store/auth";
 import { isAdmin } from "@/lib/admin";
 import { watchRecentLogs, type StoredLogEntry } from "@/firebase/logs";
 import { watchAllUsers, type UserPresence } from "@/firebase/presence";
-import type { LogLevel } from "@/lib/logger";
+import { logger, type LogLevel } from "@/lib/logger";
 import { cn } from "@/lib/cn";
 
 /**
@@ -34,9 +34,17 @@ export function AdminLogsPage() {
   const [filterUid, setFilterUid] = useState<string | null>(null);
   const [filterLevels, setFilterLevels] = useState<LogLevel[]>([]);
   const [maxEntries] = useState(200);
+  const [diag, setDiag] = useState(logger.diagnostics());
 
   useEffect(() => {
     return watchAllUsers(setUsers);
+  }, []);
+
+  // Refresh the logger diagnostics panel every second so the admin sees
+  // the buffer drain in (near) real time + any flush error surfaces fast.
+  useEffect(() => {
+    const t = setInterval(() => setDiag(logger.diagnostics()), 1000);
+    return () => clearInterval(t);
   }, []);
 
   useEffect(() => {
@@ -82,6 +90,8 @@ export function AdminLogsPage() {
           Live tail des actions, erreurs et bugs remontés par tous les launchers connectés. Stream temps-réel via Firestore.
         </p>
       </motion.div>
+
+      <DiagnosticsBanner diag={diag} logsCount={logs.length} />
 
       {/* Filters */}
       <motion.div
@@ -334,4 +344,102 @@ function safeJson(v: unknown): string {
   } catch {
     return String(v);
   }
+}
+
+// ---------------------------------------------------------------------------
+//                            DIAGNOSTICS BANNER
+// ---------------------------------------------------------------------------
+
+/**
+ * Live diagnostics for the local logger. Shows what's in the buffer, when
+ * the last flush happened, the cumulative count of shipped entries, and
+ * any flush error (Firestore rules denial, network, …). When something is
+ * wrong, this surfaces it instead of silently saying "no logs".
+ */
+function DiagnosticsBanner({
+  diag,
+  logsCount,
+}: {
+  diag: ReturnType<typeof logger.diagnostics>;
+  logsCount: number;
+}) {
+  const hasError = !!diag.lastFlushError;
+  const noShipped = diag.totalShipped === 0;
+  const tone = hasError ? "danger" : noShipped ? "amber" : "ok";
+
+  const fmt = (ts: number | null) => {
+    if (!ts) return "—";
+    const ago = Math.round((Date.now() - ts) / 1000);
+    if (ago < 60) return `il y a ${ago}s`;
+    return `il y a ${Math.round(ago / 60)} min`;
+  };
+
+  return (
+    <div
+      className={cn(
+        "mb-5 rounded-2xl glass p-4 ring-1",
+        tone === "danger" && "ring-danger/40",
+        tone === "amber" && "ring-amber-500/30",
+        tone === "ok" && "ring-emerald-500/20",
+      )}
+    >
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2 text-xs uppercase tracking-wider">
+          <span
+            className={cn(
+              "inline-block size-2 rounded-full",
+              tone === "danger" && "bg-danger animate-pulse",
+              tone === "amber" && "bg-amber-400 animate-pulse",
+              tone === "ok" && "bg-emerald-400",
+            )}
+          />
+          <span className="text-fg-muted">Logger local</span>
+        </div>
+        <DiagPill label="UID" value={diag.uid ? diag.uid.replace("discord_", "…") : "anon"} />
+        <DiagPill label="Buffer" value={String(diag.bufferSize)} />
+        <DiagPill label="Envoyés" value={String(diag.totalShipped)} />
+        <DiagPill label="Dernier flush" value={fmt(diag.lastFlushedAt)} />
+        <DiagPill label="Logs en vue" value={String(logsCount)} />
+        <button
+          type="button"
+          onClick={() => void logger.flush()}
+          className="ml-auto inline-flex items-center gap-1 rounded-lg bg-accent/15 px-3 py-1.5 text-xs text-accent ring-1 ring-accent/30 hover:bg-accent/25"
+        >
+          <RefreshCw className="size-3" /> Flush maintenant
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            logger.action("Test diagnostic admin", {
+              source: "AdminLogsPage.test",
+              metadata: { ts: Date.now() },
+            });
+            void logger.flush();
+          }}
+          className="inline-flex items-center gap-1 rounded-lg bg-bg-elevated px-3 py-1.5 text-xs ring-1 ring-white/[0.06] hover:bg-bg-base"
+        >
+          + Test entry
+        </button>
+      </div>
+      {hasError && (
+        <div className="mt-3 rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger ring-1 ring-danger/30">
+          <strong>Dernier flush en erreur :</strong> {diag.lastFlushError}
+        </div>
+      )}
+      {!hasError && noShipped && diag.bufferSize > 0 && (
+        <div className="mt-3 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-300 ring-1 ring-amber-500/30">
+          {diag.bufferSize} entrée(s) en attente — clique « Flush maintenant » pour forcer l'envoi.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DiagPill({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="inline-flex items-center gap-1.5 rounded-md bg-bg-base/40 px-2.5 py-1 text-[10px] uppercase tracking-wider ring-1 ring-white/[0.06]">
+      <span className="text-fg-dim">{label}</span>
+      <span className="font-mono text-fg-primary normal-case tracking-normal">{value}</span>
+    </div>
+  );
 }

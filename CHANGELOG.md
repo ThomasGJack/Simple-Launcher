@@ -18,6 +18,16 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.04.29.2] - 2026-04-29  · semver `26.429.1`
+
+
+### Ajouté
+
+- **Banner de diagnostic du logger** sur la page Admin → Logs : affiche en temps réel l'UID lié, la taille du buffer, le total envoyé, l'heure du dernier flush et toute erreur. Boutons « Flush maintenant » et « Test entry » pour vérifier que les writes Firestore passent. Plus de "no logs" silencieux quand un flush échoue.
+
+### Changé
+
+- **Logger** : intervalle de flush passé de 10 s à 5 s, taille de batch de 50 à 30, et flush automatique au `visibilitychange` (couvre le tray-hide Tauri en plus du `beforeunload`). Les logs des amis remontent plus vite.
 ## [v26.04.29] - 2026-04-29  · semver `26.429.0`
 
 
