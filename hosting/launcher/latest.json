@@ -1,12 +1,12 @@
 {
-  "version": "26.429.5",
-  "displayVersion": "v26.04.29.6",
-  "notes": "### Corrigé\n\n- **Logger : fix complet du flush vers Firestore**. Firestore rejetait les batches contenant `undefined` (ex. `metadata` pas fourni, ou champ optionnel undefined dans metadata) → tous les logs en attente échouaient en silence. Ajout d'un `stripUndefined` récursif qui nettoie chaque entrée avant `batch.set`. Les `null` sont préservés (valides côté Firestore). Les logs des amis et du launcher remontent enfin dans la console admin.",
-  "pub_date": "2026-04-29T19:51:54.983Z",
+  "version": "26.429.6",
+  "displayVersion": "v26.04.29.7",
+  "notes": "### Ajouté\n\n- **Réactions emoji sur les News** : sous chaque news de l'accueil, 4 emojis de réaction (❤️ 🔥 👍 🎉) avec compteurs live + tooltip listant qui a réagi. Toggle au clic, propage instantanément via Firestore onSnapshot. Sub-collection `/news/{id}/reactions/{uid}` avec rules par-utilisateur.\n- **Live activity toast Steam-like** : quand un ami passe en ligne ou lance un jeu, mini-toast en bas-droite avec son avatar + indicateur (vert WiFi pour online, accent Play pour gaming). Auto-dismiss en 5,5 s, dismissable manuellement, click → ouvre le profil. Throttled à 1 toast par ami par 30 s pour éviter le spam. Skip le snapshot initial pour ne pas annoncer toute la communauté au boot. Honore privacy.showActivity.\n- **Profil public web partageable** : page `simplelaunche.web.app/u/{discordId}` qui rend une carte de visite read-only du joueur (avatar, bannière, bio, thème) + un gros bouton \"Télécharger pour Windows\". Vanilla HTML/CSS, lit Firestore directement via le SDK web. Bouton \"Partager mon profil\" dans la page profil du launcher qui copie l'URL en un clic.\n\n### Changé\n\n- **Rules Firestore** : `users/{uid}` passe en lecture publique (sans auth) pour permettre le rendu de la page web profil. Les sous-collections sensibles (playtime, shortcuts, etc.) restent privées.",
+  "pub_date": "2026-04-29T20:12:00.805Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReExlbkZGc0Y5eEJxLzE1TmlNTHlwZE1IOW5lQzBSR3dzRlNaNGh2c0U1T0szeWhZN09BN2dYNzJrTTdDNDlmVnZlZEZZWU1YRlByb0NmbzhMc2pUVFdpUitHcUZ3SXc0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3NDkyMzE0CWZpbGU6U2ltcGxlIExhdW5jaGVyXzI2LjQyOS41X3g2NC1zZXR1cC5leGUKM2VydWFWWFgvUW9VUmdNMDdqdDB4S0FHKzlMa0lEakVEV2tDbHpjQnhGUFhGajNyQy84TW5UTDdveHhSVUN5Qnd2NSttYkFaVmhNckdKNnZORGx4RFE9PQo=",
-      "url": "https://simplelaunche.web.app/releases/26.429.5/Simple Launcher_26.429.5_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReExlbkZGc0Y5eEVJMjM1a1hKOCtTbVBHSnFkMEQ5TGd1dHIvUlRqeTd4cWxUUEtIQmZLdE43aHB5THRmUVRhVUp6Vk5Zc2FTSFl4L2k0ZGdHbkJOdVV5VHB2c09LaXdvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3NDkzNTIwCWZpbGU6U2ltcGxlIExhdW5jaGVyXzI2LjQyOS42X3g2NC1zZXR1cC5leGUKdlNqVzVISUl4YWVQdi8wUWhVZGxxWTJBRmFabURTQU1mUmRhY2s4Zm43Ym9wVEZ5WjZHZ0FieWRpRTdONzFjdEppSHRZN1Y2VWtTdDAxNmlCZHlkREE9PQo=",
+      "url": "https://simplelaunche.web.app/releases/26.429.6/Simple Launcher_26.429.6_x64-setup.exe"
     }
   }
 }

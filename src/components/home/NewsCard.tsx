@@ -1,9 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Megaphone, Pin, ChevronRight } from "lucide-react";
 import { watchNews, type News } from "@/firebase/news";
+import {
+  REACTION_EMOJIS,
+  toggleReaction,
+  watchReactions,
+  type NewsReaction,
+} from "@/firebase/newsReactions";
+import { useAuthStore } from "@/store/auth";
 import { sanitizeHtml } from "@/lib/sanitizeHtml";
+import { sounds } from "@/lib/sounds";
 import { marked } from "marked";
+import { cn } from "@/lib/cn";
 
 /**
  * Live newsfeed card on the home page. Displays the top item (pinned first,
@@ -139,6 +148,7 @@ function NewsItem({
           {item.authorName && !compact && (
             <div className="mt-2 text-[10px] text-fg-dim">— {item.authorName}</div>
           )}
+          {!compact && <ReactionsRow newsId={item.id} />}
         </div>
       </div>
       {showMore && onToggle && !compact && (
@@ -152,6 +162,83 @@ function NewsItem({
         </button>
       )}
     </motion.div>
+  );
+}
+
+function ReactionsRow({ newsId }: { newsId: string }) {
+  const me = useAuthStore((s) => s.user);
+  const [reactions, setReactions] = useState<NewsReaction[]>([]);
+
+  useEffect(() => watchReactions(newsId, setReactions), [newsId]);
+
+  const myEmojis = useMemo(
+    () => reactions.find((r) => r.uid === me?.uid)?.emojis ?? [],
+    [reactions, me?.uid],
+  );
+
+  const counts = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const r of reactions) {
+      for (const e of r.emojis) {
+        m[e] = (m[e] ?? 0) + 1;
+      }
+    }
+    return m;
+  }, [reactions]);
+
+  const tooltipFor = (emoji: string): string => {
+    const names = reactions
+      .filter((r) => r.emojis.includes(emoji))
+      .map((r) => r.userName ?? "Anonyme")
+      .slice(0, 8);
+    if (names.length === 0) return "";
+    if (names.length === 1) return names[0];
+    return `${names.slice(0, -1).join(", ")} et ${names[names.length - 1]}`;
+  };
+
+  const handleClick = async (emoji: string) => {
+    if (!me) return;
+    sounds.click();
+    try {
+      await toggleReaction(
+        newsId,
+        me.uid,
+        emoji,
+        myEmojis,
+        me.displayName ?? null,
+        me.photoURL ?? null,
+      );
+    } catch (err) {
+      console.warn("[reactions] toggle failed:", err);
+    }
+  };
+
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-1.5">
+      {REACTION_EMOJIS.map((emoji) => {
+        const count = counts[emoji] ?? 0;
+        const active = myEmojis.includes(emoji);
+        return (
+          <motion.button
+            key={emoji}
+            type="button"
+            onClick={() => handleClick(emoji)}
+            whileTap={{ scale: 0.85 }}
+            whileHover={{ scale: 1.08 }}
+            title={tooltipFor(emoji)}
+            className={cn(
+              "no-drag inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs ring-1 transition-all",
+              active
+                ? "bg-accent/15 text-fg-primary ring-accent/40 shadow-[0_0_12px_var(--color-accent-soft)]"
+                : "bg-bg-base/40 text-fg-muted ring-white/[0.06] hover:bg-bg-base/60 hover:ring-white/15",
+            )}
+          >
+            <span className="text-sm leading-none">{emoji}</span>
+            {count > 0 && <span className="font-mono tabular-nums">{count}</span>}
+          </motion.button>
+        );
+      })}
+    </div>
   );
 }
 

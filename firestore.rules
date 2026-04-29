@@ -8,10 +8,11 @@ service cloud.firestore {
         request.auth.uid in ['discord_306118713537462273'];
     }
 
-    // Users — any authed user can read public profiles (community page),
-    // only the owner can write.
+    // Users — public profile read so the shareable web profile page
+    // (simplelaunche.web.app/u/{discordId}) can render without auth.
+    // Sensitive sub-collections below stay locked down.
     match /users/{uid} {
-      allow read: if request.auth != null;
+      allow read: if true;
       allow write: if request.auth != null && request.auth.uid == uid;
 
       // Playtime per module — private to the owner
@@ -40,6 +41,14 @@ service cloud.firestore {
     match /news/{newsId} {
       allow read: if request.auth != null;
       allow write: if isAdmin();
+
+      // Emoji reactions — every authed user can write their own doc;
+      // they can't impersonate someone else (path uid must match auth).
+      match /reactions/{uid} {
+        allow read: if request.auth != null;
+        allow create, update, delete:
+          if request.auth != null && request.auth.uid == uid;
+      }
     }
 
     // Modules: any authenticated user can read; admins can write.

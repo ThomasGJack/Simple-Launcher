@@ -18,6 +18,7 @@ import { watchAchievements, recordUnlock } from "@/firebase/achievements";
 import { ACHIEVEMENTS, isUnlocked, type AchievementContext } from "@/lib/achievements";
 import { pushAchievementToast, AchievementUnlockToastHost } from "@/components/achievements/AchievementUnlockToast";
 import { InvitationPopupHost } from "@/components/invitations/InvitationPopup";
+import { LiveActivityToastHost } from "@/components/presence/LiveActivityToastHost";
 import type { Conversation as ConversationT } from "@/types/messaging";
 import type { LauncherModule } from "@/types/module";
 import type { ModuleExitEvent, ModuleLaunchEvent } from "@/lib/modules";
@@ -288,6 +289,7 @@ function App() {
       <AppShell />
       <AchievementUnlockToastHost />
       <InvitationPopupHost />
+      <LiveActivityToastHost />
     </>
   );
 }

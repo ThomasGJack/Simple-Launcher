@@ -18,6 +18,18 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.04.29.7] - 2026-04-29  · semver `26.429.6`
+
+
+### Ajouté
+
+- **Réactions emoji sur les News** : sous chaque news de l'accueil, 4 emojis de réaction (❤️ 🔥 👍 🎉) avec compteurs live + tooltip listant qui a réagi. Toggle au clic, propage instantanément via Firestore onSnapshot. Sub-collection `/news/{id}/reactions/{uid}` avec rules par-utilisateur.
+- **Live activity toast Steam-like** : quand un ami passe en ligne ou lance un jeu, mini-toast en bas-droite avec son avatar + indicateur (vert WiFi pour online, accent Play pour gaming). Auto-dismiss en 5,5 s, dismissable manuellement, click → ouvre le profil. Throttled à 1 toast par ami par 30 s pour éviter le spam. Skip le snapshot initial pour ne pas annoncer toute la communauté au boot. Honore privacy.showActivity.
+- **Profil public web partageable** : page `simplelaunche.web.app/u/{discordId}` qui rend une carte de visite read-only du joueur (avatar, bannière, bio, thème) + un gros bouton "Télécharger pour Windows". Vanilla HTML/CSS, lit Firestore directement via le SDK web. Bouton "Partager mon profil" dans la page profil du launcher qui copie l'URL en un clic.
+
+### Changé
+
+- **Rules Firestore** : `users/{uid}` passe en lecture publique (sans auth) pour permettre le rendu de la page web profil. Les sous-collections sensibles (playtime, shortcuts, etc.) restent privées.
 ## [v26.04.29.6] - 2026-04-29  · semver `26.429.5`
 
 

@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#07090d" />
+  <title>Simple Launcher — Profil</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Audiowide&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-base: #07090d;
+      --bg-soft: #0d1117;
+      --bg-elev: #141a23;
+      --fg-primary: #e6edf3;
+      --fg-muted: #8b949e;
+      --fg-dim: #6e7681;
+      --accent: #00d4ff;
+      --accent-glow: rgba(0, 212, 255, 0.5);
+      --accent-soft: rgba(0, 212, 255, 0.2);
+      --grad-from: var(--accent);
+      --grad-via: var(--bg-elev);
+      --grad-to: #a855f7;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      background: var(--bg-base);
+      color: var(--fg-primary);
+      font-family: "Inter", system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    body {
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 20% 10%, rgba(0,212,255,0.08), transparent 40%),
+        radial-gradient(circle at 80% 90%, rgba(168,85,247,0.08), transparent 40%),
+        var(--bg-base);
+    }
+    .display { font-family: "Audiowide", "Orbitron", "Inter", sans-serif; }
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 48px 24px 80px;
+    }
+    .glass {
+      background: rgba(13, 17, 23, 0.6);
+      backdrop-filter: blur(18px) saturate(140%);
+      -webkit-backdrop-filter: blur(18px) saturate(140%);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .header {
+      border-radius: 28px;
+      overflow: hidden;
+    }
+    .banner {
+      height: 140px;
+      background:
+        linear-gradient(135deg,
+          color-mix(in srgb, var(--grad-from) 30%, transparent) 0%,
+          color-mix(in srgb, var(--grad-via) 50%, transparent) 50%,
+          color-mix(in srgb, var(--grad-to) 30%, transparent) 100%);
+      position: relative;
+    }
+    .banner.image {
+      background-size: cover;
+      background-position: center;
+    }
+    .banner::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, transparent 40%, rgba(13,17,23,0.85) 100%);
+    }
+    .ident {
+      position: relative;
+      padding: 0 28px 28px;
+      margin-top: -48px;
+      display: flex;
+      gap: 16px;
+      align-items: flex-end;
+    }
+    .avatar {
+      width: 96px;
+      height: 96px;
+      border-radius: 24px;
+      object-fit: cover;
+      box-shadow: 0 0 28px var(--accent-glow);
+      border: 2px solid color-mix(in srgb, var(--accent) 40%, transparent);
+      background: var(--bg-elev);
+    }
+    .avatar.fallback {
+      display: grid;
+      place-items: center;
+      font-family: "Audiowide", sans-serif;
+      font-size: 40px;
+      color: var(--accent);
+    }
+    .name-block { flex: 1; min-width: 0; padding-bottom: 6px; }
+    .display-name {
+      font-size: 28px;
+      line-height: 1.1;
+      color: var(--fg-primary);
+      text-shadow: 0 2px 12px rgba(0,0,0,0.5);
+    }
+    .username {
+      font-size: 13px;
+      color: var(--fg-muted);
+      margin-top: 4px;
+    }
+    .body {
+      padding: 24px 28px 28px;
+      border-top: 1px solid rgba(255,255,255,0.04);
+    }
+    .bio {
+      font-size: 15px;
+      color: var(--fg-muted);
+      line-height: 1.55;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    .bio.empty {
+      font-style: italic;
+      color: var(--fg-dim);
+    }
+    .badges {
+      margin-top: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    }
+    .cta {
+      margin-top: 28px;
+      padding: 24px;
+      border-radius: 24px;
+      text-align: center;
+      background:
+        linear-gradient(135deg,
+          color-mix(in srgb, var(--accent) 15%, transparent),
+          color-mix(in srgb, #a855f7 15%, transparent));
+      border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    }
+    .cta h2 {
+      font-family: "Audiowide", sans-serif;
+      font-size: 22px;
+      margin-bottom: 6px;
+    }
+    .cta p {
+      font-size: 13px;
+      color: var(--fg-muted);
+      margin-bottom: 18px;
+    }
+    .download-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 28px;
+      border-radius: 16px;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      text-decoration: none;
+      color: var(--bg-base);
+      background: var(--accent);
+      box-shadow: 0 0 28px var(--accent-glow);
+      transition: transform 0.18s ease, box-shadow 0.18s ease;
+    }
+    .download-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 40px var(--accent-glow);
+    }
+    .footer {
+      margin-top: 28px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--fg-dim);
+    }
+    .footer a { color: var(--fg-muted); text-decoration: none; }
+    .footer a:hover { color: var(--accent); }
+    .loading {
+      display: grid;
+      place-items: center;
+      min-height: 60vh;
+      color: var(--fg-muted);
+      font-size: 14px;
+    }
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 2px solid rgba(255,255,255,0.08);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .error {
+      text-align: center;
+      padding: 48px 24px;
+    }
+    .error h1 {
+      font-family: "Audiowide", sans-serif;
+      font-size: 24px;
+      margin-bottom: 8px;
+      color: var(--fg-primary);
+    }
+    .error p { color: var(--fg-muted); font-size: 14px; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .reveal { animation: fadeUp 0.5s ease both; }
+  </style>
+</head>
+<body>
+  <div class="container" id="root">
+    <div class="loading">
+      <div class="spinner"></div>
+      Chargement du profil…
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+    import {
+      getFirestore,
+      doc,
+      getDoc,
+    } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBaAu1eNRtZfYdTuyG0jGpSjqvK873yL9A",
+      authDomain: "simplelaunche.firebaseapp.com",
+      projectId: "simplelaunche",
+      storageBucket: "simplelaunche.firebasestorage.app",
+      messagingSenderId: "705755854966",
+      appId: "1:705755854966:web:582a6b94ef774e4334c757",
+    };
+
+    const PROFILE_THEMES = {
+      default: { from: "#00d4ff", via: "#1a3554", to: "#a855f7", accent: "#00d4ff" },
+      aurora:  { from: "#ff4d6d", via: "#3b1f3f", to: "#9333ea", accent: "#ff4d6d" },
+      sunset:  { from: "#ef4444", via: "#1e293b", to: "#3b82f6", accent: "#ef4444" },
+      forest:  { from: "#22c55e", via: "#1f2937", to: "#facc15", accent: "#22c55e" },
+      peach:   { from: "#fb923c", via: "#3b2530", to: "#f472b6", accent: "#fb923c" },
+      lagoon:  { from: "#06b6d4", via: "#0d3a3a", to: "#5eead4", accent: "#06b6d4" },
+      nebula:  { from: "#a855f7", via: "#2e1b3a", to: "#ec4899", accent: "#a855f7" },
+      ember:   { from: "#f59e0b", via: "#3a1f1f", to: "#dc2626", accent: "#f59e0b" },
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    function escapeHtml(s) {
+      if (typeof s !== "string") return "";
+      return s
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function getDiscordIdFromPath() {
+      const m = window.location.pathname.match(/^\/u\/([^/?#]+)/);
+      return m ? decodeURIComponent(m[1]) : null;
+    }
+
+    function applyTheme(profile) {
+      const tid = profile.profileTheme;
+      const preset = tid && PROFILE_THEMES[tid];
+      if (preset) {
+        document.documentElement.style.setProperty("--accent", preset.accent);
+        document.documentElement.style.setProperty("--accent-glow", `${preset.accent}80`);
+        document.documentElement.style.setProperty("--accent-soft", `${preset.accent}33`);
+        document.documentElement.style.setProperty("--grad-from", preset.from);
+        document.documentElement.style.setProperty("--grad-via", preset.via);
+        document.documentElement.style.setProperty("--grad-to", preset.to);
+      } else if (typeof profile.accentColor === "string" && profile.accentColor) {
+        const c = profile.accentColor;
+        document.documentElement.style.setProperty("--accent", c);
+        document.documentElement.style.setProperty("--accent-glow", `${c}80`);
+        document.documentElement.style.setProperty("--accent-soft", `${c}33`);
+      }
+    }
+
+    function renderProfile(profile) {
+      applyTheme(profile);
+
+      const root = document.getElementById("root");
+      const initial = (profile.displayName || "?").trim().charAt(0).toUpperCase();
+      const avatar = profile.avatarUrl
+        ? `<img class="avatar" src="${escapeHtml(profile.avatarUrl)}" alt="" referrerpolicy="no-referrer" />`
+        : `<div class="avatar fallback">${escapeHtml(initial)}</div>`;
+      const banner = profile.bannerUrl
+        ? `<div class="banner image" style="background-image:url('${escapeHtml(profile.bannerUrl)}')"></div>`
+        : `<div class="banner"></div>`;
+      const bio = profile.bio
+        ? `<div class="bio">${escapeHtml(profile.bio)}</div>`
+        : `<div class="bio empty">Pas encore de bio.</div>`;
+
+      root.innerHTML = `
+        <div class="header glass reveal">
+          ${banner}
+          <div class="ident">
+            ${avatar}
+            <div class="name-block">
+              <div class="display display-name">${escapeHtml(profile.displayName || "Joueur anonyme")}</div>
+              ${profile.username ? `<div class="username">@${escapeHtml(profile.username)}</div>` : ""}
+            </div>
+          </div>
+          <div class="body">
+            ${bio}
+            <div class="badges">
+              <span class="badge">Simple Launcher</span>
+              ${profile.profileTheme && profile.profileTheme !== "default" && profile.profileTheme !== "custom"
+                ? `<span class="badge">Thème ${escapeHtml(profile.profileTheme)}</span>`
+                : ""}
+            </div>
+          </div>
+        </div>
+
+        <div class="cta reveal" style="animation-delay: 0.15s">
+          <h2>Rejoins le launcher</h2>
+          <p>Télécharge Simple Launcher et joue avec ${escapeHtml(profile.displayName || "ce joueur")}.</p>
+          <a class="download-btn" href="/download/SimpleLauncher-Setup.exe" download>
+            ⬇ Télécharger pour Windows
+          </a>
+        </div>
+
+        <div class="footer">
+          <a href="https://simplelaunche.web.app">simplelaunche.web.app</a>
+          · Profil partageable de
+          <strong>${escapeHtml(profile.displayName || "Anonyme")}</strong>
+        </div>
+      `;
+
+      document.title = `${profile.displayName || "Profil"} — Simple Launcher`;
+    }
+
+    function renderError(title, message) {
+      document.getElementById("root").innerHTML = `
+        <div class="header glass error">
+          <h1>${escapeHtml(title)}</h1>
+          <p>${escapeHtml(message)}</p>
+          <p style="margin-top:24px">
+            <a class="download-btn" href="https://simplelaunche.web.app">Page d'accueil</a>
+          </p>
+        </div>
+      `;
+    }
+
+    async function main() {
+      const id = getDiscordIdFromPath();
+      if (!id) {
+        renderError("Profil introuvable", "L'URL n'est pas valide. Format attendu: /u/{discordId}");
+        return;
+      }
+      // Auth uid format = discord_{discordId}
+      const uid = id.startsWith("discord_") ? id : `discord_${id}`;
+      try {
+        const snap = await getDoc(doc(db, "users", uid));
+        if (!snap.exists()) {
+          renderError("Joueur introuvable", "Ce profil n'existe pas (encore).");
+          return;
+        }
+        const data = snap.data();
+        renderProfile(data);
+      } catch (err) {
+        console.error(err);
+        renderError("Oups", "Impossible de charger ce profil pour le moment.");
+      }
+    }
+
+    main();
+  </script>
+</body>
+</html>

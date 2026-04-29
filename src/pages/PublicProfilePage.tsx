@@ -279,6 +279,7 @@ export function PublicProfilePage() {
         </div>
         {isMe ? (
           <div className="flex items-center gap-2">
+            <ShareProfileButton discordId={profile.discordId} />
             <button
               onClick={() => {
                 sounds.click();
@@ -979,5 +980,85 @@ function InviteToPlayButton({
         </motion.div>
       )}
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+//                           SHARE PROFILE BUTTON
+// ---------------------------------------------------------------------------
+
+/**
+ * Copies the public web profile URL (simplelaunche.web.app/u/{discordId})
+ * to the clipboard. Falls back gracefully when clipboard API is denied or
+ * the discordId is missing.
+ */
+function ShareProfileButton({ discordId }: { discordId: string | null }) {
+  const [copied, setCopied] = useState(false);
+  if (!discordId) return null;
+  const url = `https://simplelaunche.web.app/u/${discordId}`;
+
+  const handle = async () => {
+    sounds.click();
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      sounds.success();
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.warn("[share] clipboard failed:", err);
+      // Fallback: select the text in a hidden textarea
+      const ta = document.createElement("textarea");
+      ta.value = url;
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand("copy");
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch {
+        /* give up */
+      }
+      document.body.removeChild(ta);
+    }
+  };
+
+  return (
+    <button
+      onClick={handle}
+      title={url}
+      className="no-drag inline-flex items-center gap-2 rounded-xl bg-white/[0.04] px-4 py-2.5 text-sm text-fg-primary ring-1 ring-white/[0.06] hover:bg-white/[0.08] transition-colors"
+    >
+      {copied ? (
+        <>
+          <CheckIcon className="size-4 text-emerald-400" />
+          Lien copié !
+        </>
+      ) : (
+        <>
+          <ShareIcon className="size-4" />
+          Partager mon profil
+        </>
+      )}
+    </button>
+  );
+}
+
+function ShareIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <circle cx="18" cy="5" r="3" />
+      <circle cx="6" cy="12" r="3" />
+      <circle cx="18" cy="19" r="3" />
+      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+    </svg>
+  );
+}
+
+function CheckIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
   );
 }

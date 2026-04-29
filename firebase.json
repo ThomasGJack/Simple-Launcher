@@ -17,6 +17,12 @@
   "hosting": {
     "public": "hosting",
     "ignore": ["**/.*"],
+    "rewrites": [
+      {
+        "source": "/u/**",
+        "destination": "/u/index.html"
+      }
+    ],
     "headers": [
       {
         "source": "**/*.json",
