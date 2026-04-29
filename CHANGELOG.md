@@ -18,6 +18,13 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.04.29.3] - 2026-04-29  · semver `26.429.2`
+
+
+### Ajouté
+
+- **Auto-installation des mises à jour au démarrage** : si une nouvelle version est détectée dans les 30 s qui suivent le boot du launcher, elle se télécharge et s'installe automatiquement (banner de progression seulement, plus de popup à valider). Les détections en cours de session continuent d'afficher la modal d'invitation pour ne pas redémarrer pendant qu'on joue.
+- **Modal post-update** : au premier lancement après une auto-install, un popup vert affiche le changelog de la version qu'on vient d'installer (sans bouton « Mettre à jour » puisque c'est déjà fait). Le changelog est mis en cache local juste avant le download pour qu'il soit dispo après relaunch.
 ## [v26.04.29.2] - 2026-04-29  · semver `26.429.1`
 
 

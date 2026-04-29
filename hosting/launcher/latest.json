@@ -1,12 +1,12 @@
 {
-  "version": "26.429.1",
-  "displayVersion": "v26.04.29.2",
-  "notes": "### Ajouté\n\n- **Banner de diagnostic du logger** sur la page Admin → Logs : affiche en temps réel l'UID lié, la taille du buffer, le total envoyé, l'heure du dernier flush et toute erreur. Boutons « Flush maintenant » et « Test entry » pour vérifier que les writes Firestore passent. Plus de \"no logs\" silencieux quand un flush échoue.\n\n### Changé\n\n- **Logger** : intervalle de flush passé de 10 s à 5 s, taille de batch de 50 à 30, et flush automatique au `visibilitychange` (couvre le tray-hide Tauri en plus du `beforeunload`). Les logs des amis remontent plus vite.",
-  "pub_date": "2026-04-29T16:35:02.009Z",
+  "version": "26.429.2",
+  "displayVersion": "v26.04.29.3",
+  "notes": "### Ajouté\n\n- **Auto-installation des mises à jour au démarrage** : si une nouvelle version est détectée dans les 30 s qui suivent le boot du launcher, elle se télécharge et s'installe automatiquement (banner de progression seulement, plus de popup à valider). Les détections en cours de session continuent d'afficher la modal d'invitation pour ne pas redémarrer pendant qu'on joue.\n- **Modal post-update** : au premier lancement après une auto-install, un popup vert affiche le changelog de la version qu'on vient d'installer (sans bouton « Mettre à jour » puisque c'est déjà fait). Le changelog est mis en cache local juste avant le download pour qu'il soit dispo après relaunch.",
+  "pub_date": "2026-04-29T19:08:03.400Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReExlbkZGc0Y5eE5KVVpUaU1pZmR2ZDBBdkU3VnBwUFZxL2NMR05DSzA2Zmp4OU9qRXpCMjRCN2lyZ3RGRm5nclA4eVdoTTRqS0NaenR6UFozc09OWXFFM0JlSnlSRFF3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3NDgwNTAxCWZpbGU6U2ltcGxlIExhdW5jaGVyXzI2LjQyOS4xX3g2NC1zZXR1cC5leGUKZ1NydlBvYmF1L0luVVBjbngyYjNMcjgrN29zRGo4WkUwUXFFVkViWTR6QnJtVm9MMmsxYy9XL2FnNlYwUFpOeTJwSUdUM3FrTUJDbmw2VFlqbXRhRHc9PQo=",
-      "url": "https://simplelaunche.web.app/releases/26.429.1/Simple Launcher_26.429.1_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReExlbkZGc0Y5eENjSmFYZGVlazNFSmp4czcwZmtpMUdQR1Q1L2U2VlpXaGY4TEg0c3RtVDdTRlhiTVgrTVdPbXRXZG9VTXB3Wi84dFMreFd0T0liTU84MlhMK2ZoZGdjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc3NDg5NjgzCWZpbGU6U2ltcGxlIExhdW5jaGVyXzI2LjQyOS4yX3g2NC1zZXR1cC5leGUKQTlYaDJ4L0QxSVFXWXI1a3JlWnVYczIzT2xTUHJwWXBFYU5mdjVUNkI5NE9mRDc2dDVjRUtGbmYzU2srQjlPaElHOUpId05EZkk2NG1zSVJEcnpKQ2c9PQo=",
+      "url": "https://simplelaunche.web.app/releases/26.429.2/Simple Launcher_26.429.2_x64-setup.exe"
     }
   }
 }
