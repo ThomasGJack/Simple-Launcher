@@ -18,6 +18,14 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.04.29.8] - 2026-04-29  · semver `26.429.7`
+
+
+### Ajouté
+
+- **Sessions de jeu coordonnées** : nouvel onglet « Sessions » dans la sidebar. N'importe quel user peut créer une session (jeu + date + note), tes potes RSVPent en un clic (✅ Là / ❓ Peut-être / ❌ Pas dispo). Compteurs et avatars live, badge « Maintenant » + bouton Lancer quand l'heure est venue. Sessions passées affichées en compact en bas. Sub-collection `/sessions/{id}/rsvps/{uid}` avec rules par-utilisateur.
+- **Clans / Crews (Discord-like textuel)** : nouvel onglet « Clans » avec layout 3 colonnes (rail clans / rail salons / messages). L'admin crée les clans (nom, emblème emoji, couleur, ordre) et leurs salons textuels depuis le panel admin. Tous les users authentifiés peuvent envoyer des messages, regroupement par auteur si messages successifs sous 5 min. Architecture Firestore: `/crews/{id}/channels/{id}/messages/{id}`.
+- **Sondages dans les News** : option « Ajouter un sondage » dans l'éditeur de news admin (question + 2-6 options). Sur l'accueil, chaque news avec sondage affiche les options en boutons cliquables avec barre de progression live + pourcentage par option + total des votes. Toggle son vote en cliquant à nouveau. Sub-collection `/news/{id}/votes/{uid}`.
 ## [v26.04.29.7] - 2026-04-29  · semver `26.429.6`
 
 

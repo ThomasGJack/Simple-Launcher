@@ -206,6 +206,11 @@ function NewsEditor({
   const [accent, setAccent] = useState(initial?.accent ?? "");
   const [pinned, setPinned] = useState(initial?.pinned ?? false);
   const [hidden, setHidden] = useState(initial?.hidden ?? false);
+  const [pollEnabled, setPollEnabled] = useState(!!initial?.poll);
+  const [pollQuestion, setPollQuestion] = useState(initial?.poll?.question ?? "");
+  const [pollOptions, setPollOptions] = useState<string[]>(
+    initial?.poll?.options ?? ["", ""],
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -217,12 +222,18 @@ function NewsEditor({
     setSaving(true);
     setError(null);
     try {
+      const cleanedOptions = pollOptions.map((o) => o.trim()).filter(Boolean);
+      const poll =
+        pollEnabled && pollQuestion.trim() && cleanedOptions.length >= 2
+          ? { question: pollQuestion.trim(), options: cleanedOptions }
+          : null;
       const draft = {
         title: title.trim(),
         body: body.trim(),
         accent: accent.trim() || null,
         pinned,
         hidden,
+        poll,
       };
       if (initial) {
         await updateNews(initial.id, draft);
@@ -305,6 +316,71 @@ function NewsEditor({
             <Toggle label="Épinglé" value={pinned} onChange={setPinned} icon={<Pin className="size-3.5" />} />
             <Toggle label="Masqué" value={hidden} onChange={setHidden} icon={<EyeOff className="size-3.5" />} />
           </div>
+        </div>
+
+        {/* Poll editor — toggle reveals question + options inputs. */}
+        <div className="space-y-2 rounded-2xl bg-bg-base/30 p-3 ring-1 ring-white/[0.06]">
+          <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={pollEnabled}
+              onChange={(e) => setPollEnabled(e.target.checked)}
+              className="size-4 cursor-pointer accent-accent"
+            />
+            <span className="font-medium">Ajouter un sondage</span>
+            <span className="text-xs text-fg-dim">— les amis votent en temps réel</span>
+          </label>
+          {pollEnabled && (
+            <div className="space-y-2 pl-6">
+              <input
+                type="text"
+                value={pollQuestion}
+                onChange={(e) => setPollQuestion(e.target.value)}
+                placeholder="Question (ex: Quel modpack ce week-end ?)"
+                maxLength={140}
+                className="w-full rounded-xl bg-bg-base/40 px-3 py-2 text-sm text-fg-primary ring-1 ring-white/[0.06] focus:outline-none focus:ring-accent/50"
+              />
+              <div className="space-y-1.5">
+                {pollOptions.map((opt, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="grid size-6 shrink-0 place-items-center rounded-full bg-bg-elevated text-[10px] text-fg-muted">
+                      {String.fromCharCode(65 + i)}
+                    </span>
+                    <input
+                      type="text"
+                      value={opt}
+                      onChange={(e) => {
+                        const next = [...pollOptions];
+                        next[i] = e.target.value;
+                        setPollOptions(next);
+                      }}
+                      placeholder={`Option ${i + 1}`}
+                      maxLength={80}
+                      className="flex-1 rounded-xl bg-bg-base/40 px-3 py-1.5 text-sm ring-1 ring-white/[0.06] focus:outline-none focus:ring-accent/50"
+                    />
+                    {pollOptions.length > 2 && (
+                      <button
+                        type="button"
+                        onClick={() => setPollOptions(pollOptions.filter((_, j) => j !== i))}
+                        className="grid size-7 place-items-center rounded-lg text-fg-muted hover:bg-danger/15 hover:text-danger"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {pollOptions.length < 6 && (
+                  <button
+                    type="button"
+                    onClick={() => setPollOptions([...pollOptions, ""])}
+                    className="ml-8 text-xs text-accent hover:underline"
+                  >
+                    + Ajouter une option
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {error && (

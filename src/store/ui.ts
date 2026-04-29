@@ -10,6 +10,8 @@ export type Route =
   | { name: "admin-builder"; moduleId: string }
   | { name: "admin-logs" }
   | { name: "community" }
+  | { name: "sessions" }
+  | { name: "crews"; crewId?: string; channelId?: string }
   | { name: "messages"; conversationId?: string }
   | { name: "user-profile"; uid: string }
   | { name: "login" };

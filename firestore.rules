@@ -34,6 +34,43 @@ service cloud.firestore {
       }
     }
 
+    // Crews — Discord-like text-only clans. Admin-only writes for crew/
+    // channel structure; any authed user can post messages in any channel.
+    match /crews/{crewId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+
+      match /channels/{channelId} {
+        allow read: if request.auth != null;
+        allow write: if isAdmin();
+
+        match /messages/{messageId} {
+          allow read: if request.auth != null;
+          allow create: if request.auth != null &&
+            request.resource.data.senderUid == request.auth.uid;
+          // No edits/deletes for now — keeps the chat audit trail honest.
+          allow update, delete: if false;
+        }
+      }
+    }
+
+    // Coordinated game sessions — any authed user can create their own,
+    // edit only their own, RSVP to anyone's. Host is locked to creator.
+    match /sessions/{sessionId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null &&
+        request.resource.data.hostUid == request.auth.uid;
+      allow update, delete: if request.auth != null &&
+        resource.data.hostUid == request.auth.uid;
+
+      // RSVPs — per-user doc, only the user can write theirs.
+      match /rsvps/{uid} {
+        allow read: if request.auth != null;
+        allow create, update, delete:
+          if request.auth != null && request.auth.uid == uid;
+      }
+    }
+
     // News broadcast on the home page — any authed launcher reads, only
     // admins can create/edit/delete. Updates propagate live via onSnapshot
     // so changes published from the admin panel show up on every launcher
@@ -45,6 +82,13 @@ service cloud.firestore {
       // Emoji reactions — every authed user can write their own doc;
       // they can't impersonate someone else (path uid must match auth).
       match /reactions/{uid} {
+        allow read: if request.auth != null;
+        allow create, update, delete:
+          if request.auth != null && request.auth.uid == uid;
+      }
+
+      // Poll votes — same per-user pattern as reactions.
+      match /votes/{uid} {
         allow read: if request.auth != null;
         allow create, update, delete:
           if request.auth != null && request.auth.uid == uid;

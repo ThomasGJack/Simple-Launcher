@@ -18,6 +18,11 @@ import { getFirebase } from "./config";
  * any authed user can read. Updates propagate via onSnapshot — no relaunch
  * required client-side.
  */
+export type NewsPoll = {
+  question: string;
+  options: string[];
+};
+
 export type News = {
   id: string;
   title: string;
@@ -26,6 +31,9 @@ export type News = {
   accent: string | null;
   pinned: boolean;
   hidden: boolean;
+  /** Optional embedded poll. When set, renders below the news body with
+   *  live vote counts. Votes are stored in the `votes` sub-collection. */
+  poll: NewsPoll | null;
   createdAt: number;
   updatedAt: number;
   authorUid: string;
@@ -38,6 +46,7 @@ export type NewsDraft = {
   accent: string | null;
   pinned: boolean;
   hidden: boolean;
+  poll: NewsPoll | null;
 };
 
 /**
@@ -56,6 +65,17 @@ export function watchNews(callback: (entries: News[]) => void): Unsubscribe {
     (snap) => {
       const list: News[] = snap.docs.map((d) => {
         const data = d.data();
+        const rawPoll = data.poll;
+        const poll: NewsPoll | null =
+          rawPoll &&
+          typeof rawPoll === "object" &&
+          typeof rawPoll.question === "string" &&
+          Array.isArray(rawPoll.options)
+            ? {
+                question: rawPoll.question,
+                options: rawPoll.options.filter((o: unknown) => typeof o === "string"),
+              }
+            : null;
         return {
           id: d.id,
           title: typeof data.title === "string" ? data.title : "",
@@ -63,6 +83,7 @@ export function watchNews(callback: (entries: News[]) => void): Unsubscribe {
           accent: typeof data.accent === "string" ? data.accent : null,
           pinned: !!data.pinned,
           hidden: !!data.hidden,
+          poll,
           createdAt: tsToMs(data.createdAt) ?? 0,
           updatedAt: tsToMs(data.updatedAt) ?? 0,
           authorUid: typeof data.authorUid === "string" ? data.authorUid : "",
@@ -97,6 +118,7 @@ export async function createNews(
     accent: draft.accent,
     pinned: draft.pinned,
     hidden: draft.hidden,
+    poll: draft.poll,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     authorUid,

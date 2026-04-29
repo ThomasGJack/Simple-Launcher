@@ -21,6 +21,7 @@ import {
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/auth";
 import { NewsManager } from "@/components/admin/NewsManager";
+import { CrewsManager } from "@/components/admin/CrewsManager";
 import { isAdmin } from "@/lib/admin";
 import {
   deleteHostedZip,
@@ -446,6 +447,17 @@ export function AdminPage() {
           className="my-8"
         >
           <NewsManager />
+        </motion.div>
+      )}
+
+      {!isEditing && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.18 }}
+          className="my-8"
+        >
+          <CrewsManager />
         </motion.div>
       )}
 

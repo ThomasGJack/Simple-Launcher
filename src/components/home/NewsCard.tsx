@@ -8,6 +8,12 @@ import {
   watchReactions,
   type NewsReaction,
 } from "@/firebase/newsReactions";
+import {
+  castVote,
+  clearVote,
+  watchPollVotes,
+  type NewsPollVote,
+} from "@/firebase/newsPollVotes";
 import { useAuthStore } from "@/store/auth";
 import { sanitizeHtml } from "@/lib/sanitizeHtml";
 import { sounds } from "@/lib/sounds";
@@ -148,6 +154,7 @@ function NewsItem({
           {item.authorName && !compact && (
             <div className="mt-2 text-[10px] text-fg-dim">— {item.authorName}</div>
           )}
+          {!compact && item.poll && <PollWidget newsId={item.id} poll={item.poll} accent={accent} />}
           {!compact && <ReactionsRow newsId={item.id} />}
         </div>
       </div>
@@ -162,6 +169,107 @@ function NewsItem({
         </button>
       )}
     </motion.div>
+  );
+}
+
+function PollWidget({
+  newsId,
+  poll,
+  accent,
+}: {
+  newsId: string;
+  poll: { question: string; options: string[] };
+  accent: string;
+}) {
+  const me = useAuthStore((s) => s.user);
+  const [votes, setVotes] = useState<NewsPollVote[]>([]);
+  useEffect(() => watchPollVotes(newsId, setVotes), [newsId]);
+
+  const myVote = useMemo(
+    () => votes.find((v) => v.uid === me?.uid)?.option ?? null,
+    [votes, me?.uid],
+  );
+  const counts = useMemo(() => {
+    const arr = poll.options.map(() => 0);
+    for (const v of votes) {
+      if (v.option >= 0 && v.option < arr.length) arr[v.option]++;
+    }
+    return arr;
+  }, [votes, poll.options]);
+  const total = counts.reduce((a, b) => a + b, 0);
+
+  const handle = async (idx: number) => {
+    if (!me) return;
+    sounds.click();
+    try {
+      if (myVote === idx) {
+        await clearVote(newsId, me.uid);
+      } else {
+        await castVote(newsId, me.uid, idx, me.displayName ?? null, me.photoURL ?? null);
+      }
+    } catch (err) {
+      console.warn("[poll] vote failed:", err);
+    }
+  };
+
+  return (
+    <div className="mt-4 rounded-2xl bg-bg-base/30 p-4 ring-1 ring-white/[0.06]">
+      <div className="mb-3 flex items-center gap-2 text-xs uppercase tracking-wider" style={{ color: accent }}>
+        <span>Sondage</span>
+        <span className="text-fg-dim">· {total} {total > 1 ? "votes" : "vote"}</span>
+      </div>
+      <div className="mb-3 text-sm font-semibold text-fg-primary">{poll.question}</div>
+      <div className="space-y-1.5">
+        {poll.options.map((opt, i) => {
+          const count = counts[i];
+          const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+          const active = myVote === i;
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => handle(i)}
+              className={cn(
+                "no-drag relative w-full overflow-hidden rounded-xl px-3 py-2 text-left text-sm ring-1 transition-all",
+                active
+                  ? "bg-accent/10 text-fg-primary ring-accent/40"
+                  : "bg-bg-elevated/40 text-fg-muted ring-white/[0.06] hover:bg-bg-elevated/70 hover:text-fg-primary",
+              )}
+            >
+              {/* fill bar */}
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-y-0 left-0 transition-[width] duration-500"
+                style={{
+                  width: `${pct}%`,
+                  background: `linear-gradient(90deg, ${accent}30, transparent)`,
+                }}
+              />
+              <div className="relative flex items-center gap-2">
+                <span
+                  className={cn(
+                    "grid size-5 shrink-0 place-items-center rounded-full text-[10px] font-mono",
+                    active ? "ring-2" : "bg-bg-elevated text-fg-dim",
+                  )}
+                  style={active ? { background: accent, color: "#07090d" } : undefined}
+                >
+                  {String.fromCharCode(65 + i)}
+                </span>
+                <span className="flex-1">{opt}</span>
+                {total > 0 && (
+                  <span className="font-mono text-xs tabular-nums text-fg-muted">{pct}%</span>
+                )}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      {myVote !== null && (
+        <div className="mt-2 text-[10px] text-fg-dim">
+          Tu as voté · clique à nouveau pour retirer ton vote
+        </div>
+      )}
+    </div>
   );
 }
 
