@@ -53,7 +53,9 @@ export async function launchModule(module: LauncherModule): Promise<void> {
     });
   }
   if (module.type === "minecraft") {
-    throw new Error("Use launchMinecraft from lib/minecraft.ts for Minecraft modules");
+    // Minecraft modules go through the dedicated native action panel in
+    // ModuleDetailPage (it calls `mc_native_launch` directly).
+    throw new Error("Minecraft modules launch via the native action panel, not launchModule");
   }
   return invoke<void>("module_launch_shortcut", {
     moduleId: module.id,

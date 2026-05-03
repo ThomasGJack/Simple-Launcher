@@ -26,17 +26,9 @@ import { migrateModulePage } from "@/lib/modulePageMigration";
 import { isModulePageV2 } from "@/types/module";
 import { loadFontFace } from "@/lib/dynamicFont";
 import { MinecraftRamControl } from "@/components/library/MinecraftRamControl";
-import { MinecraftLaunchModeToggle } from "@/components/library/MinecraftLaunchModeToggle";
 import { MinecraftServerCard } from "@/components/library/MinecraftServerCard";
 import { RconConsoleModal } from "@/components/admin/RconConsole";
 import { isAdmin } from "@/lib/admin";
-import {
-  deriveMinecraftStatus,
-  installModpack,
-  launchMinecraft,
-  useLaunchMode,
-  type MinecraftStatus,
-} from "@/lib/minecraft";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
 
@@ -317,7 +309,6 @@ export function ModuleDetailPage() {
               </>
             )}
             {module.type === "minecraft" && <MinecraftRamControl module={module} />}
-            {module.type === "minecraft" && <MinecraftLaunchModeToggle module={module} />}
           </div>
         </div>
 
@@ -625,217 +616,11 @@ function MinecraftActionPanel({
   module: import("@/types/module").MinecraftModule;
   themePrimary?: string;
 }) {
-  // Branch on the EFFECTIVE launch mode (resolved from per-machine
-  // localStorage override → admin default → temporary Prism fallback
-  // for native-flagged modules). The hook makes this reactive : when
-  // the user flips the toggle in the sidebar, this panel re-renders
-  // with the new backend without a page reload.
-  //
-  // The two backend implementations stay as separate components rather
-  // than one conditional render so React's hooks order stays stable
-  // across switches (each backend has its own state machine, useEffects,
-  // event listeners, etc.).
-  const { effective } = useLaunchMode(module);
-  if (effective === "native") {
-    return <NativeMinecraftActionPanel module={module} themePrimary={themePrimary} />;
-  }
-  return <PrismMinecraftActionPanel module={module} themePrimary={themePrimary} />;
-}
-
-function PrismMinecraftActionPanel({
-  module,
-  themePrimary,
-}: {
-  module: import("@/types/module").MinecraftModule;
-  themePrimary?: string;
-}) {
-  const [status, setStatus] = useState<MinecraftStatus | null>(null);
-  const [busy, setBusy] = useState<"install" | "launch" | null>(null);
-  const [progress, setProgress] = useState<{ phase: string; bytes: number; total: number } | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const refresh = async () => {
-    try {
-      const s = await deriveMinecraftStatus(module);
-      setStatus(s);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  };
-
-  useEffect(() => {
-    refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [module.id, module.curseforgeFileId]);
-
-  useEffect(() => {
-    let cleanup: (() => void) | undefined;
-    import("@tauri-apps/api/event").then(({ listen }) => {
-      listen<{ moduleId: string; phase: string; bytesDownloaded: number; bytesTotal: number }>(
-        "module-progress",
-        (event) => {
-          if (event.payload.moduleId !== module.id) return;
-          setProgress({
-            phase: event.payload.phase,
-            bytes: event.payload.bytesDownloaded,
-            total: event.payload.bytesTotal,
-          });
-        },
-      ).then((u) => {
-        cleanup = u;
-      });
-    });
-    return () => {
-      cleanup?.();
-    };
-  }, [module.id]);
-
-  const handleInstall = async () => {
-    if (status?.kind !== "not-installed" && status?.kind !== "update-available") return;
-    setBusy("install");
-    setError(null);
-    setProgress(null);
-    sounds.click();
-    try {
-      await installModpack(module);
-      sounds.success();
-      await refresh();
-    } catch (e) {
-      sounds.error();
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(null);
-      setProgress(null);
-    }
-  };
-
-  const handleLaunch = async () => {
-    if (status?.kind !== "ready") return;
-    setBusy("launch");
-    setError(null);
-    sounds.launch();
-    try {
-      await launchMinecraft(module, status.instanceName);
-      setTimeout(() => setBusy(null), 1500);
-    } catch (e) {
-      sounds.error();
-      setError(e instanceof Error ? e.message : String(e));
-      setBusy(null);
-    }
-  };
-
-  if (!status) {
-    return (
-      <div className="flex items-center gap-2 text-sm text-fg-muted">
-        <Loader2 className="size-4 animate-spin" /> Vérification…
-      </div>
-    );
-  }
-
-  if (busy === "install" && progress) {
-    const phaseLabels: Record<string, string> = {
-      "fetching-prism-info": "Préparation de Prism Launcher…",
-      "downloading-prism": "Téléchargement de Prism Launcher",
-      "extracting-prism": "Extraction de Prism Launcher",
-      resolving: "Résolution CurseForge…",
-      downloading: "Téléchargement du modpack",
-      "reading-manifest": "Analyse du manifest",
-      importing: "Import dans Prism Launcher",
-      ready: "Prêt",
-    };
-    const pct = progress.total > 0 ? Math.round((progress.bytes / progress.total) * 100) : null;
-    return (
-      <div className="rounded-2xl bg-bg-base/80 p-4 ring-1 ring-white/[0.06]">
-        <div className="mb-2 flex items-baseline justify-between">
-          <span className="text-sm font-medium text-fg-primary">{phaseLabels[progress.phase] ?? progress.phase}</span>
-          {pct !== null && progress.total > 0 && (
-            <span className="text-xs text-fg-muted">
-              {(progress.bytes / 1_048_576).toFixed(1)} / {(progress.total / 1_048_576).toFixed(1)} Mo · {pct}%
-            </span>
-          )}
-        </div>
-        <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
-          <motion.div
-            className="h-full bg-emerald-400 shadow-[0_0_18px_rgba(74,222,128,0.6)]"
-            animate={{ width: pct !== null ? `${pct}%` : "30%" }}
-            transition={{ duration: 0.2 }}
-          />
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      {status.kind === "no-api-key" && (
-        <ErrorBanner
-          message={"Clé API CurseForge manquante. Inscris-toi gratuitement sur console.curseforge.com puis ajoute VITE_CURSEFORGE_API_KEY dans .env.local et relance le launcher."}
-          onDismiss={() => {}}
-        />
-      )}
-
-      {(status.kind === "not-installed" || status.kind === "update-available") && (
-        <>
-          <button
-            onClick={handleInstall}
-            disabled={busy !== null}
-            className="no-drag flex w-full items-center justify-center gap-3 rounded-2xl px-8 py-4 font-display text-lg tracking-[0.18em] text-bg-base shadow-[0_0_32px_rgba(74,222,128,0.4)] ring-1 ring-white/30 transition-shadow hover:shadow-[0_0_44px_rgba(74,222,128,0.6)] disabled:opacity-60"
-            style={{ background: "linear-gradient(90deg, #22c55e, #4ade80, #22c55e)", backgroundSize: "200% 100%" }}
-          >
-            <Download className="size-5" />
-            {status.kind === "update-available" ? "METTRE À JOUR LE MODPACK" : "INSTALLER LE MODPACK"}
-          </button>
-          {status.kind === "not-installed" && !status.prismDetected && (
-            <p className="text-center text-xs text-fg-muted">
-              Première install : Prism Launcher (~90 Mo) sera téléchargé en plus du modpack. Une seule fois.
-            </p>
-          )}
-        </>
-      )}
-
-      {status.kind === "ready" && (
-        <button
-          onClick={handleLaunch}
-          disabled={busy !== null}
-          className="no-drag flex w-full items-center justify-center gap-3 rounded-2xl px-8 py-4 font-display text-lg tracking-[0.18em] text-bg-base shadow-[0_0_32px_var(--color-accent-glow)] ring-1 ring-white/30 transition-shadow hover:shadow-[0_0_44px_var(--color-accent-glow)] disabled:opacity-60"
-          style={{
-            background: themePrimary
-              ? `linear-gradient(90deg, ${themePrimary}, ${themePrimary}dd, ${themePrimary})`
-              : "linear-gradient(90deg, var(--color-accent), #4ed6ff, var(--color-accent))",
-          }}
-        >
-          <Play className="size-5 fill-bg-base" strokeWidth={0} />
-          {busy === "launch" ? "LANCEMENT…" : "JOUER"}
-        </button>
-      )}
-
-      {status.kind === "ready" && (
-        <div className="flex flex-col items-center gap-2">
-          <div className="text-center text-xs text-fg-muted">
-            Instance Prism : <span className="font-mono text-fg-primary">{status.instanceName}</span>
-          </div>
-          <button
-            type="button"
-            onClick={async () => {
-              try {
-                const { openPrismInstanceDir } = await import("@/lib/minecraft");
-                await openPrismInstanceDir(status.instanceName);
-              } catch (err) {
-                setError(err instanceof Error ? err.message : String(err));
-              }
-            }}
-            title="Ouvre le dossier .minecraft/ pour ajouter resourcepacks, shaders, configs…"
-            className="inline-flex items-center gap-1.5 rounded-2xl bg-bg-elevated/40 px-3 py-2 text-xs text-fg-muted ring-1 ring-white/[0.06] hover:bg-bg-elevated/70 hover:text-fg-primary"
-          >
-            <Folder className="size-3.5" />
-            Ouvrir le dossier
-          </button>
-        </div>
-      )}
-
-      {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
-    </div>
-  );
+  // Single backend: the in-house native chain. Prism support was removed
+  // in v26.05.03.8 — see CHANGELOG. `MinecraftActionPanel` is now a thin
+  // wrapper that delegates to `NativeMinecraftActionPanel` for every
+  // Minecraft module.
+  return <NativeMinecraftActionPanel module={module} themePrimary={themePrimary} />;
 }
 
 /**

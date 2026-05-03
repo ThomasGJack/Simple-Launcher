@@ -18,6 +18,15 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.05.03.8] - 2026-05-03  · semver `26.503.7`
+
+
+
+
+
+### Supprimé
+
+- **Suppression complète de l'intégration Prism Launcher** ([src-tauri/src/minecraft.rs](src-tauri/src/minecraft.rs), [src-tauri/src/lib.rs](src-tauri/src/lib.rs), [src/lib/minecraft.ts](src/lib/minecraft.ts), [src/types/module.ts](src/types/module.ts), [src/pages/ModuleDetailPage.tsx](src/pages/ModuleDetailPage.tsx), [src/pages/AdminPage.tsx](src/pages/AdminPage.tsx)) — la chaîne native Minecraft (`mc_native_launch` + `mc_vanilla_*` + `mc_fabric_*` + `mc_forge_*` + `mc_zip_*` + `mc_modrinth_*`) est maintenant le seul chemin d'install + lancement supporté. Confirmé que le bug "rendu en bruit coloré sur portable AMD iGPU" était bien un problème de driver utilisateur — corrigé côté machine, plus côté launcher. **Côté Rust** : retrait des commandes `mc_find_prism`, `mc_open_prism_instance_dir`, `mc_install_modpack`, `mc_launch`, `mc_uninstall` (1082 lignes de `minecraft.rs` réduites à ~50 lignes shim, garde juste `McLaunchTracker` placeholder). **Côté TS** : suppression de `findPrism`, `openPrismInstanceDir`, `installModpack`, `launchMinecraft`, `useLaunchMode`, `getEffectiveLaunchMode`, `LaunchMode`, `MinecraftStatus`, `deriveMinecraftStatus`, `MinecraftStateLocal`, `getMinecraftState`, `uninstallModpack` ; `lib/minecraft.ts` ne garde plus que les helpers RAM + le mapping MC version → Java major. **`MinecraftLaunchModeToggle.tsx` supprimé** (le toggle Prism/Natif n'a plus lieu d'être). **`MinecraftActionPanel`** dans `ModuleDetailPage` réduit à un wrapper qui délègue toujours à `NativeMinecraftActionPanel` (suppression du `PrismMinecraftActionPanel` complet). **Type `MinecraftModule`** : suppression des champs `curseforgeProjectId`, `curseforgeFileId`, `customZipUrl`, `customZipSize`, `prismInstanceName`, `nativeMc` (toujours natif désormais). **`AdminPage`** : suppression du toggle `nativeMc`, suppression du composant `ModpackZipPicker` legacy, suppression du sélecteur `mcSource` (CurseForge / manual), simplification de la validation et de la persistance Firestore ; le block `NativeMinecraftBlock` est maintenant l'unique config Minecraft, présenté comme stable et non plus en bêta. Net : **-870 lignes de code**, et un seul chemin de lancement à maintenir.
 ## [v26.05.03.7] - 2026-05-03  · semver `26.503.6`
 
 

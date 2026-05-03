@@ -54,8 +54,6 @@ type ParticlesPreset = NonNullable<ParticlesConfig["preset"]> | "none";
 type BgType = "none" | "image" | "video";
 type ModuleType = "hosted" | "minecraft";
 type ModLoader = "" | "forge" | "fabric" | "quilt" | "neoforge";
-type McSource = "curseforge" | "manual";
-
 type FormState = {
   type: ModuleType;
   id: string;
@@ -77,19 +75,12 @@ type FormState = {
   screenshots: string;
   stats: string;
   // Minecraft fields
-  mcSource: McSource;
-  curseforgeProjectId: string;
-  curseforgeFileId: string;
-  customZipUrl: string;
-  customZipSize: number;
   minecraftVersion: string;
   modLoader: ModLoader;
-  // Heap allocation in MiB. 0 = "let Prism decide" (default).
+  /** Heap allocation in MiB. 0 = "let JVM pick" (defaults to 4 GiB
+   *  in `mc_launch.rs`). */
   maxRamMb: number;
-  // ─── Native MC fields (no Prism) ────────────────────────────────
-  /** Master toggle: when on, the launcher uses the in-house native
-   *  chain instead of Prism for this module. */
-  nativeMc: boolean;
+  // ─── Native MC config (sole launch path since v26.05.03.8) ────────
   /** Vanilla MC version pinned for the native install. */
   nativeMcVersion: string;
   /** Loader pick for the native install. */
@@ -124,15 +115,9 @@ const EMPTY_FORM: FormState = {
   serverAddress: "",
   screenshots: "",
   stats: "",
-  mcSource: "manual",
-  curseforgeProjectId: "",
-  curseforgeFileId: "",
-  customZipUrl: "",
-  customZipSize: 0,
   minecraftVersion: "",
   modLoader: "",
   maxRamMb: 4096,
-  nativeMc: false,
   nativeMcVersion: "",
   nativeLoader: "vanilla",
   nativeLoaderVersion: "",
@@ -219,16 +204,10 @@ export function AdminPage() {
         statsSection && statsSection.type === "stats"
           ? statsSection.data.map((s) => `${s.label} = ${s.value}`).join("\n")
           : "",
-      mcSource: m.type === "minecraft" && m.customZipUrl ? "manual" : "curseforge",
-      curseforgeProjectId: m.type === "minecraft" && m.curseforgeProjectId ? String(m.curseforgeProjectId) : "",
-      curseforgeFileId: m.type === "minecraft" && m.curseforgeFileId ? String(m.curseforgeFileId) : "",
-      customZipUrl: m.type === "minecraft" ? m.customZipUrl ?? "" : "",
-      customZipSize: m.type === "minecraft" ? m.customZipSize ?? 0 : 0,
       minecraftVersion: m.type === "minecraft" ? m.minecraftVersion ?? "" : "",
       modLoader: m.type === "minecraft" ? ((m.modLoader ?? "") as ModLoader) : "",
       maxRamMb: m.type === "minecraft" ? m.maxRamMb ?? 4096 : 4096,
-      // Native MC config — load from existing module or default off.
-      nativeMc: m.type === "minecraft" ? m.nativeMc === true : false,
+      // Native MC config — sole launch path post-Prism removal.
       nativeMcVersion: m.type === "minecraft" ? m.nativeMcVersion ?? "" : "",
       nativeLoader:
         m.type === "minecraft" && m.nativeLoader ? m.nativeLoader : "vanilla",
@@ -269,27 +248,15 @@ export function AdminPage() {
       if (!form.version || !/^\d+\.\d+\.\d+$/.test(form.version)) return "Version semver requise (ex: 1.0.0)";
       if (!form.executable) return "Nom de l'exécutable requis (ex: MyGame.exe)";
     } else if (form.type === "minecraft") {
-      // When `nativeMc` is enabled, the legacy Prism-mode source
-      // fields (curseforgeProjectId / customZipUrl) are irrelevant —
-      // the native pipeline drives off `nativeMcVersion` + optional
-      // `nativeModpack`. So skip the legacy validation in that case.
-      // We still require an MC version though.
-      if (form.nativeMc) {
-        if (!form.nativeMcVersion) return "Version Minecraft requise (sélectionne-la dans le picker natif)";
-        if (form.nativeLoader !== "vanilla" && !form.nativeLoaderVersion) {
-          return `Version du loader ${form.nativeLoader} requise (ou choisis « Vanilla »)`;
-        }
-        // Modpack source is optional in native mode — "Aucun" is valid
-        // (= NeoForge/Fabric/Forge sans modpack), tested for users
-        // who veulent juste un loader nu pour debug ou test.
-        if (form.nativeModpackKind !== "none" && !form.nativeModpackUrl) {
-          return "URL du modpack requise (ou bascule sur « Aucun modpack » pour un loader nu)";
-        }
-      } else if (form.mcSource === "curseforge") {
-        if (!/^\d+$/.test(form.curseforgeProjectId)) return "Project ID CurseForge invalide (numérique)";
-        if (!/^\d+$/.test(form.curseforgeFileId)) return "File ID CurseForge invalide (numérique)";
-      } else {
-        if (!form.customZipUrl) return "Upload un .zip de modpack ou choisis « API CurseForge »";
+      // Native chain is the sole supported launch path post v26.05.03.8.
+      if (!form.nativeMcVersion) return "Version Minecraft requise (sélectionne-la dans le picker)";
+      if (form.nativeLoader !== "vanilla" && !form.nativeLoaderVersion) {
+        return `Version du loader ${form.nativeLoader} requise (ou choisis « Vanilla »)`;
+      }
+      // Modpack source is optional — "Aucun" is valid (= NeoForge /
+      // Fabric / Forge sans modpack), useful pour un loader nu de test.
+      if (form.nativeModpackKind !== "none" && !form.nativeModpackUrl) {
+        return "URL du modpack requise (ou bascule sur « Aucun modpack » pour un loader nu)";
       }
     }
     return null;
@@ -363,11 +330,9 @@ export function AdminPage() {
 
       if (form.type === "minecraft") {
         // Save covers both create and update — Firestore setDoc with merge.
-        const useManual = form.mcSource === "manual";
-        // Compose the optional native modpack overlay so the same shape
-        // round-trips into Firestore + back into `startEdit`.
+        // Native chain is the sole supported launch path since v26.05.03.8.
         const nativeModpack =
-          form.nativeMc && form.nativeModpackKind === "modrinth" && form.nativeModpackUrl
+          form.nativeModpackKind === "modrinth" && form.nativeModpackUrl
             ? {
                 kind: "modrinth" as const,
                 mrpackUrl: form.nativeModpackUrl,
@@ -375,11 +340,9 @@ export function AdminPage() {
                   modrinthProjectId: form.nativeModrinthProjectId,
                 }),
               }
-            : form.nativeMc && form.nativeModpackKind === "zip" && form.nativeModpackUrl
+            : form.nativeModpackKind === "zip" && form.nativeModpackUrl
               ? { kind: "zip" as const, zipUrl: form.nativeModpackUrl }
-              : form.nativeMc
-                ? { kind: "none" as const }
-                : undefined;
+              : { kind: "none" as const };
         await saveMinecraftModule({
           type: "minecraft",
           id: form.id,
@@ -387,33 +350,15 @@ export function AdminPage() {
           ...(form.shortDescription && { shortDescription: form.shortDescription }),
           ...(form.iconUrl && { iconUrl: form.iconUrl }),
           ...(form.bannerUrl && { bannerUrl: form.bannerUrl }),
-          // Legacy Prism-mode source fields are only relevant when
-          // `nativeMc !== true`. In native mode we'd otherwise persist
-          // `customZipUrl: ""` or `curseforgeProjectId: NaN` (since
-          // those text inputs are empty in native mode), which
-          // Firestore rejects ("Invalid use of NaN") and which adds
-          // dead config to the doc. Skip them when native is on.
-          ...(!form.nativeMc &&
-            (useManual
-              ? { customZipUrl: form.customZipUrl, customZipSize: form.customZipSize }
-              : {
-                  curseforgeProjectId: parseInt(form.curseforgeProjectId, 10),
-                  curseforgeFileId: parseInt(form.curseforgeFileId, 10),
-                })),
           ...(form.minecraftVersion && { minecraftVersion: form.minecraftVersion }),
           ...(form.modLoader && { modLoader: form.modLoader }),
           ...(form.maxRamMb >= 512 && { maxRamMb: form.maxRamMb }),
-          // Native MC config — only persisted when explicitly enabled
-          // by the toggle, so legacy modules stay legacy.
-          ...(form.nativeMc && {
-            nativeMc: true,
-            ...(form.nativeMcVersion && { nativeMcVersion: form.nativeMcVersion }),
-            nativeLoader: form.nativeLoader,
-            ...(form.nativeLoaderVersion && {
-              nativeLoaderVersion: form.nativeLoaderVersion,
-            }),
-            ...(nativeModpack && { nativeModpack }),
+          ...(form.nativeMcVersion && { nativeMcVersion: form.nativeMcVersion }),
+          nativeLoader: form.nativeLoader,
+          ...(form.nativeLoaderVersion && {
+            nativeLoaderVersion: form.nativeLoaderVersion,
           }),
+          nativeModpack,
           ...(page && { page }),
           ...(server && { server }),
         });
@@ -464,11 +409,11 @@ export function AdminPage() {
     try {
       await deleteModule(mod.id);
       if (mod.type === "hosted") await deleteHostedZip(mod.id, mod.version);
-      // Native MC modules: wipe the per-instance .minecraft/ dir on the
+      // Minecraft modules: wipe the per-instance .minecraft/ dir on the
       // local machine too. Best-effort — failures (e.g. file in use) are
       // ignored, the daily Cloud Function won't help here since this is
       // a local-only directory.
-      if (mod.type === "minecraft" && mod.nativeMc === true) {
+      if (mod.type === "minecraft") {
         try {
           const { mcNativeUninstallInstance } = await import("@/lib/mcVanilla");
           await mcNativeUninstallInstance(mod.id);
@@ -517,13 +462,7 @@ export function AdminPage() {
       const { url, size } = await uploadModpackZip(form.id, uploadedFile, (p) => {
         setModpackUploading({ percent: p.percent, uploaded: p.bytesUploaded, total: p.bytesTotal });
       });
-      // Populate BOTH the legacy and native modpack URL fields. The
-      // user uploads once, the same Storage object is consumed by
-      // whichever path they end up using (legacy Prism via
-      // `customZipUrl`, native via `nativeModpackUrl`). Switching modes
-      // later doesn't require re-uploading.
-      updateForm("customZipUrl", url);
-      updateForm("customZipSize", size);
+      // Native chain consumes the uploaded ZIP via `nativeModpackUrl`.
       updateForm("nativeModpackUrl", url);
       if (detectedManifest && detectedManifest.name) {
         setFeedback({
@@ -1108,11 +1047,6 @@ function MinecraftFields({
   modpackUploading: { percent: number; uploaded: number; total: number } | null;
   onUploadModpack: (file: File) => void;
 }) {
-  const handleUrlPaste = (raw: string) => {
-    const match = /\/files\/(\d+)/.exec(raw);
-    if (match) updateForm("curseforgeFileId", match[1]);
-  };
-
   const loaders: { value: ModLoader; label: string }[] = [
     { value: "", label: "—" },
     { value: "forge", label: "Forge" },
@@ -1121,16 +1055,11 @@ function MinecraftFields({
     { value: "quilt", label: "Quilt" },
   ];
 
-  const sources: { value: McSource; label: string; hint: string }[] = [
-    { value: "manual", label: "Upload manuel (fat-zip)", hint: "Aucune UI Prism, mods bundled" },
-    { value: "curseforge", label: "API CurseForge", hint: "Récupéré via Project + File ID" },
-  ];
-
   return (
     <div className="grid gap-4 rounded-2xl bg-bg-base/30 p-5 ring-1 ring-white/[0.04]">
-      {/* Native MC config — the recommended path. Holds version, loader,
-          loader version, modpack overlay (Modrinth or local zip upload),
-          and the RAM slider. */}
+      {/* Native MC config — the only launch path since v26.05.03.8. Holds
+          version, loader, loader version, modpack overlay (Modrinth or
+          local zip upload), and the RAM slider. */}
       <NativeMinecraftBlock
         form={form}
         updateForm={updateForm}
@@ -1140,217 +1069,31 @@ function MinecraftFields({
 
       <RamSlider value={form.maxRamMb} onChange={(v) => updateForm("maxRamMb", v)} />
 
-      {/* Legacy Prism config — kept behind a disclosure for backwards
-          compatibility with modules created before the native chain
-          existed. New modules should ignore this section entirely. */}
-      <details className="group rounded-2xl bg-bg-base/30 ring-1 ring-white/[0.04]">
-        <summary className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl px-5 py-3 text-sm text-fg-muted hover:bg-white/[0.02]">
-          <div className="flex items-center gap-2">
-            <Cloud className="size-3.5" />
-            <span>
-              Configuration legacy Prism{" "}
-              <span className="ml-1 rounded-full bg-fg-dim/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-fg-dim">
-                Modules anciens uniquement
-              </span>
-            </span>
-          </div>
-          <span className="text-xs text-fg-dim group-open:hidden">Cliquer pour déplier</span>
-        </summary>
-        <div className="grid gap-4 border-t border-white/[0.04] p-5">
-          <div className="grid grid-cols-2 gap-2 rounded-xl bg-white/[0.03] p-1.5 ring-1 ring-white/[0.06]">
-            {sources.map((s) => (
-              <button
-                key={s.value}
-                onClick={() => updateForm("mcSource", s.value)}
-                className={cn(
-                  "relative rounded-lg px-3 py-2.5 text-left transition-colors",
-                  form.mcSource === s.value ? "text-bg-base" : "text-fg-muted hover:text-fg-primary",
-                )}
-              >
-                {form.mcSource === s.value && (
-                  <motion.div
-                    layoutId="mc-source-pill"
-                    className="absolute inset-0 rounded-lg bg-accent shadow-[0_0_18px_var(--color-accent-soft)]"
-                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                  />
-                )}
-                <span className="relative z-10 block text-sm font-medium">{s.label}</span>
-                <span
-                  className={cn(
-                    "relative z-10 block text-xs",
-                    form.mcSource === s.value ? "text-bg-base/70" : "text-fg-dim",
-                  )}
-                >
-                  {s.hint}
-                </span>
-              </button>
+      {/* Display-only metadata (the actual install config lives in the
+          native block above; these two fields are just for module list
+          UI labels). */}
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Version Minecraft" hint="affichage uniquement">
+          <Input
+            value={form.minecraftVersion}
+            onChange={(v) => updateForm("minecraftVersion", v)}
+            placeholder="1.20.1"
+          />
+        </Field>
+        <Field label="Mod loader" hint="affichage uniquement">
+          <select
+            value={form.modLoader}
+            onChange={(e) => updateForm("modLoader", e.target.value as ModLoader)}
+            className="no-drag w-full rounded-lg bg-bg-base/40 px-3.5 py-2.5 text-sm text-fg-primary ring-1 ring-white/[0.06] focus:outline-none focus:ring-1 focus:ring-accent/60"
+          >
+            {loaders.map((l) => (
+              <option key={l.value} value={l.value}>
+                {l.label}
+              </option>
             ))}
-          </div>
-
-          {form.mcSource === "manual" ? (
-            <ModpackZipPicker
-              currentUrl={form.customZipUrl}
-              currentSize={form.customZipSize}
-              uploading={modpackUploading}
-              onPick={onUploadModpack}
-              onClear={() => {
-                updateForm("customZipUrl", "");
-                updateForm("customZipSize", 0);
-              }}
-            />
-          ) : (
-            <>
-              <Field label="URL du fichier modpack" hint="optionnel · auto-extrait le File ID">
-                <Input
-                  value=""
-                  onChange={handleUrlPaste}
-                  placeholder="https://www.curseforge.com/minecraft/modpacks/.../files/6051892"
-                />
-              </Field>
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="Project ID" hint="numérique · cf. About Project sur CF">
-                  <Input
-                    value={form.curseforgeProjectId}
-                    onChange={(v) => updateForm("curseforgeProjectId", v.replace(/\D/g, ""))}
-                    placeholder="520914"
-                    mono
-                  />
-                </Field>
-                <Field label="File ID" hint="version spécifique du modpack">
-                  <Input
-                    value={form.curseforgeFileId}
-                    onChange={(v) => updateForm("curseforgeFileId", v.replace(/\D/g, ""))}
-                    placeholder="6051892"
-                    mono
-                  />
-                </Field>
-              </div>
-            </>
-          )}
-
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Version Minecraft" hint="affichage uniquement">
-              <Input
-                value={form.minecraftVersion}
-                onChange={(v) => updateForm("minecraftVersion", v)}
-                placeholder="1.20.1"
-              />
-            </Field>
-            <Field label="Mod loader" hint="affichage uniquement">
-              <select
-                value={form.modLoader}
-                onChange={(e) => updateForm("modLoader", e.target.value as ModLoader)}
-                className="no-drag w-full rounded-lg bg-bg-base/40 px-3.5 py-2.5 text-sm text-fg-primary ring-1 ring-white/[0.06] focus:outline-none focus:ring-1 focus:ring-accent/60"
-              >
-                {loaders.map((l) => (
-                  <option key={l.value} value={l.value}>
-                    {l.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          </div>
-        </div>
-      </details>
-
-    </div>
-  );
-}
-
-function ModpackZipPicker({
-  currentUrl,
-  currentSize,
-  uploading,
-  onPick,
-  onClear,
-}: {
-  currentUrl: string;
-  currentSize: number;
-  uploading: { percent: number; uploaded: number; total: number } | null;
-  onPick: (file: File) => void;
-  onClear: () => void;
-}) {
-  const id = "modpack-zip-input";
-  const sizeMb = (b: number) => (b / 1_048_576).toFixed(1);
-  return (
-    <div className="rounded-xl border border-dashed border-white/10 bg-bg-base/30 p-4 transition-colors hover:border-accent/40">
-      <input
-        type="file"
-        id={id}
-        accept=".zip,application/zip"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) onPick(f);
-        }}
-        className="hidden"
-      />
-      {uploading ? (
-        <div className="space-y-2">
-          <div className="flex items-baseline justify-between text-xs">
-            <span className="font-medium text-fg-primary">Upload du modpack…</span>
-            <span className="text-fg-muted">
-              {sizeMb(uploading.uploaded)} / {sizeMb(uploading.total)} Mo · {uploading.percent.toFixed(0)}%
-            </span>
-          </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-            <motion.div
-              className="h-full bg-accent shadow-[0_0_12px_var(--color-accent-glow)]"
-              animate={{ width: `${uploading.percent}%` }}
-              transition={{ duration: 0.2 }}
-            />
-          </div>
-        </div>
-      ) : currentUrl ? (
-        /* min-w-0 on the flex container itself + on the text wrapper is what
-           lets the row shrink correctly; without it, intrinsic content sizing
-           (especially long Firebase Storage URLs) was forcing the form column
-           to grow past its 7/12 grid track and bleed into the preview. */
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-success/15 text-success ring-1 ring-success/30">
-            <CheckCircle2 className="size-5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-sm text-fg-primary">
-              Modpack uploadé{currentSize > 0 ? ` (${sizeMb(currentSize)} Mo)` : ""}
-            </div>
-            {/* No more raw Firebase URL on screen — that 200-char string was
-                wrecking the layout. The hover-only tooltip keeps it accessible
-                for admins who actually want to copy the URL. */}
-            <div
-              className="truncate text-xs text-fg-muted"
-              title={currentUrl}
-            >
-              hébergé sur Firebase Storage
-            </div>
-          </div>
-          <label
-            htmlFor={id}
-            className="no-drag shrink-0 cursor-pointer rounded-md bg-white/[0.04] px-3 py-1.5 text-xs text-fg-primary ring-1 ring-white/[0.06] transition-colors hover:bg-white/[0.08]"
-          >
-            Remplacer
-          </label>
-          <button
-            onClick={onClear}
-            type="button"
-            className="shrink-0 rounded-md bg-white/[0.02] px-2.5 py-1.5 text-xs text-fg-muted ring-1 ring-white/[0.04] transition-colors hover:bg-danger/10 hover:text-danger"
-          >
-            Retirer
-          </button>
-        </div>
-      ) : (
-        <label htmlFor={id} className="no-drag flex cursor-pointer items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="grid size-10 place-items-center rounded-lg bg-accent/10 text-accent">
-              <Upload className="size-5" />
-            </div>
-            <div>
-              <div className="text-sm text-fg-primary">Upload du fat-zip modpack</div>
-              <div className="text-xs text-fg-muted">manifest.json + overrides/ (mods bundled inclus)</div>
-            </div>
-          </div>
-          <span className="rounded-md bg-white/[0.04] px-3 py-1.5 text-xs text-fg-primary ring-1 ring-white/[0.06]">Parcourir</span>
-        </label>
-      )}
+          </select>
+        </Field>
+      </div>
     </div>
   );
 }
@@ -1754,17 +1497,12 @@ function ModuleCard({
 }
 
 /**
- * Compact configuration block for the *native* Minecraft launch path
- * (no Prism). Renders inline inside `MinecraftFields` so admins can
- * decide per-module whether to use Prism (legacy) or the in-house chain.
- *
- * The toggle is OFF by default — existing modules keep their Prism
- * behaviour unchanged. Once enabled, the admin sets a pinned MC version,
- * a loader (vanilla / Fabric / Forge / NeoForge), an optional loader
+ * Configuration block for the native Minecraft launch path. Sole launch
+ * path since v26.05.03.8 (Prism support removed). Holds the pinned MC
+ * version, the loader (vanilla / Fabric / Forge / NeoForge), the loader
  * version, and an optional modpack overlay (Modrinth `.mrpack` URL or
- * raw ZIP). All of this gets persisted into Firestore alongside the
- * existing module fields and consumed by `ModuleDetailPage` at launch
- * time.
+ * raw ZIP). Everything gets persisted into Firestore and consumed by
+ * `ModuleDetailPage` at launch time via `mc_native_launch`.
  */
 function NativeMinecraftBlock({
   form,
@@ -1774,55 +1512,30 @@ function NativeMinecraftBlock({
 }: {
   form: FormState;
   updateForm: <K extends keyof FormState>(key: K, value: FormState[K]) => void;
-  /** Same upload progress channel the legacy ModpackZipPicker uses —
-   *  shared so the admin doesn't need two upload UIs. */
   modpackUploading: { percent: number; uploaded: number; total: number } | null;
   onUploadModpack: (file: File) => void;
 }) {
   return (
-    <div
-      className={cn(
-        "rounded-2xl ring-1 p-4 transition-colors",
-        form.nativeMc
-          ? "bg-emerald-400/[0.03] ring-emerald-400/30"
-          : "bg-bg-base/30 ring-white/[0.06]",
-      )}
-    >
+    <div className="rounded-2xl bg-emerald-400/[0.03] p-4 ring-1 ring-emerald-400/30">
       <div className="flex items-start gap-3">
-        <button
-          type="button"
-          onClick={() => updateForm("nativeMc", !form.nativeMc)}
-          className={cn(
-            "mt-0.5 grid size-5 shrink-0 place-items-center rounded-md ring-1 transition-colors",
-            form.nativeMc
-              ? "bg-emerald-400 ring-emerald-400 text-bg-base"
-              : "bg-bg-elevated ring-white/[0.08] text-fg-dim",
-          )}
-        >
-          {form.nativeMc && <CheckCircle2 className="size-3.5" strokeWidth={3} />}
-        </button>
-        <div className="flex-1 min-w-0">
-          <button
-            type="button"
-            onClick={() => updateForm("nativeMc", !form.nativeMc)}
-            className="block text-left"
-          >
-            <div className="text-sm font-medium text-fg-primary">
-              Mode natif (sans Prism){" "}
-              <span className="ml-1 rounded-full bg-emerald-400/15 px-2 py-0.5 text-[10px] uppercase tracking-wider text-emerald-300 ring-1 ring-emerald-400/30">
-                Bêta
-              </span>
-            </div>
-            <div className="text-xs text-fg-muted">
-              Utilise le launcher Minecraft intégré (auth Microsoft + DL
-              libs/assets + Forge/Fabric/NeoForge + modpack Modrinth ou ZIP).
-              Les utilisateurs n'ont rien à installer côté.
-            </div>
-          </button>
+        <div className="grid size-5 shrink-0 place-items-center rounded-md bg-emerald-400 text-bg-base ring-1 ring-emerald-400">
+          <CheckCircle2 className="size-3.5" strokeWidth={3} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium text-fg-primary">
+            Lanceur Minecraft natif{" "}
+            <span className="ml-1 rounded-full bg-emerald-400/15 px-2 py-0.5 text-[10px] uppercase tracking-wider text-emerald-300 ring-1 ring-emerald-400/30">
+              Stable
+            </span>
+          </div>
+          <div className="text-xs text-fg-muted">
+            Auth Microsoft + DL libs/assets + Forge/Fabric/NeoForge + modpack
+            Modrinth ou ZIP. Sole launch path depuis v26.05.03.8.
+          </div>
         </div>
       </div>
 
-      {form.nativeMc && (
+      {(
         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
           <Field label="Version Minecraft" hint='Ex. "1.20.1" ou "26.1.2"'>
             <input
@@ -2001,14 +1714,6 @@ function NativeMinecraftBlock({
         </div>
       )}
 
-      {form.nativeMc && (
-        <div className="mt-3 rounded-xl bg-amber-400/[0.06] p-3 text-xs text-amber-200 ring-1 ring-amber-400/20">
-          ℹ️ Quand <strong>Mode natif</strong> est activé, le bouton « Lancer »
-          de la page module utilise la chaîne native. Les champs
-          CurseForge/Prism (section legacy ci-dessous) sont conservés mais
-          ignorés.
-        </div>
-      )}
     </div>
   );
 }

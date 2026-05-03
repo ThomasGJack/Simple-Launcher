@@ -85,7 +85,7 @@ export function MinecraftRamControl({ module }: { module: MinecraftModule }) {
           </>
         ) : (
           <>
-            L'admin n'a pas configuré de défaut, donc Prism utilise sa valeur système (souvent 1–2 Go) si tu ne touches à rien. Pour un modpack, mets au moins 4 Go.
+            L'admin n'a pas configuré de défaut, donc le launcher utilise sa valeur par défaut (~4 Go) si tu ne touches à rien. Pour un modpack lourd, monte à 6-8 Go.
           </>
         )}
       </p>

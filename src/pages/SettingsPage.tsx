@@ -450,7 +450,7 @@ function MinecraftAccountsCard() {
             </span>
           </div>
           <div className="text-sm text-fg-muted">
-            Connecte ton compte Microsoft pour lancer Minecraft sans Prism.
+            Connecte ton compte Microsoft pour lancer Minecraft.
             La fenêtre Microsoft s'ouvre dans ton navigateur — tes
             identifiants ne transitent jamais par le launcher.
           </div>

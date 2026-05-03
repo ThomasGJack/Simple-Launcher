@@ -64,12 +64,10 @@ pub fn run() {
             modules::module_launch_hosted,
             modules::module_launch_shortcut,
             modules::module_uninstall,
-            minecraft::mc_find_prism,
-            minecraft::mc_open_prism_instance_dir,
-            minecraft::mc_get_state,
-            minecraft::mc_install_modpack,
-            minecraft::mc_launch,
-            minecraft::mc_uninstall,
+            // Prism-era commands removed in v26.05.03.8 — the in-house
+            // native chain (`mc_native_*` + `mc_vanilla_*` + `mc_fabric_*` +
+            // `mc_forge_*` + `mc_zip_*` + `mc_modrinth_*`) is now the only
+            // supported Minecraft launch path.
             rcon::rcon_connect,
             rcon::rcon_send,
             rcon::rcon_close,

@@ -102,8 +102,7 @@ export type ShortcutModule = BaseModule & {
 
 /**
  * Native modpack source — describes how the launcher should populate
- * `.minecraft/` for a Minecraft module that uses the native launch path
- * (no Prism). Only relevant when `nativeMc === true`.
+ * `.minecraft/` for a Minecraft module.
  *
  * - `none`: pure vanilla + loader, no extra mods
  * - `modrinth`: pull a `.mrpack` from `mrpackUrl` (manifest resolves
@@ -116,44 +115,35 @@ export type NativeModpackSource =
   | { kind: "modrinth"; mrpackUrl: string; modrinthProjectId?: string; versionLabel?: string }
   | { kind: "zip"; zipUrl: string };
 
+/**
+ * Minecraft module — always uses the in-house native launch chain
+ * (`mc_native_launch` + `mc_vanilla_*` / `mc_fabric_*` / `mc_forge_*` /
+ * `mc_modrinth_*` / `mc_zip_*` Tauri commands). Prism support was
+ * removed in v26.05.03.8.
+ *
+ * Fields removed in that release for completeness :
+ *   `curseforgeProjectId`, `curseforgeFileId`, `customZipUrl`,
+ *   `customZipSize`, `prismInstanceName`, `nativeMc` (always treated
+ *   as true now). Existing Firestore documents that still carry these
+ *   fields just have them ignored at read time — TypeScript won't see
+ *   them through this type and they're harmless on disk.
+ */
 export type MinecraftModule = BaseModule & {
   type: "minecraft";
-  // ─── Legacy Prism-based config (still used when nativeMc !== true) ──
-  curseforgeProjectId?: number;
-  curseforgeFileId?: number;
-  /**
-   * Direct download URL to a CurseForge-format modpack .zip
-   * (`manifest.json` + `overrides/` at the root). When set, the launcher
-   * skips the CurseForge API entirely and uses this URL instead.
-   * Typically a Firebase Storage URL produced by the admin UI.
-   */
-  customZipUrl?: string;
-  /** Size in bytes of the custom zip (display only). */
-  customZipSize?: number;
-  // Optional metadata, displayed but not required for launching
+
+  // Optional metadata, displayed but not required for launching.
   minecraftVersion?: string;
   modLoader?: "forge" | "fabric" | "quilt" | "neoforge";
-  // Optional override for the Prism instance name (default: from modpack manifest)
-  prismInstanceName?: string;
+
   /**
-   * Max heap size for the JVM, in MiB. When set, the launcher writes
-   * `OverrideMemory=true` + `MaxMemAlloc=<value>` to the Prism `instance.cfg`
-   * so the modpack runs with that allocation regardless of the user's global
-   * Prism settings. Recommended: 4096 (4 GB) for vanilla-ish, 6144–8192 for
-   * heavy modpacks. The min heap is automatically set to ~half this value.
+   * Max heap size for the JVM, in MiB. Default behaviour when unset is
+   * `mc_launch.rs` falling back to 4096 MiB. Per-machine user override
+   * lives in localStorage (see `getUserRamOverride` in `lib/minecraft.ts`).
    */
   maxRamMb?: number;
 
-  // ─── Native launch path (no Prism dependency) ──────────────────────
-  /**
-   * When `true`, the launcher uses the in-house native chain (mc_auth +
-   * mc_java + mc_vanilla + mc_fabric/mc_forge + mc_modrinth/mc_zip +
-   * mc_launch) instead of Prism. The Prism-related fields above are
-   * ignored — the native config below drives the install + launch.
-   */
-  nativeMc?: boolean;
-  /** Vanilla MC version pinned for this module, e.g. "1.20.1" or
-   *  "26.1.2". Required when `nativeMc === true`. */
+  // ─── Native install/launch config ──────────────────────────────────
+  /** Vanilla MC version pinned for this module, e.g. "1.20.1". */
   nativeMcVersion?: string;
   /** Loader pick: "vanilla" (no loader) / fabric / forge / neoforge. */
   nativeLoader?: "vanilla" | "fabric" | "forge" | "neoforge";

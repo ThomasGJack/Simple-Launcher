@@ -21,7 +21,7 @@ export function ramTone(value: number): { tone: "neutral" | "warn" | "danger"; t
   if (value === 0) {
     return {
       tone: "warn",
-      tip: "« Défaut » = Prism décide tout seul (~1–2 Go). Pour la plupart des modpacks il faut au moins 4 Go pour éviter les freezes.",
+      tip: "« Défaut » = la JVM choisit (~4 Go). Pour la plupart des modpacks il faut 4 à 8 Go pour éviter les freezes.",
     };
   }
   if (value < 3072) {
