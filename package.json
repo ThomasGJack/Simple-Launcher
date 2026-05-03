@@ -1,7 +1,7 @@
 {
   "name": "simple-launcher",
   "private": true,
-  "version": "26.503.7",
+  "version": "26.503.8",
   "type": "module",
   "scripts": {
     "dev": "vite",
