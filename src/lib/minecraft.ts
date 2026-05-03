@@ -9,11 +9,11 @@ import type { MinecraftModule } from "@/types/module";
  * in-house native chain became the only launch path. What remains is
  * tiny: per-machine RAM overrides + an MC-version → Java mapping.
  *
- * The actual install/launch entrypoints for native modules live in
- * `MinecraftNativeBuilder` (admin install flow) and the Tauri commands
- * `mc_native_launch` / `mc_vanilla_install` / `mc_fabric_install` /
- * `mc_forge_install` / `mc_modrinth_install` / `mc_zip_install` invoked
- * directly from `ModuleDetailPage.tsx`'s native action panel.
+ * The actual install/launch entrypoints for native modules live in the
+ * Tauri commands `mc_native_launch` / `mc_vanilla_install` /
+ * `mc_fabric_install` / `mc_forge_install` / `mc_modrinth_install` /
+ * `mc_zip_install` invoked directly from `ModuleDetailPage.tsx`'s
+ * native action panel.
  */
 
 // ─── Per-machine RAM override (localStorage) ──────────────────────────

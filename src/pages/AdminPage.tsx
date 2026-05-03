@@ -28,7 +28,6 @@ import { useAuthStore } from "@/store/auth";
 import { NewsManager } from "@/components/admin/NewsManager";
 import { CrewsManager } from "@/components/admin/CrewsManager";
 import { LogsManager } from "@/components/admin/LogsManager";
-import { MinecraftNativeBuilder } from "@/components/admin/MinecraftNativeBuilder";
 import { isAdmin } from "@/lib/admin";
 import {
   deleteHostedZip,
@@ -128,7 +127,7 @@ const EMPTY_FORM: FormState = {
 
 export function AdminPage() {
   const user = useAuthStore((s) => s.user);
-  const [activeTab, setActiveTab] = useState<"modules" | "news" | "crews" | "logs" | "mc-native">("modules");
+  const [activeTab, setActiveTab] = useState<"modules" | "news" | "crews" | "logs">("modules");
   const modules = useModules();
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [file, setFile] = useState<File | null>(null);
@@ -530,14 +529,6 @@ export function AdminPage() {
       description:
         "Consulte les fichiers de session de chaque user. Sélectionne un launcher → choisis un fichier → lis, télécharge ou supprime. Rétention auto 7 jours.",
     },
-    {
-      id: "mc-native" as const,
-      label: "MC natif",
-      icon: Gamepad2,
-      title: "Minecraft natif (sans Prism)",
-      description:
-        "Banc de test pour la chaîne complète d'install et de lancement Minecraft sans dépendance externe. Vanilla + Fabric + Forge + NeoForge.",
-    },
   ];
   const currentTab = tabs.find((t) => t.id === activeTab) ?? tabs[0];
 
@@ -623,17 +614,6 @@ export function AdminPage() {
           transition={{ duration: 0.35 }}
         >
           <LogsManager />
-        </motion.div>
-      )}
-
-      {activeTab === "mc-native" && (
-        <motion.div
-          key="tab-mc-native"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35 }}
-        >
-          <MinecraftNativeBuilder />
         </motion.div>
       )}
 
@@ -1006,7 +986,7 @@ function PublishedModulesRow({
 function ModuleTypeSwitch({ value, onChange }: { value: ModuleType; onChange: (v: ModuleType) => void }) {
   const types: { value: ModuleType; label: string; hint: string }[] = [
     { value: "hosted", label: "Hébergé", hint: "Jeu standalone uploadé sur Firebase" },
-    { value: "minecraft", label: "Minecraft", hint: "Modpack CurseForge via Prism" },
+    { value: "minecraft", label: "Minecraft", hint: "Vanilla / Fabric / Forge / NeoForge + modpack Modrinth ou ZIP" },
   ];
   return (
     <div className="grid grid-cols-2 gap-2 rounded-xl bg-white/[0.03] p-1.5 ring-1 ring-white/[0.06]">
