@@ -3,26 +3,74 @@ import type { LauncherModule } from "@/types/module";
 import type { AnyModuleBlock } from "@/types/moduleBlocks";
 import { BlockShell } from "./BlockShell";
 
-import { BlockHeroParallax } from "./HeroParallax";
-import { BlockPoster } from "./Poster";
-import { BlockRichText } from "./RichText";
-import { BlockFeatureCards } from "./FeatureCards";
-import { BlockQuote } from "./Quote";
-import { BlockCta } from "./Cta";
+// ─── Eager (tiny, frequently-rendered) ─────────────────────────────
+//
+// Blocks kept inline in the main bundle because they are :
+//   - Trivial (Divider, Spacer = 1-2 elements + CSS)
+//   - Almost always present (Cta — used as the bottom-of-page launch
+//     button on most modules, kept eager so the launch UX never has a
+//     Suspense fallback flash)
+//   - Static layout (Poster — pure <img> + caption, no animation)
 import { BlockDivider } from "./Divider";
 import { BlockSpacer } from "./Spacer";
-import { BlockStats } from "./Stats";
-import { BlockTimeline } from "./Timeline";
-import { BlockChangelog } from "./Changelog";
-import { BlockScreenshotsGrid } from "./ScreenshotsGrid";
-import { BlockMascotSpot } from "./MascotSpot";
+import { BlockCta } from "./Cta";
+import { BlockPoster } from "./Poster";
 
-const BlockGalleryLazy = lazy(() => import("./Gallery").then((m) => ({ default: m.BlockGallery })));
-const BlockCarouselLazy = lazy(() => import("./Carousel").then((m) => ({ default: m.BlockCarousel })));
-const BlockVideoEmbedLazy = lazy(() => import("./VideoEmbed").then((m) => ({ default: m.BlockVideoEmbed })));
-const BlockComparisonLazy = lazy(() => import("./Comparison").then((m) => ({ default: m.BlockComparison })));
-const BlockParticlesBandLazy = lazy(() => import("./ParticlesBand").then((m) => ({ default: m.BlockParticlesBand })));
-const BlockEmbedHtmlLazy = lazy(() => import("./EmbedHtml").then((m) => ({ default: m.BlockEmbedHtml })));
+// ─── Lazy (everything else) ────────────────────────────────────────
+//
+// Each block becomes its own chunk. First paint of a module page only
+// loads the chunks for blocks actually present on it, instead of the
+// previous monolithic ~612 KB BlockRenderer chunk that bundled all 19
+// types eagerly.
+//
+// The Suspense boundary is in `BlockRenderer` below, fallback is null
+// (blocks are usually inside a vertical scroll list — a flash of empty
+// space is less disruptive than a spinner per block).
+const BlockHeroParallaxLazy = lazy(() =>
+  import("./HeroParallax").then((m) => ({ default: m.BlockHeroParallax })),
+);
+const BlockRichTextLazy = lazy(() =>
+  import("./RichText").then((m) => ({ default: m.BlockRichText })),
+);
+const BlockFeatureCardsLazy = lazy(() =>
+  import("./FeatureCards").then((m) => ({ default: m.BlockFeatureCards })),
+);
+const BlockQuoteLazy = lazy(() =>
+  import("./Quote").then((m) => ({ default: m.BlockQuote })),
+);
+const BlockStatsLazy = lazy(() =>
+  import("./Stats").then((m) => ({ default: m.BlockStats })),
+);
+const BlockTimelineLazy = lazy(() =>
+  import("./Timeline").then((m) => ({ default: m.BlockTimeline })),
+);
+const BlockChangelogLazy = lazy(() =>
+  import("./Changelog").then((m) => ({ default: m.BlockChangelog })),
+);
+const BlockScreenshotsGridLazy = lazy(() =>
+  import("./ScreenshotsGrid").then((m) => ({ default: m.BlockScreenshotsGrid })),
+);
+const BlockMascotSpotLazy = lazy(() =>
+  import("./MascotSpot").then((m) => ({ default: m.BlockMascotSpot })),
+);
+const BlockGalleryLazy = lazy(() =>
+  import("./Gallery").then((m) => ({ default: m.BlockGallery })),
+);
+const BlockCarouselLazy = lazy(() =>
+  import("./Carousel").then((m) => ({ default: m.BlockCarousel })),
+);
+const BlockVideoEmbedLazy = lazy(() =>
+  import("./VideoEmbed").then((m) => ({ default: m.BlockVideoEmbed })),
+);
+const BlockComparisonLazy = lazy(() =>
+  import("./Comparison").then((m) => ({ default: m.BlockComparison })),
+);
+const BlockParticlesBandLazy = lazy(() =>
+  import("./ParticlesBand").then((m) => ({ default: m.BlockParticlesBand })),
+);
+const BlockEmbedHtmlLazy = lazy(() =>
+  import("./EmbedHtml").then((m) => ({ default: m.BlockEmbedHtml })),
+);
 
 type Props = {
   blocks: AnyModuleBlock[];
@@ -74,7 +122,7 @@ function BlockBody({
 }) {
   switch (block.type) {
     case "hero-parallax":
-      return <BlockHeroParallax {...block.props} />;
+      return <BlockHeroParallaxLazy {...block.props} />;
     case "poster":
       return <BlockPoster {...block.props} />;
     case "gallery":
@@ -86,11 +134,11 @@ function BlockBody({
     case "comparison":
       return <BlockComparisonLazy {...block.props} />;
     case "rich-text":
-      return <BlockRichText {...block.props} />;
+      return <BlockRichTextLazy {...block.props} />;
     case "feature-cards":
-      return <BlockFeatureCards {...block.props} />;
+      return <BlockFeatureCardsLazy {...block.props} />;
     case "quote":
-      return <BlockQuote {...block.props} />;
+      return <BlockQuoteLazy {...block.props} />;
     case "cta":
       return <BlockCta {...block.props} module={module} onLaunch={onLaunch} />;
     case "divider":
@@ -98,15 +146,15 @@ function BlockBody({
     case "spacer":
       return <BlockSpacer {...block.props} />;
     case "stats":
-      return <BlockStats {...block.props} />;
+      return <BlockStatsLazy {...block.props} />;
     case "timeline":
-      return <BlockTimeline {...block.props} />;
+      return <BlockTimelineLazy {...block.props} />;
     case "changelog":
-      return <BlockChangelog {...block.props} moduleId={module?.id} />;
+      return <BlockChangelogLazy {...block.props} moduleId={module?.id} />;
     case "screenshots-grid":
-      return <BlockScreenshotsGrid {...block.props} />;
+      return <BlockScreenshotsGridLazy {...block.props} />;
     case "mascot-spot":
-      return <BlockMascotSpot {...block.props} />;
+      return <BlockMascotSpotLazy {...block.props} />;
     case "particles-band":
       return <BlockParticlesBandLazy {...block.props} />;
     case "embed-html":
