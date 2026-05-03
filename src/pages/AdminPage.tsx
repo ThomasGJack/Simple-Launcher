@@ -15,6 +15,7 @@ import {
   Sparkles,
   Server,
   Activity,
+  BarChart3,
   Layout,
   TerminalSquare,
   Loader2,
@@ -28,6 +29,7 @@ import { useAuthStore } from "@/store/auth";
 import { NewsManager } from "@/components/admin/NewsManager";
 import { CrewsManager } from "@/components/admin/CrewsManager";
 import { LogsManager } from "@/components/admin/LogsManager";
+import { AdminStatsPanel } from "@/components/admin/AdminStatsPanel";
 import { isAdmin } from "@/lib/admin";
 import {
   deleteHostedZip,
@@ -127,7 +129,7 @@ const EMPTY_FORM: FormState = {
 
 export function AdminPage() {
   const user = useAuthStore((s) => s.user);
-  const [activeTab, setActiveTab] = useState<"modules" | "news" | "crews" | "logs">("modules");
+  const [activeTab, setActiveTab] = useState<"modules" | "news" | "crews" | "logs" | "stats">("modules");
   const modules = useModules();
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [file, setFile] = useState<File | null>(null);
@@ -529,6 +531,14 @@ export function AdminPage() {
       description:
         "Consulte les fichiers de session de chaque user. Sélectionne un launcher → choisis un fichier → lis, télécharge ou supprime. Rétention auto 7 jours.",
     },
+    {
+      id: "stats" as const,
+      label: "Stats",
+      icon: BarChart3,
+      title: "Stats & Analytics",
+      description:
+        "Lancements et temps de jeu cumulés sur tout le launcher, top modules, utilisateurs actifs. Données agrégées au moment de l'ouverture (refresh manuel).",
+    },
   ];
   const currentTab = tabs.find((t) => t.id === activeTab) ?? tabs[0];
 
@@ -614,6 +624,17 @@ export function AdminPage() {
           transition={{ duration: 0.35 }}
         >
           <LogsManager />
+        </motion.div>
+      )}
+
+      {activeTab === "stats" && (
+        <motion.div
+          key="tab-stats"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+        >
+          <AdminStatsPanel />
         </motion.div>
       )}
 
