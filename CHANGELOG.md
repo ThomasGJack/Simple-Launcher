@@ -18,6 +18,12 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.05.03.2] - 2026-05-03  · semver `26.503.1`
+
+
+### Corrigé
+
+- **Crash NeoForge `ClassNotFoundException: java.lang.Integer` sur les Windows avec Java 26** ([src-tauri/src/mc_java.rs](src-tauri/src/mc_java.rs)) — symptôme : Glitch's Colony (MC 1.21.1 + NeoForge 21.1.224) crashait au boot sur le PC du release tester avec une trace Mixin / `cpw.mods.securejarhandler`. Cause : `mc_java_resolve` acceptait n'importe quelle JRE plus récente que celle requise (`major_version > required`). Sur les machines avec Java 26 installé en système, il piochait Java 26 pour MC 1.21.1 (qui requiert 21). Java 26 a serré les règles d'accès du Java Module System → `MixinPreProcessor` n'arrive plus à introspecter `java.lang.Integer` → crash. Fix : `mc_java_resolve` exige maintenant le **major exact**. Si non trouvé → DL Adoptium Temurin pour ce major précis (au lieu de gambler sur une JRE trop récente). Logs `[mc-java] resolve:` pour tracer le choix. Le bytecode reste backward compatible mais le module layer ne l'est pas — installer 40 Mo de JRE en plus vaut mieux qu'un crash silencieux.
 ## [v26.05.03] - 2026-05-03  · semver `26.503.0`
 
 

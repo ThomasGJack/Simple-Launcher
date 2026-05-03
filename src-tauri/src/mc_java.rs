@@ -402,11 +402,25 @@ pub async fn mc_java_install<R: Runtime>(
 }
 
 /// Returns the Java installation to use for launching the given MC
-/// version. If a compatible installation is already present (managed or
-/// system-wide), returns it immediately. Otherwise downloads the
-/// Adoptium Temurin JRE for the right major version on the fly. The
-/// returned installation is guaranteed `major_version >= required_for_mc`
-/// — we accept newer Java for older MC since the JVM is backward compat.
+/// version. If the **exact** major version we want is already present
+/// (managed or system-wide), returns it. Otherwise downloads the
+/// Adoptium Temurin JRE for that major on the fly. The returned
+/// installation is guaranteed `major_version == required_for_mc`.
+///
+/// Why we don't accept newer Java versions: NeoForge / Forge use the
+/// Java Module System (JPMS) for their `securejarhandler`, and
+/// Mojang/Microsoft have tightened module access rules with each
+/// release (Java 22 made `--add-opens` warnings into hard errors for
+/// some packages, Java 24 removed several legacy reflection
+/// workarounds, Java 26 broke `MixinPreProcessor`'s class
+/// introspection). Symptom of the bug we hit before this rewrite:
+/// crash with `java.lang.ClassNotFoundException: java.lang.Integer`
+/// during NeoForge boot when running NeoForge 21.1.x on Java 26.
+/// Bytecode itself is backward compatible, but the module layer
+/// isn't, so NeoForge / Forge launches need the exact major they
+/// were built for. Vanilla and Fabric are also strict-major locked
+/// for consistency — installing a 40 MB Temurin JRE is cheap and
+/// removes a class of footgun.
 #[tauri::command]
 pub async fn mc_java_resolve<R: Runtime>(
     app: AppHandle<R>,
@@ -414,15 +428,23 @@ pub async fn mc_java_resolve<R: Runtime>(
 ) -> Result<JavaInstallation, String> {
     let required = required_java_for_mc(&mc_version);
     let installed = list_installations(&app).await.unwrap_or_default();
-    // Prefer exact major match (same Java the modpack was built for).
     if let Some(exact) = installed.iter().find(|j| j.major_version == required) {
+        eprintln!(
+            "[mc-java] resolve: MC {} → Java {} HIT (path={}, source={})",
+            mc_version, required, exact.path, exact.source
+        );
         return Ok(exact.clone());
     }
-    // Otherwise allow any newer major — JVMs are backward compatible.
-    if let Some(newer) = installed.iter().find(|j| j.major_version > required) {
-        return Ok(newer.clone());
-    }
-    // Nothing usable → install one.
+    eprintln!(
+        "[mc-java] resolve: MC {} requires Java {}; not installed (have: {:?}). Auto-downloading Adoptium Temurin {}.",
+        mc_version,
+        required,
+        installed
+            .iter()
+            .map(|j| j.major_version)
+            .collect::<Vec<_>>(),
+        required
+    );
     install_adoptium(&app, required).await
 }
 
