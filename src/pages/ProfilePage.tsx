@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { LogOut, Calendar, Mail, Hash, Gamepad2, Clock, Rocket, Trophy, Sigma, Flame, ChevronDown, ChevronUp } from "lucide-react";
+import { LogOut, Calendar, Mail, Hash, Gamepad2, Clock, Rocket, Trophy, Sigma, Flame, ChevronDown, ChevronUp, Share2 } from "lucide-react";
+import { ShareProfileModal } from "@/components/profile/ShareProfileModal";
+import { sounds } from "@/lib/sounds";
 import { useAuthStore } from "@/store/auth";
 import { useUIStore } from "@/store/ui";
 import { signOut } from "@/firebase/auth";
@@ -15,6 +17,7 @@ export function ProfilePage() {
   const unlockedAchievements = useAchievements(user?.uid);
   const modules = useModules();
   const [showAllModules, setShowAllModules] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   if (!user) return null;
 
@@ -96,6 +99,20 @@ export function ProfilePage() {
               Connecté via Discord
             </div>
           </div>
+          {discordId && (
+            <button
+              type="button"
+              onClick={() => {
+                sounds.click();
+                setShareOpen(true);
+              }}
+              className="no-drag inline-flex items-center gap-1.5 self-start rounded-xl bg-accent/10 px-3 py-2 text-xs font-medium text-accent ring-1 ring-accent/30 transition-all hover:bg-accent/20 hover:shadow-[0_0_18px_var(--color-accent-soft)]"
+              title="Lien public + QR code de mon profil"
+            >
+              <Share2 className="size-3.5" />
+              Partager
+            </button>
+          )}
         </div>
 
         <div className="mt-8 grid gap-3">
@@ -236,6 +253,15 @@ export function ProfilePage() {
           </div>
         )}
       </motion.div>
+
+      {discordId && (
+        <ShareProfileModal
+          open={shareOpen}
+          onClose={() => setShareOpen(false)}
+          discordId={discordId}
+          displayName={user.displayName ?? "Joueur"}
+        />
+      )}
     </div>
   );
 }

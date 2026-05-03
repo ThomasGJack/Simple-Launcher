@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Bell,
@@ -72,7 +73,18 @@ export function NotificationsCenter({
     );
   };
 
-  return (
+  // Portaled to <body> rather than rendered inline. The Sidebar host
+  // (where this component is mounted) wraps its children in a Framer
+  // Motion `<motion.aside>` with transform animations, and any parent
+  // with a `transform` creates a *containing block* for fixed-positioned
+  // descendants — defeating `position: fixed` so `right-0` snaps to the
+  // sidebar's right edge (~64 px from screen left) instead of the
+  // actual viewport right edge. Portaling to body sidesteps that
+  // entirely. Same pattern is used by every modal toolkit (Radix,
+  // shadcn, react-modal) for the same reason.
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <AnimatePresence>
       {open && (
         <>
@@ -156,7 +168,8 @@ export function NotificationsCenter({
           </motion.aside>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }
 

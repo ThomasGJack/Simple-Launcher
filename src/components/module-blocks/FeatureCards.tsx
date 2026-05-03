@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import * as Icons from "lucide-react";
+import { DynamicIcon } from "lucide-react/dynamic";
 import { cn } from "@/lib/cn";
 import type { FeatureCardsProps } from "@/types/moduleBlocks";
 
@@ -9,10 +9,17 @@ const COLS: Record<NonNullable<FeatureCardsProps["columns"]>, string> = {
   4: "grid-cols-1 sm:grid-cols-2 md:grid-cols-4",
 };
 
-function getIcon(name?: string): React.ComponentType<{ className?: string }> | null {
-  if (!name) return null;
-  const Comp = (Icons as unknown as Record<string, React.ComponentType<{ className?: string }>>)[name];
-  return typeof Comp === "function" ? Comp : null;
+/**
+ * Lucide DynamicIcon takes the kebab-case icon name (e.g. "sparkles",
+ * "zap"), but our config historically stores the PascalCase React
+ * component name ("Sparkles", "Zap") as set by IconPicker. Convert here
+ * so legacy data keeps working with the lazy-loading path.
+ */
+function pascalToKebab(name: string): string {
+  return name
+    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1-$2")
+    .toLowerCase();
 }
 
 export function BlockFeatureCards(props: FeatureCardsProps) {
@@ -22,7 +29,7 @@ export function BlockFeatureCards(props: FeatureCardsProps) {
   return (
     <div className={cn("grid gap-4", cols)}>
       {props.cards.map((card, i) => {
-        const Icon = getIcon(card.icon);
+        const iconName = card.icon ? pascalToKebab(card.icon) : null;
         return (
           <motion.div
             key={i}
@@ -32,7 +39,7 @@ export function BlockFeatureCards(props: FeatureCardsProps) {
             transition={{ delay: i * 0.06, duration: 0.5 }}
             className="rounded-2xl glass p-5 transition-shadow hover:shadow-[0_0_28px_var(--module-primary,var(--color-accent-soft))]"
           >
-            {Icon && (
+            {iconName && (
               <div
                 className={cn(
                   "mb-3 inline-flex size-10 items-center justify-center rounded-xl",
@@ -52,7 +59,7 @@ export function BlockFeatureCards(props: FeatureCardsProps) {
                       : undefined,
                 }}
               >
-                <Icon className="size-5" />
+                <DynamicIcon name={iconName as never} className="size-5" />
               </div>
             )}
             <h3

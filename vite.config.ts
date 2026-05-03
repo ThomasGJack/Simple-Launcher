@@ -26,6 +26,42 @@ export default defineConfig(async () => ({
     },
   },
 
+  build: {
+    // Split every lucide-react icon into its own chunk. Without this,
+    // Rollup groups all icons used anywhere in the graph into a single
+    // ~580 KB vendor chunk that ships eagerly even when 90% of the icons
+    // are only referenced from lazy-loaded pages. Per-icon chunking lets
+    // each lazy page pull only the icons it actually uses, and the eager
+    // bundle drops to just the icons used in Sidebar / TitleBar / root.
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // Match `…/lucide-react/dist/esm/icons/{name}.mjs` (forward or
+          // back slashes for Windows). Each icon gets its own tiny chunk.
+          const iconMatch = id.match(
+            /lucide-react[\\/]dist[\\/]esm[\\/]icons[\\/]([^\\/]+)\.mjs$/,
+          );
+          if (iconMatch) return `lucide/${iconMatch[1]}`;
+          // The DynamicIcon path (DynamicIcon + the 115 KB dynamicIcon
+          // Imports lookup table) is only consumed by FeatureCards and
+          // the admin IconPicker — both lazy. Isolate it so it never
+          // gets pulled into the eager chunk just because something
+          // shares a sibling import.
+          const isLucideEsm =
+            id.includes("lucide-react/dist/esm/") ||
+            id.includes("lucide-react\\dist\\esm\\");
+          if (isLucideEsm) {
+            const isDynamic =
+              /lucide-react[\\/]dist[\\/]esm[\\/](DynamicIcon|dynamicIconImports)\.mjs$/.test(
+                id,
+              );
+            return isDynamic ? "lucide-dynamic" : "lucide-shared";
+          }
+        },
+      },
+    },
+  },
+
   clearScreen: false,
   server: {
     port: 1420,
