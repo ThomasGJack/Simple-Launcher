@@ -10,7 +10,6 @@ mod mc_modrinth;
 mod mc_runtime_deps;
 mod mc_vanilla;
 mod mc_zip;
-mod minecraft;
 mod modules;
 mod oauth;
 mod rcon;
@@ -27,7 +26,6 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .manage(modules::LaunchTracker::new())
-        .manage(minecraft::McLaunchTracker::new())
         .manage(discord_rpc::DiscordRpc::new())
         .manage(rcon::RconRegistry::new())
         .manage(log_file::LogFileState::new())

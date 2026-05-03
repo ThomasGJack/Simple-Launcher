@@ -16,17 +16,59 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Runtime};
+use tauri::{AppHandle, Emitter, Runtime, State};
 use tokio::fs;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 
+use crate::discord_rpc::DiscordRpc;
 use crate::mc_java::mc_java_resolve;
 use crate::mc_vanilla::{
     instance_natives_dir, libraries_dir, maven_path, mc_root, versions_dir,
 };
+use crate::modules::LaunchTracker;
+
+// ─── Cross-launch tracking events ─────────────────────────────────────
+//
+// Mirrors the shape of the `LaunchEvent` / `ExitEvent` structs in
+// `modules.rs` so the frontend can listen on a single pair of channels
+// (`module-launched` / `module-exited`) regardless of whether the
+// launched thing is a hosted module, a shortcut, or a native MC
+// instance. Frontend consumers : presence heartbeat, playtime tracking,
+// achievements (see `App.tsx` and `lib/achievements.ts`).
+#[derive(Debug, Serialize, Clone)]
+struct ModuleLaunchEvent<'a> {
+    #[serde(rename = "moduleId")]
+    module_id: &'a str,
+    #[serde(rename = "moduleName")]
+    module_name: &'a str,
+    #[serde(rename = "startedAt")]
+    started_at: u128,
+}
+
+#[derive(Debug, Serialize, Clone)]
+struct ModuleExitEvent {
+    #[serde(rename = "moduleId")]
+    module_id: String,
+    #[serde(rename = "moduleName")]
+    module_name: String,
+    #[serde(rename = "startedAt")]
+    started_at: u128,
+    #[serde(rename = "exitedAt")]
+    exited_at: u128,
+    #[serde(rename = "durationMs")]
+    duration_ms: u128,
+}
+
+fn now_ms() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0)
+}
 
 // ─── Inputs (from the frontend) ───────────────────────────────────────
 
@@ -36,6 +78,11 @@ pub struct LaunchOptions {
     /// Stable instance id (e.g. the Firestore module id). Drives the
     /// per-instance dirs (.minecraft, natives, logs).
     pub instance_id: String,
+    /// Display name surfaced via Discord Rich Presence + the `module-launched`
+    /// / `module-exited` events the frontend listens to (heartbeats,
+    /// playtime tracking, achievements).
+    #[serde(default)]
+    pub module_name: String,
     /// Vanilla MC version like "1.20.1".
     pub mc_version: String,
     /// "vanilla" or "fabric" (others come later).
@@ -451,6 +498,8 @@ fn chrono_millis_now() -> i64 {
 
 pub async fn launch<R: Runtime>(
     app: AppHandle<R>,
+    tracker: State<'_, LaunchTracker>,
+    discord: State<'_, DiscordRpc>,
     opts: LaunchOptions,
 ) -> Result<(), String> {
     // Diagnostic: surface what we received from the frontend so a
@@ -894,6 +943,35 @@ pub async fn launch<R: Runtime>(
         .spawn()
         .map_err(|e| format!("Spawn javaw échoué : {}", e))?;
 
+    // ── Cross-launch tracking ─────────────────────────────────────
+    //
+    // Wire this MC instance into the shared `LaunchTracker` + emit
+    // `module-launched` so the frontend's heartbeat / playtime / activity
+    // pipeline picks it up just like a hosted module launch. Discord
+    // Rich Presence flips to "Playing <module name>" until the process
+    // exits.
+    let started_at = now_ms();
+    let module_name = if opts.module_name.trim().is_empty() {
+        // Sensible fallback so Discord doesn't show empty status if the
+        // frontend forgot to pass `moduleName`. The instance_id is
+        // usually a slug (e.g. "glitchscolony") which is decent.
+        opts.instance_id.clone()
+    } else {
+        opts.module_name.clone()
+    };
+
+    let tracker_handle = tracker.handle();
+    tracker_handle.mark_running(&opts.instance_id).await;
+    let _ = app.emit(
+        "module-launched",
+        ModuleLaunchEvent {
+            module_id: &opts.instance_id,
+            module_name: &module_name,
+            started_at,
+        },
+    );
+    discord.arc().set_playing(&module_name).await;
+
     // Stream stdout/stderr line-by-line into Tauri events. The frontend
     // can append them to a console UI.
     let id_for_stdout = opts.instance_id.clone();
@@ -932,16 +1010,22 @@ pub async fn launch<R: Runtime>(
     }
 
     // Watch the exit status and emit a final event so the UI can flip
-    // its "running" indicator off + show exit code if non-zero.
+    // its "running" indicator off + show exit code if non-zero. Also
+    // takes care of the cross-launch tracking cleanup : remove from the
+    // shared running set, fire `module-exited` (drives playtime
+    // recording in App.tsx), and flip Discord RPC back to idle.
     let id_for_exit = opts.instance_id.clone();
+    let name_for_exit = module_name.clone();
     let app_for_exit = app.clone();
+    let tracker_for_exit = tracker_handle.clone();
+    let discord_for_exit = discord.arc();
     tokio::spawn(async move {
         match child.wait().await {
             Ok(status) => {
                 emit(
                     &app_for_exit,
                     &LaunchLogLine {
-                        instance_id: id_for_exit,
+                        instance_id: id_for_exit.clone(),
                         stream: "exit".into(),
                         line: format!("exit code: {:?}", status.code()),
                     },
@@ -951,13 +1035,27 @@ pub async fn launch<R: Runtime>(
                 emit(
                     &app_for_exit,
                     &LaunchLogLine {
-                        instance_id: id_for_exit,
+                        instance_id: id_for_exit.clone(),
                         stream: "exit".into(),
                         line: format!("wait failed: {}", err),
                     },
                 );
             }
         }
+
+        let exited_at = now_ms();
+        tracker_for_exit.mark_stopped(&id_for_exit).await;
+        let _ = app_for_exit.emit(
+            "module-exited",
+            ModuleExitEvent {
+                module_id: id_for_exit.clone(),
+                module_name: name_for_exit.clone(),
+                started_at,
+                exited_at,
+                duration_ms: exited_at.saturating_sub(started_at),
+            },
+        );
+        discord_for_exit.set_idle().await;
     });
 
     Ok(())
@@ -968,9 +1066,11 @@ pub async fn launch<R: Runtime>(
 #[tauri::command]
 pub async fn mc_native_launch<R: Runtime>(
     app: AppHandle<R>,
+    tracker: State<'_, LaunchTracker>,
+    discord: State<'_, DiscordRpc>,
     options: LaunchOptions,
 ) -> Result<(), String> {
-    launch(app, options).await
+    launch(app, tracker, discord, options).await
 }
 
 // `Path` import keeps clippy happy when no other public API needs it

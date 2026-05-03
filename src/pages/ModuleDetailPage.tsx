@@ -801,6 +801,7 @@ function NativeMinecraftActionPanel({
       const m = await import("@/lib/mcLaunch");
       await m.mcNativeLaunch({
         instanceId: module.id,
+        moduleName: module.name,
         mcVersion: module.nativeMcVersion,
         loader: module.nativeLoader ?? "vanilla",
         loaderVersion: module.nativeLoaderVersion || undefined,

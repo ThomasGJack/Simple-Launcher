@@ -14,6 +14,12 @@ export type LaunchOptions = {
   /** Stable instance id (use the Firestore module id). Drives the
    *  per-instance dirs (.minecraft, natives, logs). */
   instanceId: string;
+  /** Display name surfaced via Discord Rich Presence and the
+   *  `module-launched` / `module-exited` events. Falls back to
+   *  `instanceId` server-side if omitted, so it's optional, but pass it
+   *  whenever you can — Discord status reads way better with the
+   *  module's actual name than with a slug. */
+  moduleName?: string;
   /** Vanilla MC version like "1.20.1". */
   mcVersion: string;
   /** Pick of loader. Forge / NeoForge install via their installer JAR;

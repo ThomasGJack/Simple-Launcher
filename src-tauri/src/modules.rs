@@ -34,6 +34,34 @@ impl LaunchTracker {
     fn arc(&self) -> Arc<TrackerInner> {
         self.inner.clone()
     }
+
+    /// Cloneable handle exposing just the mark_running / mark_stopped
+    /// API. Lets external launch paths (e.g. `mc_launch.rs` for native
+    /// Minecraft) participate in the shared tracker without having to
+    /// reach into private internals. The handle owns an `Arc` to the
+    /// tracker state so it survives being moved into spawned tasks.
+    pub fn handle(&self) -> LaunchTrackerHandle {
+        LaunchTrackerHandle {
+            inner: self.inner.clone(),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct LaunchTrackerHandle {
+    inner: Arc<TrackerInner>,
+}
+
+impl LaunchTrackerHandle {
+    pub async fn mark_running(&self, module_id: &str) {
+        let mut running = self.inner.running.lock().await;
+        running.insert(module_id.to_string());
+    }
+
+    pub async fn mark_stopped(&self, module_id: &str) {
+        let mut running = self.inner.running.lock().await;
+        running.remove(module_id);
+    }
 }
 
 #[derive(Debug, Serialize, Clone)]
