@@ -18,6 +18,20 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.05.03.4] - 2026-05-03  · semver `26.503.3`
+
+
+### Ajouté
+
+- **Aikar's flags GC tuning par défaut sur Java 17+** ([src-tauri/src/mc_launch.rs](src-tauri/src/mc_launch.rs)) — Java 9+ utilise G1GC par défaut, mais ses heuristiques out-of-the-box sont tunées pour des charges serveur, pas pour les bursts d'allocation que produit Minecraft moddé (chunk meshing, particle storms, mob ticking). Sans tuning, sur les machines avec iGPU + RAM limitée, Distant Horizons + Iris + Sodium peuvent thrash le heap au point que les uploads GPU stallent et produisent du **rendu en bruit coloré**. **Fix** : injection automatique du subset Aikar's flags qu'utilise Prism par défaut (`-XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M`) sur Java 17+. Skipped sur Java legacy où certains flags ne sont pas reconnus.
+
+### Changé
+
+- **RAM par défaut 2 GiB → 4 GiB** ([src-tauri/src/mc_launch.rs](src-tauri/src/mc_launch.rs)) — fallback de `mc_native_launch` quand le module Firestore ne définit pas `maxRamMb`. 2 GiB était criminel pour un modpack moderne (Sodium + Iris + Distant Horizons + ~100 mods en routine demandent 4-6 GiB). Symptôme avant fix : GC starvation → chunks pas uploadés au GPU à temps → monde en bruit coloré pendant que le HUD reste OK. Match avec Prism / CurseForge qui tournent à 4 GiB par défaut sur ce profil.
+
+### Corrigé
+
+- **Variables d'env Java polluantes neutralisées avant le spawn de javaw** ([src-tauri/src/mc_launch.rs](src-tauri/src/mc_launch.rs)) — `_JAVA_OPTIONS`, `JAVA_TOOL_OPTIONS` et `JDK_JAVA_OPTIONS` sont auto-prepended par la JVM à chaque ligne de commande. Une variable laissée par un vieux installer / anti-cheat / overlay Discord-MSI (ex. `_JAVA_OPTIONS=-Dsun.java2d.opengl=true`) suffit à forcer le rendu software ou désactiver les shaders sans qu'aucun message d'erreur ne le signale, produisant exactement le symptôme bruit coloré qu'on chassait sur certains laptops. **Fix** : `command.env_remove()` sur les 3 variables avant `spawn()`, avec log dans la console launch (`Variable d'env Java polluante neutralisée : NAME="VALUE"`) pour traçabilité. Comportement identique à Prism qui purge ces mêmes variables pour la même raison.
 ## [v26.05.03.3] - 2026-05-03  · semver `26.503.2`
 
 

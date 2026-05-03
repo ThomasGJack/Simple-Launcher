@@ -660,16 +660,43 @@ pub async fn launch<R: Runtime>(
     // 7. Compose JVM args ─────────────────────────────────────────────
     let mut jvm_args: Vec<String> = Vec::new();
     // Heap.
+    //
+    // Default bumped from 2 GiB → 4 GiB. Modern modded MC (Sodium +
+    // Iris + Distant Horizons + ~100 mods) routinely needs 4-6 GiB to
+    // avoid GC thrashing. Symptom of GC starvation on this profile is
+    // the world rendering as garbage / colored noise while the HUD stays
+    // intact (chunks fail to upload to GPU on time). Prism / CurseForge
+    // default to 4 GiB for this reason — match them.
     let ram = if opts.max_ram_mb >= 512 {
         opts.max_ram_mb
     } else {
-        2048
+        4096
     };
     jvm_args.push(format!("-Xmx{}M", ram));
     jvm_args.push(format!("-Xms{}M", (ram / 2).max(512)));
     // Encoding sanity (MC otherwise corrupts accented characters).
     jvm_args.push("-Dfile.encoding=UTF-8".into());
     jvm_args.push("-Djava.net.preferIPv4Stack=true".into());
+
+    // GC tuning. Java 9+ defaults to G1GC, but the heuristics out of the
+    // box are tuned for server workloads, not for the alloc-heavy bursts
+    // that modded MC produces (chunk meshing, particle storms, etc.).
+    // The values below are the well-known "Aikar's flags" subset that
+    // Prism injects by default for modded clients on Java 17+. Without
+    // them, on machines with limited iGPU + RAM, we've seen Distant
+    // Horizons + Iris + Sodium thrash the heap badly enough that GPU
+    // uploads stall, producing the same colored-noise rendering.
+    //
+    // Skipped on legacy Java (< 17) where some flags aren't recognized
+    // and Aikar's profile was originally designed for an older HotSpot.
+    if java.major_version >= 17 {
+        jvm_args.push("-XX:+UnlockExperimentalVMOptions".into());
+        jvm_args.push("-XX:+UseG1GC".into());
+        jvm_args.push("-XX:G1NewSizePercent=20".into());
+        jvm_args.push("-XX:G1ReservePercent=20".into());
+        jvm_args.push("-XX:MaxGCPauseMillis=50".into());
+        jvm_args.push("-XX:G1HeapRegionSize=32M".into());
+    }
 
     // Pull in the manifest's JVM args (modern format; legacy versions
     // don't have them and rely on hardcoded sensible defaults).
@@ -801,6 +828,36 @@ pub async fn launch<R: Runtime>(
     command.current_dir(&game_dir);
     command.stdout(Stdio::piped());
     command.stderr(Stdio::piped());
+
+    // Strip out the global Java-options env vars before spawning. These
+    // three are auto-prepended by the JVM to every command line, so a
+    // stray `_JAVA_OPTIONS=-Dsun.java2d.opengl=true` set at the user or
+    // system level (often left over by old installers, anti-cheats, or
+    // Discord/MSI overlays) can silently force software rendering or
+    // disable shaders, producing the exact colored-noise symptom we've
+    // been chasing on certain laptops. Prism does the same purge for
+    // the same reason. We log what we stripped so it's visible if a
+    // user ever asks "why did my custom flag not apply".
+    for var in ["_JAVA_OPTIONS", "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS"] {
+        if let Ok(value) = std::env::var(var) {
+            eprintln!(
+                "[mc-launch] stripping inherited env {}=\"{}\" before spawn",
+                var, value
+            );
+            emit(
+                &app,
+                &LaunchLogLine {
+                    instance_id: opts.instance_id.clone(),
+                    stream: "info".into(),
+                    line: format!(
+                        "Variable d'env Java polluante neutralisée : {}=\"{}\"",
+                        var, value
+                    ),
+                },
+            );
+        }
+        command.env_remove(var);
+    }
 
     let mut child = command
         .spawn()
