@@ -72,18 +72,8 @@ export function SettingsPage() {
             }
           }}
         />
-        <SettingCard
-          icon={Palette}
-          title="Apparence"
-          description="Thème global, couleurs d'accent, animations."
-          status="Bientôt"
-        />
-        <SettingCard
-          icon={FolderDown}
-          title="Téléchargements"
-          description="Dossier d'installation des jeux, limite de bande passante."
-          status="Bientôt"
-        />
+        <ApparenceCard />
+        <DownloadsCard />
         <LogsDiagnosticCard />
         <SettingButton
           icon={Stethoscope}
@@ -110,6 +100,335 @@ export function SettingsPage() {
 
       <DiagnosticModal open={diagOpen} onClose={() => setDiagOpen(false)} />
     </div>
+  );
+}
+
+function ApparenceCard() {
+  const accentColor = useSettingsStore((s) => s.accentColor);
+  const setAccentColor = useSettingsStore((s) => s.setAccentColor);
+  const animationsEnabled = useSettingsStore((s) => s.animationsEnabled);
+  const toggleAnimations = useSettingsStore((s) => s.toggleAnimations);
+  const resetApparence = useSettingsStore((s) => s.resetApparence);
+  const [customOpen, setCustomOpen] = useState(false);
+
+  // Curated accent palette — 6 presets that all read well on the dark
+  // background. Custom hex via the swatch at the end.
+  const presets: { name: string; hex: string }[] = [
+    { name: "Cyan (défaut)", hex: "#00d4ff" },
+    { name: "Violet", hex: "#a855f7" },
+    { name: "Rose", hex: "#ff4d8d" },
+    { name: "Vert", hex: "#22c55e" },
+    { name: "Ambre", hex: "#fbbf24" },
+    { name: "Rouge", hex: "#ef4444" },
+  ];
+
+  const isDefault = accentColor === null;
+  const activeHex = accentColor ?? "#00d4ff";
+
+  return (
+    <motion.div whileHover={{ x: 4 }} className="no-drag rounded-2xl glass p-5">
+      <div className="flex items-start gap-4">
+        <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-accent/10 text-accent ring-1 ring-accent/20">
+          <Palette className="size-5" strokeWidth={2} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <div className="font-medium text-fg-primary">Apparence</div>
+            {!isDefault || !animationsEnabled ? (
+              <span className="rounded-full bg-amber-400/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-amber-300 ring-1 ring-amber-400/30">
+                Personnalisé
+              </span>
+            ) : null}
+          </div>
+          <div className="text-sm text-fg-muted">
+            Couleur d'accent et animations. Sauvegardé localement, par machine.
+          </div>
+        </div>
+        {(!isDefault || !animationsEnabled) && (
+          <button
+            type="button"
+            onClick={() => {
+              sounds.click();
+              resetApparence();
+              setCustomOpen(false);
+            }}
+            className="self-start rounded-lg bg-white/[0.03] px-3 py-1.5 text-xs text-fg-muted ring-1 ring-white/[0.06] transition-colors hover:bg-white/[0.06] hover:text-fg-primary"
+            title="Revenir aux valeurs par défaut"
+          >
+            Reset
+          </button>
+        )}
+      </div>
+
+      {/* Accent color picker */}
+      <div className="mt-5">
+        <div className="mb-2 text-xs uppercase tracking-wider text-fg-dim">
+          Couleur d'accent
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {presets.map((p) => {
+            const active =
+              (isDefault && p.hex === "#00d4ff") || accentColor === p.hex;
+            return (
+              <button
+                key={p.hex}
+                type="button"
+                onClick={() => {
+                  sounds.click();
+                  setAccentColor(p.hex === "#00d4ff" ? null : p.hex);
+                }}
+                title={p.name}
+                className={cn(
+                  "relative size-8 rounded-full ring-2 transition-all",
+                  active
+                    ? "ring-fg-primary scale-110 shadow-[0_0_12px_currentColor]"
+                    : "ring-white/[0.08] hover:ring-white/[0.2]",
+                )}
+                style={{
+                  backgroundColor: p.hex,
+                  color: p.hex,
+                }}
+              >
+                {active && (
+                  <Check className="absolute inset-0 m-auto size-4 text-bg-base" strokeWidth={3} />
+                )}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => setCustomOpen((v) => !v)}
+            className="ml-1 inline-flex items-center gap-1 rounded-lg bg-white/[0.03] px-2.5 py-1 text-xs text-fg-muted ring-1 ring-white/[0.06] hover:bg-white/[0.06] hover:text-fg-primary"
+            title="Couleur custom (hex)"
+          >
+            #
+          </button>
+        </div>
+
+        {customOpen && (
+          <div className="mt-3 flex items-center gap-2">
+            <input
+              type="color"
+              value={activeHex}
+              onChange={(e) => setAccentColor(e.target.value)}
+              className="size-9 cursor-pointer rounded-md bg-transparent ring-1 ring-white/[0.08]"
+            />
+            <input
+              type="text"
+              value={activeHex}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+                  setAccentColor(v);
+                }
+              }}
+              placeholder="#00d4ff"
+              maxLength={7}
+              className="w-32 rounded-lg bg-bg-base/60 px-3 py-1.5 font-mono text-sm text-fg-primary ring-1 ring-white/[0.08] focus:outline-none focus:ring-accent/50"
+            />
+            <span className="text-xs text-fg-dim">
+              Format hex 6 chars (#RRGGBB)
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Animations toggle */}
+      <div className="mt-5 flex items-center justify-between rounded-xl bg-white/[0.02] p-3 ring-1 ring-white/[0.04]">
+        <div className="flex-1">
+          <div className="text-sm text-fg-primary">Animations</div>
+          <div className="text-xs text-fg-muted">
+            Désactive transitions, animations Framer Motion et keyframes CSS.
+            Recommandé sur PC peu puissant ou si tu es sensible aux animations.
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            sounds.click();
+            toggleAnimations();
+          }}
+          className={cn(
+            "relative ml-4 h-7 w-12 shrink-0 rounded-full transition-colors",
+            animationsEnabled ? "bg-accent" : "bg-white/[0.08]",
+          )}
+          aria-pressed={animationsEnabled}
+        >
+          <motion.span
+            layout
+            transition={{ type: "spring", stiffness: 600, damping: 32 }}
+            className={cn(
+              "absolute top-0.5 size-6 rounded-full bg-bg-base shadow-md",
+              animationsEnabled ? "right-0.5" : "left-0.5",
+            )}
+          />
+        </button>
+      </div>
+    </motion.div>
+  );
+}
+
+function DownloadsCard() {
+  // Async-loaded from Rust to avoid blocking the page on big disk
+  // walks. The user clicks "Calculer" to populate, otherwise we just
+  // show the cache categories statically (so the UI is never empty).
+  const [snapshot, setSnapshot] = useState<import("@/lib/cache").CacheSnapshot | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const calculate = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const m = await import("@/lib/cache");
+      const data = await m.cacheCalculateSize();
+      setSnapshot(data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const purge = async (category: import("@/lib/cache").CacheCategory) => {
+    if (
+      !confirm(
+        `Vider le cache "${category}" ?\n\nLes fichiers seront re-téléchargés au prochain lancement Minecraft. Tes saves et tes mods ne sont PAS touchés.`,
+      )
+    )
+      return;
+    setBusy(category);
+    setError(null);
+    try {
+      const m = await import("@/lib/cache");
+      await m.cachePurge(category);
+      sounds.success();
+      await calculate();
+    } catch (e) {
+      sounds.error();
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const fmt = (b: number) => {
+    if (b <= 0) return "—";
+    const gb = b / 1024 ** 3;
+    if (gb >= 1) return `${gb.toFixed(1)} Go`;
+    const mb = b / 1024 ** 2;
+    if (mb >= 1) return `${mb.toFixed(0)} Mo`;
+    return `${(b / 1024).toFixed(0)} Ko`;
+  };
+
+  const categories: { id: import("@/lib/cache").CacheCategory; label: string; hint: string }[] = [
+    {
+      id: "mc-libraries",
+      label: "Libraries Java partagées",
+      hint: "LWJGL, Forge/Fabric, deps Mojang. Re-DL au prochain launch.",
+    },
+    {
+      id: "mc-assets",
+      label: "Assets Minecraft (textures, sons)",
+      hint: "Re-DL au prochain launch — gros (~500 Mo).",
+    },
+    {
+      id: "mc-runtimes",
+      label: "Runtimes Java téléchargés",
+      hint: "Adoptium Temurin auto-DL. Re-installé si un module en a besoin.",
+    },
+    {
+      id: "mc-temp",
+      label: "Fichiers temporaires d'install",
+      hint: "Modpacks staging, ZIPs intermédiaires, redists VC++ téléchargés.",
+    },
+  ];
+
+  return (
+    <motion.div whileHover={{ x: 4 }} className="no-drag rounded-2xl glass p-5">
+      <div className="flex items-start gap-4">
+        <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-accent/10 text-accent ring-1 ring-accent/20">
+          <FolderDown className="size-5" strokeWidth={2} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="font-medium text-fg-primary">Téléchargements & cache</div>
+          <div className="text-sm text-fg-muted">
+            Vide les caches partagés pour libérer du disque. Tes saves Minecraft
+            ne sont jamais touchées.
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={calculate}
+          disabled={loading}
+          className="self-start inline-flex items-center gap-1.5 rounded-lg bg-accent/10 px-3 py-1.5 text-xs text-accent ring-1 ring-accent/30 hover:bg-accent/20 disabled:opacity-50"
+        >
+          {loading ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : (
+            <RefreshCw className="size-3.5" />
+          )}
+          {snapshot ? "Recalculer" : "Calculer la taille"}
+        </button>
+      </div>
+
+      {error && (
+        <div className="mt-4 rounded-xl border border-danger/30 bg-danger/10 p-3 text-sm text-danger">
+          {error}
+        </div>
+      )}
+
+      <div className="mt-4 space-y-2">
+        {categories.map((cat) => {
+          const size = snapshot?.[cat.id] ?? null;
+          const empty = size !== null && size === 0;
+          return (
+            <div
+              key={cat.id}
+              className="flex items-center gap-3 rounded-xl bg-white/[0.02] p-3 ring-1 ring-white/[0.04]"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-sm text-fg-primary">{cat.label}</span>
+                  {size !== null && (
+                    <span
+                      className={cn(
+                        "font-mono text-xs",
+                        empty ? "text-fg-dim" : "text-accent",
+                      )}
+                    >
+                      {empty ? "vide" : fmt(size)}
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs text-fg-muted">{cat.hint}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => purge(cat.id)}
+                disabled={busy !== null || size === 0}
+                className="shrink-0 rounded-md bg-white/[0.03] px-3 py-1.5 text-xs text-fg-muted ring-1 ring-white/[0.04] transition-colors hover:bg-danger/10 hover:text-danger disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {busy === cat.id ? (
+                  <Loader2 className="inline size-3 animate-spin" />
+                ) : (
+                  "Vider"
+                )}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {snapshot && (
+        <div className="mt-3 text-[11px] text-fg-dim">
+          Total estimé : <span className="font-mono text-fg-muted">{fmt(snapshot.total)}</span>
+          {" · "}
+          Calculé en {snapshot.durationMs} ms
+        </div>
+      )}
+    </motion.div>
   );
 }
 
@@ -287,37 +606,6 @@ function DiagPill({ label, value, mono }: { label: string; value: string; mono?:
   );
 }
 
-function SettingCard({
-  icon: Icon,
-  title,
-  description,
-  status,
-}: {
-  icon: typeof Cog;
-  title: string;
-  description: string;
-  status?: string;
-}) {
-  return (
-    <motion.div
-      whileHover={{ x: 4 }}
-      className="no-drag flex items-center gap-4 rounded-2xl glass p-5"
-    >
-      <div className="grid size-11 place-items-center rounded-xl bg-accent/10 text-accent ring-1 ring-accent/20">
-        <Icon className="size-5" strokeWidth={2} />
-      </div>
-      <div className="flex-1">
-        <div className="font-medium text-fg-primary">{title}</div>
-        <div className="text-sm text-fg-muted">{description}</div>
-      </div>
-      {status && (
-        <span className="rounded-full bg-white/[0.04] px-3 py-1 text-xs text-fg-muted ring-1 ring-white/[0.06]">
-          {status}
-        </span>
-      )}
-    </motion.div>
-  );
-}
 
 /**
  * Renders a Minecraft player's head from one of several avatar services,

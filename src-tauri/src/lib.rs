@@ -1,3 +1,4 @@
+mod cache;
 mod diagnostic;
 mod discord_rpc;
 mod log_file;
@@ -106,6 +107,8 @@ pub fn run() {
             mc_runtime_deps::mc_runtime_deps_check,
             mc_runtime_deps::mc_runtime_deps_install,
             diagnostic::diagnostic_run,
+            cache::cache_calculate_size,
+            cache::cache_purge,
             mc_backup::mc_backup_create,
             mc_backup::mc_backup_list,
             mc_backup::mc_backup_delete,

@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
 import { AppShell } from "@/components/layout/AppShell";
 import { useAuthStore } from "@/store/auth";
+import { useSettingsStore } from "@/store/settings";
 import { useUIStore } from "@/store/ui";
 import { getFirebase } from "@/firebase/config";
 import { recordPlaytime } from "@/firebase/playtime";
@@ -270,6 +271,38 @@ function App() {
       }
     }
   }, [user, allModules, allUsers, playtime, conversations, unlockedSet, unlockedSetPrimed]);
+
+  // ─── Apparence : push the user's accent + animations prefs onto the
+  // root element so every component that reads via CSS vars / data-attr
+  // honors them. Re-applied any time the settings store changes.
+  const accentColor = useSettingsStore((s) => s.accentColor);
+  const animationsEnabled = useSettingsStore((s) => s.animationsEnabled);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (accentColor && /^#[0-9a-fA-F]{6}$/.test(accentColor)) {
+      root.style.setProperty("--color-accent", accentColor);
+      // Mirrors the index.css definitions : accent-soft = accent + alpha
+      // 0x33 (~20 %), accent-glow = accent + alpha 0x80 (~50 %). Same
+      // shorthand the original CSS uses, just via JS so the alpha
+      // channel works on hex.
+      root.style.setProperty("--color-accent-soft", `${accentColor}33`);
+      root.style.setProperty("--color-accent-glow", `${accentColor}80`);
+    } else {
+      root.style.removeProperty("--color-accent");
+      root.style.removeProperty("--color-accent-soft");
+      root.style.removeProperty("--color-accent-glow");
+    }
+  }, [accentColor]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (animationsEnabled) {
+      root.removeAttribute("data-reduced-motion");
+    } else {
+      root.setAttribute("data-reduced-motion", "true");
+    }
+  }, [animationsEnabled]);
 
   if (loading) {
     return (

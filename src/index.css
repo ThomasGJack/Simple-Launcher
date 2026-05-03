@@ -101,6 +101,28 @@ textarea {
   scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
 }
 
+/* ─── Reduced-motion override ──────────────────────────────────────────
+ * When the user toggles off animations in Settings → Apparence, the
+ * Apparence effect in App.tsx adds `data-reduced-motion="true"` on
+ * <html>. Most of our motion comes from Framer Motion (which honors
+ * `prefers-reduced-motion` natively when MotionConfig is configured),
+ * but we also have CSS-driven animations (the keyframes below + a few
+ * `transition-*` classes from Tailwind utility chains). This block
+ * neutralises them globally so an old laptop or a user with reduced-
+ * motion preference gets a snappy, transition-free UI.
+ *
+ * `transition-duration: 0.01s` rather than 0 so React's `transitionend`
+ * listeners (some libs key off them) still fire — just instantly.
+ */
+[data-reduced-motion="true"] *,
+[data-reduced-motion="true"] *::before,
+[data-reduced-motion="true"] *::after {
+  animation-duration: 0.01s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01s !important;
+  scroll-behavior: auto !important;
+}
+
 @keyframes glow-pulse {
   0%,
   100% {
