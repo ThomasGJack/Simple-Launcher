@@ -17,6 +17,7 @@ import {
   RefreshCw,
   AlertTriangle,
   ShieldCheck,
+  Stethoscope,
 } from "lucide-react";
 import { getVersion } from "@tauri-apps/api/app";
 import { useSettingsStore } from "@/store/settings";
@@ -35,10 +36,12 @@ import {
   type McAccount,
 } from "@/lib/mcAuth";
 import { cn } from "@/lib/cn";
+import { DiagnosticModal } from "@/components/settings/DiagnosticModal";
 
 export function SettingsPage() {
   const { soundsEnabled, toggleSounds } = useSettingsStore();
   const [versionDisplay, setVersionDisplay] = useState<string>("…");
+  const [diagOpen, setDiagOpen] = useState(false);
 
   useEffect(() => {
     getVersion()
@@ -79,6 +82,16 @@ export function SettingsPage() {
           status="Bientôt"
         />
         <LogsDiagnosticCard />
+        <SettingButton
+          icon={Stethoscope}
+          title="Diagnostic système"
+          description="OS, CPU, GPU, RAM libre, espace disque, Java détecté, VC++ runtimes. Utile pour debug rapidement les problèmes de lancement."
+          buttonLabel="Ouvrir"
+          onClick={() => {
+            sounds.click();
+            setDiagOpen(true);
+          }}
+        />
         <MinecraftAccountsCard />
 
         <div className="mt-2 flex items-center gap-3 rounded-2xl bg-white/[0.02] p-4 ring-1 ring-white/[0.04]">
@@ -91,7 +104,45 @@ export function SettingsPage() {
           </div>
         </div>
       </div>
+
+      <DiagnosticModal open={diagOpen} onClose={() => setDiagOpen(false)} />
     </div>
+  );
+}
+
+function SettingButton({
+  icon: Icon,
+  title,
+  description,
+  buttonLabel,
+  onClick,
+}: {
+  icon: typeof Cog;
+  title: string;
+  description: string;
+  buttonLabel: string;
+  onClick: () => void;
+}) {
+  return (
+    <motion.div
+      whileHover={{ x: 4 }}
+      className="no-drag flex items-start gap-4 rounded-2xl glass p-5"
+    >
+      <div className="grid size-11 place-items-center rounded-xl bg-accent/10 text-accent ring-1 ring-accent/20">
+        <Icon className="size-5" strokeWidth={2} />
+      </div>
+      <div className="flex-1">
+        <div className="text-sm font-medium text-fg-primary">{title}</div>
+        <div className="mt-1 text-xs leading-relaxed text-fg-muted">{description}</div>
+      </div>
+      <button
+        type="button"
+        onClick={onClick}
+        className="self-center rounded-xl bg-accent/15 px-4 py-2 text-xs font-medium text-accent ring-1 ring-accent/30 transition-colors hover:bg-accent/25"
+      >
+        {buttonLabel}
+      </button>
+    </motion.div>
   );
 }
 

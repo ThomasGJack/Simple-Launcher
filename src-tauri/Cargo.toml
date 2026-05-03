@@ -42,4 +42,9 @@ keyring = "3"
 # `mc_github` to find a stable per-user app-data path for the PAT
 # fallback file when keyring write+verify fails.
 dirs = "5"
+# Cross-platform system information : RAM, CPU, disks. Used by
+# `diagnostic.rs` to power the "Diagnostic système" modal in Settings
+# (helps users self-debug "le launcher marche pas" issues by surfacing
+# OS version, free RAM, free disk space, etc.).
+sysinfo = "0.32"
 

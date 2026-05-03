@@ -1,3 +1,4 @@
+mod diagnostic;
 mod discord_rpc;
 mod log_file;
 mod mc_auth;
@@ -103,6 +104,7 @@ pub fn run() {
             mc_zip::mc_zip_read_manifest_url,
             mc_runtime_deps::mc_runtime_deps_check,
             mc_runtime_deps::mc_runtime_deps_install,
+            diagnostic::diagnostic_run,
             mc_github::gh_token_set,
             mc_github::gh_token_status,
             mc_github::gh_token_clear,
