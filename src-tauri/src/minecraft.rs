@@ -110,20 +110,39 @@ pub async fn mc_find_prism(app: AppHandle) -> Result<Option<String>, String> {
     Ok(None)
 }
 
-/// Public re-export of `find_prism_path` for use by the `backup` module —
-/// keeps the rest of `find_prism_path` private to this file.
-pub async fn find_prism_path_pub(app: &AppHandle) -> Option<PathBuf> {
-    find_prism_path(app).await
-}
-
-/// Public re-export of `prism_data_dir`.
-pub async fn prism_data_dir_pub(prism_exe: &Path) -> Result<PathBuf, String> {
-    prism_data_dir(prism_exe).await
-}
-
-/// Public re-export of `sanitize_instance_name`.
-pub fn sanitize_instance_name_pub(s: &str) -> String {
-    sanitize_instance_name(s)
+/// Opens the Prism instance's `.minecraft/` folder in the OS file
+/// explorer. Resolves Prism's data dir at call time (the user might
+/// have moved the install) and falls back to the parent instance dir
+/// if `.minecraft/` doesn't exist yet (fresh install).
+#[tauri::command]
+pub async fn mc_open_prism_instance_dir(
+    app: AppHandle,
+    instance_name: String,
+) -> Result<String, String> {
+    let prism_exe = find_prism_path(&app)
+        .await
+        .ok_or_else(|| "Prism Launcher introuvable. Lance le jeu une fois pour qu'il s'installe.".to_string())?;
+    let data_dir = prism_data_dir(&prism_exe).await?;
+    let instance_dir = data_dir.join("instances").join(&instance_name);
+    let dot_mc = instance_dir.join(".minecraft");
+    let target = if dot_mc.exists() { dot_mc } else { instance_dir };
+    if !target.exists() {
+        return Err(format!("Instance « {} » introuvable.", instance_name));
+    }
+    let path_str = target.to_string_lossy().into_owned();
+    #[cfg(target_os = "windows")]
+    {
+        let _ = std::process::Command::new("explorer").arg(&path_str).spawn();
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("open").arg(&path_str).spawn();
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        let _ = std::process::Command::new("xdg-open").arg(&path_str).spawn();
+    }
+    Ok(path_str)
 }
 
 async fn find_prism_path(app: &AppHandle) -> Option<PathBuf> {

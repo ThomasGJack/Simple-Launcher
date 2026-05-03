@@ -10,11 +10,11 @@ import {
 } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 import { useUIStore } from "@/store/ui";
-import { watchModules, updateModulePage } from "@/firebase/modules";
+import { updateModulePage } from "@/firebase/modules";
+import { useModules } from "@/store/firebaseStores";
 import { migrateModulePage } from "@/lib/modulePageMigration";
 import { isAdmin } from "@/lib/admin";
 import { useAuthStore } from "@/store/auth";
-import type { LauncherModule } from "@/types/module";
 import { BlockPalette } from "@/components/admin/builder/BlockPalette";
 import { BlockCanvas } from "@/components/admin/builder/BlockCanvas";
 import { BlockInspector } from "@/components/admin/builder/BlockInspector";
@@ -25,7 +25,7 @@ export function AdminPageBuilder() {
   const route = useUIStore((s) => s.route);
   const navigate = useUIStore((s) => s.navigate);
   const user = useAuthStore((s) => s.user);
-  const [modules, setModules] = useState<LauncherModule[]>([]);
+  const modules = useModules();
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
 
@@ -39,8 +39,6 @@ export function AdminPageBuilder() {
   const addBlock = useBuilderStore((s) => s.addBlock);
   const isDirty = useBuilderStore((s) => s.isDirty)();
   const toPage = useBuilderStore((s) => s.toPage);
-
-  useEffect(() => watchModules(setModules), []);
 
   useEffect(() => {
     if (!module) return;

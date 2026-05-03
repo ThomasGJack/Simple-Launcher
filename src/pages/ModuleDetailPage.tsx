@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Play, Download, RefreshCw, Trash2, Folder, Hash, Loader2, AlertTriangle, HardDrive, Clock, Star, Box } from "lucide-react";
+import { ArrowLeft, Play, Download, RefreshCw, Trash2, Folder, Loader2, AlertTriangle, Star } from "lucide-react";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/auth";
 import { useFavoritesStore } from "@/store/favorites";
 import { addFavorite, removeFavorite } from "@/firebase/favorites";
-import { watchModules } from "@/firebase/modules";
+import { useModules } from "@/store/firebaseStores";
 import { watchUserShortcuts } from "@/firebase/shortcuts";
 import {
   deriveStatus,
@@ -33,7 +33,6 @@ import {
   deriveMinecraftStatus,
   installModpack,
   launchMinecraft,
-  requiredJavaVersion,
   type MinecraftStatus,
 } from "@/lib/minecraft";
 import { sounds } from "@/lib/sounds";
@@ -49,7 +48,7 @@ export function ModuleDetailPage() {
   const route = useUIStore((s) => s.route);
   const navigate = useUIStore((s) => s.navigate);
   const user = useAuthStore((s) => s.user);
-  const [hosted, setHosted] = useState<LauncherModule[]>([]);
+  const hosted = useModules();
   const [shortcuts, setShortcuts] = useState<LauncherModule[]>([]);
   const allModules = [...shortcuts, ...hosted];
   const [local, setLocal] = useState<ModuleStateLocal | null>(null);
@@ -59,10 +58,6 @@ export function ModuleDetailPage() {
 
   const moduleId = route.name === "module" ? route.moduleId : null;
   const module = allModules.find((m) => m.id === moduleId);
-
-  useEffect(() => {
-    return watchModules(setHosted);
-  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -320,69 +315,6 @@ export function ModuleDetailPage() {
               </>
             )}
             {module.type === "minecraft" && <MinecraftRamControl module={module} />}
-            <motion.div
-              initial={{ opacity: 0, y: 24 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="rounded-3xl glass p-6"
-            >
-              <h3 className="mb-4 text-xs uppercase tracking-[0.2em] text-fg-muted">Informations</h3>
-              <div className="grid gap-2.5">
-                <InfoLine icon={Hash} label="ID" value={module.id} mono />
-                {module.type === "minecraft" ? (
-                  <>
-                    <InfoLine icon={Folder} label="Type" value="Modpack CurseForge" />
-                    {module.minecraftVersion && (
-                      <InfoLine icon={Box} label="Minecraft" value={module.minecraftVersion} />
-                    )}
-                    {module.modLoader && (
-                      <InfoLine icon={Box} label="Mod loader" value={module.modLoader} />
-                    )}
-                    {(() => {
-                      const java = requiredJavaVersion(module.minecraftVersion);
-                      if (!java) return null;
-                      return (
-                        <InfoLine
-                          icon={Box}
-                          label="Java requis"
-                          value={`Java ${java} · auto-installé par Prism si manquant`}
-                          small
-                        />
-                      );
-                    })()}
-                    {module.curseforgeProjectId !== undefined && (
-                      <InfoLine icon={Hash} label="CF Project" value={String(module.curseforgeProjectId)} mono />
-                    )}
-                    {module.curseforgeFileId !== undefined && (
-                      <InfoLine icon={Hash} label="CF File" value={String(module.curseforgeFileId)} mono />
-                    )}
-                  </>
-                ) : module.type === "hosted" ? (
-                  <>
-                    <InfoLine icon={HardDrive} label="Taille" value={`${(module.size / 1_048_576).toFixed(1)} Mo`} />
-                    <InfoLine icon={Clock} label="Version" value={`v${module.version}`} />
-                    {local && (
-                      <InfoLine
-                        icon={Clock}
-                        label="Installé le"
-                        value={new Date(local.installedAt).toLocaleDateString("fr-FR", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      />
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <InfoLine icon={Folder} label="Type" value="Raccourci local" />
-                    <InfoLine icon={HardDrive} label="Chemin" value={module.executablePath} mono small />
-                  </>
-                )}
-              </div>
-            </motion.div>
           </div>
         </div>
 
@@ -690,6 +622,23 @@ function MinecraftActionPanel({
   module: import("@/types/module").MinecraftModule;
   themePrimary?: string;
 }) {
+  // Branch on the native-launch toggle: when on, the in-house chain
+  // takes over and Prism is bypassed entirely. The two implementations
+  // are siblings rather than a conditional inside one component to keep
+  // the React hooks order stable on every render.
+  if (module.nativeMc === true) {
+    return <NativeMinecraftActionPanel module={module} themePrimary={themePrimary} />;
+  }
+  return <PrismMinecraftActionPanel module={module} themePrimary={themePrimary} />;
+}
+
+function PrismMinecraftActionPanel({
+  module,
+  themePrimary,
+}: {
+  module: import("@/types/module").MinecraftModule;
+  themePrimary?: string;
+}) {
   const [status, setStatus] = useState<MinecraftStatus | null>(null);
   const [busy, setBusy] = useState<"install" | "launch" | null>(null);
   const [progress, setProgress] = useState<{ phase: string; bytes: number; total: number } | null>(null);
@@ -851,12 +800,383 @@ function MinecraftActionPanel({
       )}
 
       {status.kind === "ready" && (
-        <div className="text-center text-xs text-fg-muted">
-          Instance Prism : <span className="font-mono text-fg-primary">{status.instanceName}</span>
+        <div className="flex flex-col items-center gap-2">
+          <div className="text-center text-xs text-fg-muted">
+            Instance Prism : <span className="font-mono text-fg-primary">{status.instanceName}</span>
+          </div>
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                const { openPrismInstanceDir } = await import("@/lib/minecraft");
+                await openPrismInstanceDir(status.instanceName);
+              } catch (err) {
+                setError(err instanceof Error ? err.message : String(err));
+              }
+            }}
+            title="Ouvre le dossier .minecraft/ pour ajouter resourcepacks, shaders, configs…"
+            className="inline-flex items-center gap-1.5 rounded-2xl bg-bg-elevated/40 px-3 py-2 text-xs text-fg-muted ring-1 ring-white/[0.06] hover:bg-bg-elevated/70 hover:text-fg-primary"
+          >
+            <Folder className="size-3.5" />
+            Ouvrir le dossier
+          </button>
         </div>
       )}
 
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
+    </div>
+  );
+}
+
+/**
+ * Action panel for Minecraft modules running on the native launch path
+ * (`module.nativeMc === true`). Drives the full lifecycle:
+ *   1. Pick a connected Microsoft account (from `mcAuthList`)
+ *   2. Install button → vanilla + loader + optional modpack overlay
+ *   3. Play button → spawn `javaw`, stream stdout/stderr to a drawer
+ *
+ * Does NOT touch Prism. Replaces `PrismMinecraftActionPanel` for any
+ * module the admin flagged native via the AdminPage builder.
+ */
+function NativeMinecraftActionPanel({
+  module,
+}: {
+  module: import("@/types/module").MinecraftModule;
+  themePrimary?: string;
+}) {
+  type Phase = "checking" | "ready-to-install" | "installing" | "ready" | "launching" | "running" | "error";
+  const [phase, setPhase] = useState<Phase>("checking");
+  const [progress, setProgress] = useState<import("@/lib/mcVanilla").InstallProgress | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [logLines, setLogLines] = useState<import("@/lib/mcLaunch").LaunchLogLine[]>([]);
+  const [showConsole, setShowConsole] = useState(false);
+  const [accounts, setAccounts] = useState<import("@/lib/mcAuth").McAccount[]>([]);
+  const [selectedUuid, setSelectedUuid] = useState<string>("");
+
+  // Boot: load accounts + check whether vanilla is already on disk.
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      import("@/lib/mcAuth").then((m) => m.mcAuthList()),
+      import("@/lib/mcVanilla").then((m) =>
+        module.nativeMcVersion
+          ? m.mcVanillaIsInstalled(module.nativeMcVersion)
+          : Promise.resolve(false),
+      ),
+    ])
+      .then(([accs, installed]) => {
+        if (cancelled) return;
+        setAccounts(accs);
+        if (accs[0]) setSelectedUuid(accs[0].uuid);
+        setPhase(installed ? "ready" : "ready-to-install");
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : String(err));
+        setPhase("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [module.id, module.nativeMcVersion]);
+
+  // Subscribe to install + launch event streams (kept alive for the
+  // life of the panel — events arrive whenever the user triggers an
+  // action).
+  useEffect(() => {
+    let unsubProgress: undefined | (() => void);
+    let unsubLog: undefined | (() => void);
+    Promise.all([
+      import("@/lib/mcVanilla").then((m) => m.onMcVanillaProgress((p) => setProgress(p))),
+      import("@/lib/mcLaunch").then((m) =>
+        m.onMcLaunchLog((line) => {
+          if (line.instanceId !== module.id) return;
+          setLogLines((prev) => [...prev, line].slice(-500));
+          if (line.stream === "exit") {
+            setPhase("ready");
+          }
+        }),
+      ),
+    ]).then(([u1, u2]) => {
+      unsubProgress = u1;
+      unsubLog = u2;
+    });
+    return () => {
+      unsubProgress?.();
+      unsubLog?.();
+    };
+  }, [module.id]);
+
+  const handleInstall = async () => {
+    if (!module.nativeMcVersion) {
+      setError("Version Minecraft non configurée pour ce module.");
+      setPhase("error");
+      return;
+    }
+    setError(null);
+    setPhase("installing");
+    setProgress(null);
+    sounds.click();
+    try {
+      const loader = module.nativeLoader ?? "vanilla";
+      const loaderVersion = module.nativeLoaderVersion ?? "";
+      // 1. vanilla + loader (delegated)
+      if (loader === "vanilla") {
+        const m = await import("@/lib/mcVanilla");
+        await m.mcVanillaInstall(module.nativeMcVersion, module.id);
+      } else if (loader === "fabric") {
+        if (!loaderVersion) throw new Error("Version Fabric manquante.");
+        const m = await import("@/lib/mcFabric");
+        await m.mcFabricInstall(module.nativeMcVersion, loaderVersion, module.id);
+      } else if (loader === "forge") {
+        if (!loaderVersion) throw new Error("Version Forge manquante.");
+        const m = await import("@/lib/mcForge");
+        await m.mcForgeInstall(module.nativeMcVersion, loaderVersion, module.id);
+      } else if (loader === "neoforge") {
+        if (!loaderVersion) throw new Error("Version NeoForge manquante.");
+        const m = await import("@/lib/mcForge");
+        await m.mcNeoforgeInstall(module.nativeMcVersion, loaderVersion, module.id);
+      }
+      // 2. modpack overlay (optional)
+      const pack = module.nativeModpack;
+      if (pack && pack.kind === "modrinth") {
+        const m = await import("@/lib/mcModrinth");
+        await m.mcModrinthInstall(pack.mrpackUrl, module.id);
+      } else if (pack && pack.kind === "zip") {
+        const m = await import("@/lib/mcZip");
+        await m.mcZipInstall(pack.zipUrl, module.id);
+      }
+      sounds.success();
+      setPhase("ready");
+    } catch (err) {
+      sounds.error();
+      setError(err instanceof Error ? err.message : String(err));
+      setPhase("error");
+    }
+  };
+
+  const handleLaunch = async () => {
+    if (!module.nativeMcVersion || !selectedUuid) {
+      setError(
+        !selectedUuid
+          ? "Connecte un compte Microsoft via Paramètres → Comptes Minecraft."
+          : "Configuration native incomplète.",
+      );
+      return;
+    }
+    setError(null);
+    setLogLines([]);
+    setShowConsole(true);
+    setPhase("launching");
+    sounds.launch();
+    try {
+      const m = await import("@/lib/mcLaunch");
+      await m.mcNativeLaunch({
+        instanceId: module.id,
+        mcVersion: module.nativeMcVersion,
+        loader: module.nativeLoader ?? "vanilla",
+        loaderVersion: module.nativeLoaderVersion || undefined,
+        accountUuid: selectedUuid,
+        maxRamMb: module.maxRamMb ?? 4096,
+        // If the module has a Minecraft server registered, auto-join it
+        // on launch — saves the player a click in the main menu.
+        serverAddress:
+          module.server?.type === "minecraft" ? module.server.address : undefined,
+      });
+      setPhase("running");
+    } catch (err) {
+      sounds.error();
+      setError(err instanceof Error ? err.message : String(err));
+      setPhase("error");
+    }
+  };
+
+  if (phase === "checking") {
+    return (
+      <div className="flex items-center gap-2 text-sm text-fg-muted">
+        <Loader2 className="size-4 animate-spin" /> Vérification de l'instance native…
+      </div>
+    );
+  }
+
+  if (phase === "installing" && progress) {
+    const pct = progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0;
+    // Phases that report bytes-based progress need MB formatting; the
+    // others count files/items so the raw integer is fine.
+    const isByteCount = progress.phase === "zip-dl" || progress.phase === "modrinth-dl";
+    const fmtUnit = (n: number) =>
+      isByteCount ? `${(n / 1_048_576).toFixed(1)} Mo` : String(n);
+    const phaseLabel: Record<string, string> = {
+      "version-json": "Métadonnées MC",
+      client: "Client Minecraft",
+      libraries: "Bibliothèques",
+      "asset-index": "Index des assets",
+      assets: "Assets",
+      "fabric-install": "Fabric",
+      "forge-install": "Forge",
+      "neoforge-install": "NeoForge",
+      "zip-dl": "Téléchargement ZIP",
+      "zip-extract": "Extraction ZIP",
+      "modrinth-dl": "Téléchargement .mrpack",
+      "modrinth-deps": "Dépendances Modrinth",
+      "modrinth-mods": "Mods Modrinth",
+      "modrinth-overrides": "Overrides Modrinth",
+      done: "Terminé",
+    };
+    const label = phaseLabel[progress.phase] ?? progress.phase;
+    return (
+      <div className="space-y-3">
+        <div className="text-sm text-fg-primary">{progress.message}</div>
+        <div className="text-xs text-fg-muted">
+          {label} · {fmtUnit(progress.current)} / {fmtUnit(progress.total)}
+          {pct > 0 && ` · ${pct}%`}
+        </div>
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
+          <div
+            className="h-full bg-emerald-400 transition-all"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        {phase === "ready-to-install" || phase === "error" ? (
+          <button
+            type="button"
+            onClick={handleInstall}
+            disabled={!module.nativeMcVersion}
+            className={cn(
+              "inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-medium",
+              "bg-accent/15 text-accent ring-1 ring-accent/30",
+              "hover:bg-accent/25 hover:shadow-[0_0_18px_var(--color-accent-soft)]",
+              "disabled:opacity-50 disabled:cursor-not-allowed",
+            )}
+          >
+            <Download className="size-4" />
+            Installer
+          </button>
+        ) : null}
+        {(phase === "ready" || phase === "running" || phase === "launching") && (
+          <button
+            type="button"
+            onClick={handleLaunch}
+            disabled={!selectedUuid || phase === "launching"}
+            className={cn(
+              "inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-medium",
+              "bg-emerald-400/15 text-emerald-300 ring-1 ring-emerald-400/30",
+              "hover:bg-emerald-400/25 hover:shadow-[0_0_18px_rgba(74,222,128,0.3)]",
+              "disabled:opacity-50 disabled:cursor-not-allowed",
+            )}
+          >
+            {phase === "launching" ? (
+              <>
+                <Loader2 className="size-4 animate-spin" /> Lancement…
+              </>
+            ) : (
+              <>
+                <Play className="size-4" /> Jouer
+              </>
+            )}
+          </button>
+        )}
+        {phase === "ready" && (
+          <button
+            type="button"
+            onClick={handleInstall}
+            className="rounded-2xl bg-bg-elevated/40 px-3 py-2 text-xs text-fg-muted ring-1 ring-white/[0.06] hover:bg-bg-elevated/70 hover:text-fg-primary"
+          >
+            Réinstaller
+          </button>
+        )}
+        {(phase === "ready" || phase === "running") && (
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                const m = await import("@/lib/mcVanilla");
+                await m.mcNativeOpenInstanceDir(module.id);
+              } catch (err) {
+                setError(err instanceof Error ? err.message : String(err));
+              }
+            }}
+            title="Ouvre le dossier .minecraft/ pour ajouter resourcepacks, shaders, configs…"
+            className="inline-flex items-center gap-1.5 rounded-2xl bg-bg-elevated/40 px-3 py-2 text-xs text-fg-muted ring-1 ring-white/[0.06] hover:bg-bg-elevated/70 hover:text-fg-primary"
+          >
+            <Folder className="size-3.5" />
+            Ouvrir le dossier
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => setShowConsole((v) => !v)}
+          className="rounded-2xl bg-bg-elevated/40 px-3 py-2 text-xs text-fg-muted ring-1 ring-white/[0.06] hover:bg-bg-elevated/70 hover:text-fg-primary"
+        >
+          Console ({logLines.length})
+        </button>
+      </div>
+
+      {/* Account picker — surfaced inline so the user always knows
+          which Microsoft account will own the next launch. */}
+      <div className="flex items-center gap-2 text-xs">
+        <span className="text-fg-muted">Compte :</span>
+        {accounts.length === 0 ? (
+          <span className="text-amber-300">
+            Aucun compte connecté — va dans Paramètres → Comptes Minecraft pour en ajouter un.
+          </span>
+        ) : (
+          <select
+            value={selectedUuid}
+            onChange={(e) => setSelectedUuid(e.target.value)}
+            className="rounded-md bg-bg-base/60 px-2 py-1 text-xs text-fg-primary ring-1 ring-white/[0.08] focus:ring-emerald-400/50 focus:outline-none"
+          >
+            {accounts.map((a) => (
+              <option key={a.uuid} value={a.uuid}>
+                {a.playerName}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
+
+      {showConsole && (
+        <div className="rounded-2xl bg-bg-base/60 ring-1 ring-white/[0.06] overflow-hidden">
+          <div className="flex items-center justify-between border-b border-white/[0.06] px-3 py-2">
+            <div className="text-xs uppercase tracking-wider text-accent">Console Minecraft</div>
+            <button
+              type="button"
+              onClick={() => setLogLines([])}
+              className="text-xs text-fg-muted hover:text-fg-primary"
+            >
+              Vider
+            </button>
+          </div>
+          <div className="info-scroll max-h-72 overflow-auto p-3 font-mono text-[11px] leading-relaxed">
+            {logLines.length === 0 ? (
+              <div className="text-fg-dim italic">Pas encore de sortie. Lance le jeu pour voir le log.</div>
+            ) : (
+              logLines.map((line, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    "whitespace-pre-wrap break-words",
+                    line.stream === "stderr" && "text-amber-300",
+                    line.stream === "exit" && "text-fg-muted",
+                    line.stream === "info" && "text-accent",
+                  )}
+                >
+                  {line.line}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -893,37 +1213,3 @@ function FavoriteToggle({ moduleId }: { moduleId: string }) {
   );
 }
 
-function InfoLine({
-  icon: Icon,
-  label,
-  value,
-  mono,
-  small,
-}: {
-  icon: typeof Hash;
-  label: string;
-  value: string;
-  mono?: boolean;
-  small?: boolean;
-}) {
-  return (
-    <div className="flex items-start gap-2.5 rounded-lg bg-white/[0.02] p-2.5 ring-1 ring-white/[0.04]">
-      <div className="grid size-7 shrink-0 place-items-center rounded-md bg-white/[0.04] text-fg-muted">
-        <Icon className="size-3.5" strokeWidth={2} />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="mb-0.5 text-[10px] uppercase tracking-wider text-fg-dim">{label}</div>
-        <div
-          className={cn(
-            "info-scroll overflow-x-auto whitespace-nowrap text-sm text-fg-primary pb-0.5",
-            mono && "font-mono",
-            small && "text-xs",
-          )}
-          title={value}
-        >
-          {value}
-        </div>
-      </div>
-    </div>
-  );
-}

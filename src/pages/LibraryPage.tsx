@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Library as LibraryIcon, Loader2, Plus } from "lucide-react";
 import { ModuleCard } from "@/components/library/ModuleCard";
 import { ShortcutForm } from "@/components/library/ShortcutForm";
-import { watchModules } from "@/firebase/modules";
+import { useModules, useModulesPrimed } from "@/store/firebaseStores";
 import { watchUserShortcuts, type ShortcutModule } from "@/firebase/shortcuts";
 import { useAuthStore } from "@/store/auth";
 import { sounds } from "@/lib/sounds";
@@ -11,16 +11,18 @@ import type { LauncherModule } from "@/types/module";
 
 export function LibraryPage() {
   const user = useAuthStore((s) => s.user);
-  const [hosted, setHosted] = useState<LauncherModule[] | null>(null);
+  const allModules = useModules();
+  const modulesPrimed = useModulesPrimed();
   const [shortcuts, setShortcuts] = useState<ShortcutModule[] | null>(null);
   const [editing, setEditing] = useState<{ kind: "new" } | { kind: "edit"; shortcut: ShortcutModule } | null>(null);
 
-  useEffect(() => {
-    return watchModules((mods) => {
-      // Keep all admin-managed modules (hosted + minecraft); legacy shortcuts in /modules are filtered out (those should now live under /users/{uid}/shortcuts)
-      setHosted(mods.filter((m) => m.type !== "shortcut"));
-    });
-  }, []);
+  // Filter out legacy shortcuts that may still live under `/modules` —
+  // those now belong under `/users/{uid}/shortcuts`. Memoised to avoid
+  // re-filtering on unrelated re-renders.
+  const hosted = useMemo(
+    () => allModules.filter((m) => m.type !== "shortcut"),
+    [allModules],
+  );
 
   useEffect(() => {
     if (!user) {
@@ -30,10 +32,10 @@ export function LibraryPage() {
     return watchUserShortcuts(user.uid, setShortcuts);
   }, [user]);
 
-  const loading = hosted === null || shortcuts === null;
+  const loading = !modulesPrimed || shortcuts === null;
   const all: LauncherModule[] = [
     ...(shortcuts ?? []),
-    ...(hosted ?? []),
+    ...hosted,
   ];
 
   const ownedShortcutIds = new Set((shortcuts ?? []).map((s) => s.id));

@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { listen } from "@tauri-apps/api/event";
+import { getVersion } from "@tauri-apps/api/app";
 import { AppShell } from "@/components/layout/AppShell";
 import { useAuthStore } from "@/store/auth";
 import { useUIStore } from "@/store/ui";
@@ -10,23 +11,37 @@ import { pushHeartbeat, type CurrentActivity } from "@/firebase/presence";
 import { watchFavorites } from "@/firebase/favorites";
 import { useFavoritesStore } from "@/store/favorites";
 import { logger, installGlobalLoggerHandlers } from "@/lib/logger";
-import { watchAllUsers, type UserPresence as UserPresenceT } from "@/firebase/presence";
-import { watchPlaytime, type PlaytimeEntry } from "@/firebase/playtime";
-import { watchConversationsFor } from "@/firebase/messaging";
-import { watchModules } from "@/firebase/modules";
-import { watchAchievements, recordUnlock } from "@/firebase/achievements";
+import {
+  useUsers,
+  useModules,
+  useConversations,
+  usePlaytime,
+  useAchievements,
+  useAchievementsPrimed,
+} from "@/store/firebaseStores";
+import { recordUnlock } from "@/firebase/achievements";
 import { ACHIEVEMENTS, isUnlocked, type AchievementContext } from "@/lib/achievements";
 import { pushAchievementToast, AchievementUnlockToastHost } from "@/components/achievements/AchievementUnlockToast";
 import { InvitationPopupHost } from "@/components/invitations/InvitationPopup";
 import { LiveActivityToastHost } from "@/components/presence/LiveActivityToastHost";
-import type { Conversation as ConversationT } from "@/types/messaging";
-import type { LauncherModule } from "@/types/module";
+import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 import type { ModuleExitEvent, ModuleLaunchEvent } from "@/lib/modules";
 
-// Install window.error / window.unhandledrejection / console.error capture
-// eagerly at module load so even errors during initial mount get logged.
+// Install window.error / window.unhandledrejection capture eagerly at
+// module load so even errors during initial mount get logged. Boot log
+// is deferred until the launcher version is known so the file name
+// (`YYYY-MM-DD_HH-MM_v<version>_<sid>.log`) reflects the real version
+// instead of the "dev" fallback.
 installGlobalLoggerHandlers();
-logger.info("App boot", { source: "App" });
+void (async () => {
+  try {
+    const v = await getVersion();
+    logger.setLauncherVersion(v);
+  } catch {
+    /* offline / non-tauri — keep the "dev" fallback */
+  }
+  logger.info("App boot", { source: "App" });
+})();
 
 function App() {
   const setUser = useAuthStore((s) => s.setUser);
@@ -177,15 +192,20 @@ function App() {
   // every catalog entry whenever any input changes. New unlocks are
   // persisted to Firestore + toasted to the user. Already-unlocked
   // achievements are skipped (idempotent — the unlock doc is keyed by id).
-  const [allModules, setAllModules] = useState<LauncherModule[]>([]);
-  const [playtime, setPlaytime] = useState<PlaytimeEntry[]>([]);
-  const [conversations, setConversations] = useState<ConversationT[]>([]);
-  const [unlockedSet, setUnlockedSet] = useState<Set<string>>(new Set());
-  // Tracks whether the Firestore listener has delivered its first snapshot.
-  // Until then, `unlockedSet` is empty and we MUST NOT evaluate achievements,
-  // otherwise every already-unlocked achievement gets toasted on each boot.
-  const [unlockedSetPrimed, setUnlockedSetPrimed] = useState(false);
-  const [allUsers, setAllUsers] = useState<UserPresenceT[]>([]);
+  //
+  // All Firestore listeners go through `@/store/firebaseStores` — that
+  // module ref-counts subscriptions so multiple consumers across the app
+  // share a single network listener per query.
+  const allModules = useModules();
+  const allUsers = useUsers();
+  const playtime = usePlaytime(user?.uid);
+  const conversations = useConversations(user?.uid);
+  const unlockedList = useAchievements(user?.uid);
+  const unlockedSetPrimed = useAchievementsPrimed(user?.uid);
+  const unlockedSet = useMemo(
+    () => new Set(unlockedList.map((u) => u.id)),
+    [unlockedList],
+  );
   // Session-level guard against re-toasting an achievement multiple times.
   // The Firestore-derived `unlockedSet` should already prevent this, but if
   // the snapshot listener is delayed (e.g. rules issue, network blip), the
@@ -193,28 +213,6 @@ function App() {
   // ref ensures each achievement is announced at most once per app session,
   // regardless of Firestore state.
   const toastedThisSession = useRef<Set<string>>(new Set());
-
-  useEffect(() => watchModules(setAllModules), []);
-  useEffect(() => watchAllUsers(setAllUsers), []);
-  useEffect(() => {
-    if (!user) return;
-    return watchPlaytime(user.uid, setPlaytime);
-  }, [user]);
-  useEffect(() => {
-    if (!user) return;
-    return watchConversationsFor(user.uid, setConversations);
-  }, [user]);
-  useEffect(() => {
-    if (!user) {
-      setUnlockedSetPrimed(false);
-      return;
-    }
-    setUnlockedSetPrimed(false);
-    return watchAchievements(user.uid, (list) => {
-      setUnlockedSet(new Set(list.map((u) => u.id)));
-      setUnlockedSetPrimed(true);
-    });
-  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -287,9 +285,12 @@ function App() {
   return (
     <>
       <AppShell />
-      <AchievementUnlockToastHost />
-      <InvitationPopupHost />
-      <LiveActivityToastHost />
+      {/* Each top-level host is wrapped in its own ErrorBoundary so a
+          crash in one (e.g. a malformed Firestore snapshot) doesn't kill
+          the whole tree and turn the launcher into a black screen. */}
+      <ErrorBoundary scope="achievements-toast"><AchievementUnlockToastHost /></ErrorBoundary>
+      <ErrorBoundary scope="invitation-popup"><InvitationPopupHost /></ErrorBoundary>
+      <ErrorBoundary scope="live-activity-toast"><LiveActivityToastHost /></ErrorBoundary>
     </>
   );
 }

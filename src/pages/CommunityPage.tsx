@@ -3,7 +3,8 @@ import { motion } from "framer-motion";
 import { Users, Copy, Check, Gamepad2, ExternalLink, MessageCircle } from "lucide-react";
 import { useAuthStore } from "@/store/auth";
 import { useUIStore } from "@/store/ui";
-import { watchAllUsers, statusFromLastSeen, type UserPresence, type PresenceStatus } from "@/firebase/presence";
+import { statusFromLastSeen, type UserPresence, type PresenceStatus } from "@/firebase/presence";
+import { useUsers } from "@/store/firebaseStores";
 import { ensureConversation } from "@/firebase/messaging";
 import { conversationIdFor } from "@/types/messaging";
 import { sounds } from "@/lib/sounds";
@@ -15,12 +16,8 @@ const INVITE_MESSAGE = `Salut ! Télécharge Simple Launcher pour qu'on joue ens
 export function CommunityPage() {
   const me = useAuthStore((s) => s.user);
   const navigate = useUIStore((s) => s.navigate);
-  const [users, setUsers] = useState<UserPresence[]>([]);
+  const users = useUsers();
   const [, setNow] = useState(Date.now());
-
-  useEffect(() => {
-    return watchAllUsers(setUsers);
-  }, []);
 
   // Re-evaluate status periodically (lastSeen comparison is time-sensitive)
   useEffect(() => {

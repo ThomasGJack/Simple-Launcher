@@ -1,27 +1,16 @@
-import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { LogOut, Calendar, Mail, Hash, Gamepad2, Clock, Rocket } from "lucide-react";
 import { useAuthStore } from "@/store/auth";
 import { useUIStore } from "@/store/ui";
 import { signOut } from "@/firebase/auth";
-import { formatPlaytime, watchPlaytime, type PlaytimeEntry } from "@/firebase/playtime";
-import { watchModules } from "@/firebase/modules";
-import type { LauncherModule } from "@/types/module";
+import { formatPlaytime } from "@/firebase/playtime";
+import { useModules, usePlaytime } from "@/store/firebaseStores";
 
 export function ProfilePage() {
   const user = useAuthStore((s) => s.user);
   const navigate = useUIStore((s) => s.navigate);
-  const [playtime, setPlaytime] = useState<PlaytimeEntry[]>([]);
-  const [modules, setModules] = useState<LauncherModule[]>([]);
-
-  useEffect(() => {
-    if (!user) return;
-    return watchPlaytime(user.uid, setPlaytime);
-  }, [user]);
-
-  useEffect(() => {
-    return watchModules(setModules);
-  }, []);
+  const playtime = usePlaytime(user?.uid);
+  const modules = useModules();
 
   if (!user) return null;
 

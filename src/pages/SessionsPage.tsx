@@ -13,7 +13,8 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "@/store/auth";
 import { useUIStore } from "@/store/ui";
-import { watchModules } from "@/firebase/modules";
+import { useModules } from "@/store/firebaseStores";
+import type { LauncherModule } from "@/types/module";
 import {
   createSession,
   deleteSession,
@@ -24,7 +25,6 @@ import {
   type RsvpStatus,
   type SessionRsvp,
 } from "@/firebase/sessions";
-import type { LauncherModule } from "@/types/module";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
 
@@ -38,11 +38,10 @@ export function SessionsPage() {
   const me = useAuthStore((s) => s.user);
   const navigate = useUIStore((s) => s.navigate);
   const [sessions, setSessions] = useState<GameSession[]>([]);
-  const [modules, setModules] = useState<LauncherModule[]>([]);
+  const modules = useModules();
   const [creating, setCreating] = useState(false);
 
   useEffect(() => watchSessions(setSessions), []);
-  useEffect(() => watchModules(setModules), []);
 
   const now = Date.now();
   const upcoming = sessions.filter((s) => s.scheduledAt > now - 30 * 60_000);

@@ -27,9 +27,6 @@ const AdminPage = lazy(() =>
 const AdminPageBuilder = lazy(() =>
   import("@/pages/AdminPageBuilder").then((m) => ({ default: m.AdminPageBuilder })),
 );
-const AdminLogsPage = lazy(() =>
-  import("@/pages/AdminLogsPage").then((m) => ({ default: m.AdminLogsPage })),
-);
 const ModuleDetailPage = lazy(() =>
   import("@/pages/ModuleDetailPage").then((m) => ({ default: m.ModuleDetailPage })),
 );
@@ -47,6 +44,9 @@ const SessionsPage = lazy(() =>
 );
 const CrewsPage = lazy(() =>
   import("@/pages/CrewsPage").then((m) => ({ default: m.CrewsPage })),
+);
+const VipPage = lazy(() =>
+  import("@/pages/VipPage").then((m) => ({ default: m.VipPage })),
 );
 
 export function AppShell() {
@@ -106,14 +106,14 @@ function renderRoute(name: string) {
       return <AdminPage />;
     case "admin-builder":
       return <AdminPageBuilder />;
-    case "admin-logs":
-      return <AdminLogsPage />;
     case "community":
       return <CommunityPage />;
     case "sessions":
       return <SessionsPage />;
     case "crews":
       return <CrewsPage />;
+    case "vip":
+      return <VipPage />;
     case "messages":
       return <MessagesPage />;
     case "user-profile":

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Play, Download, RefreshCw, Gamepad2, Trash2, AlertTriangle, Folder, Pencil, Star } from "lucide-react";
+import { Play, Download, RefreshCw, Gamepad2, Trash2, AlertTriangle, Folder, Pencil, Star, Sparkles } from "lucide-react";
 import {
   deriveStatus,
   getModuleState,
@@ -179,6 +179,7 @@ export function ModuleCard({
 
       <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-4">
         <div className="flex flex-wrap items-start gap-1.5">
+          <SourceBadge module={module} />
           <StatusBadge module={module} status={status} loaded={stateLoaded} action={action} />
           {module.server?.type === "minecraft" && (
             <MinecraftStatusBadge address={module.server.address} compact />
@@ -269,11 +270,11 @@ function StatusBadge({
 
   switch (status.kind) {
     case "shortcut":
-      return (
-        <Pill color="fuchsia">
-          <Folder className="size-3" /> Local
-        </Pill>
-      );
+      // Shortcut modules don't carry an "install status" — the
+      // executable either exists at its path or it doesn't. The
+      // SourceBadge handles the "Local" labelling separately, so
+      // here we render nothing.
+      return null;
     case "minecraft":
       return <Pill color="emerald">Minecraft</Pill>;
     case "not-installed":
@@ -291,12 +292,35 @@ function StatusBadge({
   }
 }
 
+/**
+ * Tells the user where this module came from at a glance:
+ *   - **Officiel** : added by the admin to the shared `/modules/`
+ *     collection. Visible to everyone, version-managed, can ship a
+ *     curated module page.
+ *   - **Local**    : created by the user themselves under
+ *     `/users/{uid}/shortcuts/`. Only visible in their own library.
+ */
+function SourceBadge({ module }: { module: LauncherModule }) {
+  if (module.type === "shortcut") {
+    return (
+      <Pill color="fuchsia">
+        <Folder className="size-3" /> Local
+      </Pill>
+    );
+  }
+  return (
+    <Pill color="cyan">
+      <Sparkles className="size-3" /> Officiel
+    </Pill>
+  );
+}
+
 function Pill({
   color,
   pulsing,
   children,
 }: {
-  color: "accent" | "fuchsia" | "muted" | "success" | "amber" | "emerald";
+  color: "accent" | "fuchsia" | "muted" | "success" | "amber" | "emerald" | "cyan";
   pulsing?: boolean;
   children: React.ReactNode;
 }) {
@@ -307,6 +331,7 @@ function Pill({
     success: "bg-success/15 text-success ring-success/30",
     amber: "bg-amber-500/15 text-amber-300 ring-amber-500/30",
     emerald: "bg-emerald-500/15 text-emerald-300 ring-emerald-500/30",
+    cyan: "bg-cyan-500/15 text-cyan-300 ring-cyan-500/30",
   } as const;
   return (
     <span

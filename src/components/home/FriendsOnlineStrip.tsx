@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { Users } from "lucide-react";
-import { watchAllUsers, statusFromLastSeen, type UserPresence } from "@/firebase/presence";
+import { statusFromLastSeen } from "@/firebase/presence";
+import { useUsers } from "@/store/firebaseStores";
 import { useAuthStore } from "@/store/auth";
 import { useUIStore } from "@/store/ui";
 
@@ -13,13 +14,17 @@ import { useUIStore } from "@/store/ui";
 export function FriendsOnlineStrip() {
   const me = useAuthStore((s) => s.user);
   const navigate = useUIStore((s) => s.navigate);
-  const [users, setUsers] = useState<UserPresence[]>([]);
+  const users = useUsers();
 
-  useEffect(() => watchAllUsers(setUsers), []);
-
-  const online = users
-    .filter((u) => u.uid !== me?.uid && statusFromLastSeen(u.lastSeen) === "online")
-    .sort((a, b) => (b.lastSeen ?? 0) - (a.lastSeen ?? 0));
+  // Filter + sort is O(n) but n can be 100+ — memoise so HomePage's 30 s
+  // tick (setNow) doesn't recompute it.
+  const online = useMemo(
+    () =>
+      users
+        .filter((u) => u.uid !== me?.uid && statusFromLastSeen(u.lastSeen) === "online")
+        .sort((a, b) => (b.lastSeen ?? 0) - (a.lastSeen ?? 0)),
+    [users, me?.uid],
+  );
 
   if (online.length === 0) return null;
 

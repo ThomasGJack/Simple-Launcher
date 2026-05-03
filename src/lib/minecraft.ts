@@ -22,6 +22,13 @@ export async function getMinecraftState(moduleId: string): Promise<MinecraftStat
   return invoke<MinecraftStateLocal | null>("mc_get_state", { moduleId });
 }
 
+/** Opens the Prism instance's `.minecraft/` directory in the OS file
+ *  explorer. Returns the absolute path that was opened (for tooltips).
+ *  Errors out if Prism isn't installed yet. */
+export async function openPrismInstanceDir(instanceName: string): Promise<string> {
+  return invoke<string>("mc_open_prism_instance_dir", { instanceName });
+}
+
 /**
  * Per-machine RAM override stored in localStorage. Each user can pick a heap
  * size that fits their hardware regardless of what the admin set as the

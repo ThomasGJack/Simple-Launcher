@@ -5,6 +5,7 @@ import { logger } from "firebase-functions/v2";
 import { initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, FieldValue, Timestamp } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 
 initializeApp();
 
@@ -155,7 +156,7 @@ export const cleanupOldData = onSchedule(
   },
   async () => {
     const db = getFirestore();
-    const stats = { logs: 0, snapshots: 0, invitations: 0 };
+    const stats = { logs: 0, snapshots: 0, invitations: 0, logFiles: 0 };
 
     // --- /logs older than 30 days ----------------------------------------
     {
@@ -203,6 +204,34 @@ export const cleanupOldData = onSchedule(
       for (const doc of snap.docs) batch.delete(doc.ref);
       if (!snap.empty) await batch.commit();
       stats.invitations = snap.size;
+    }
+
+    // --- Storage `users/*/logs/*.log` older than 7 days ------------------
+    // Each launcher session uploads a `.log` file at `users/{uid}/logs/`.
+    // We delete every object older than 7 days so disk + bandwidth stay
+    // bounded. The sessionId-based file names contain the session start
+    // timestamp, but we use the actual object metadata.timeCreated for
+    // the cutoff — it's the source of truth (immutable, server-side).
+    {
+      const cutoffMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      const bucket = getStorage().bucket();
+      try {
+        const [files] = await bucket.getFiles({ prefix: "users/" });
+        for (const file of files) {
+          if (!/^users\/[^/]+\/logs\//.test(file.name)) continue;
+          const meta = file.metadata;
+          const created = meta.timeCreated ? Date.parse(meta.timeCreated) : NaN;
+          if (Number.isNaN(created)) continue;
+          if (created < cutoffMs) {
+            await file.delete().catch((err) => {
+              logger.warn("log file delete failed", { name: file.name, err });
+            });
+            stats.logFiles += 1;
+          }
+        }
+      } catch (err) {
+        logger.error("cleanup log files: bucket scan failed", { err });
+      }
     }
 
     logger.info("cleanupOldData done", stats);

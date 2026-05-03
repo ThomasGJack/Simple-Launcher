@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -18,10 +18,14 @@ import {
 } from "lucide-react";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/auth";
-import { watchAllUsers, statusFromLastSeen, type UserPresence, type UserPrivacy, type PresenceStatus } from "@/firebase/presence";
-import { watchPlaytime, formatPlaytime, type PlaytimeEntry } from "@/firebase/playtime";
-import { watchAchievements, type UnlockedAchievement } from "@/firebase/achievements";
-import { watchModules } from "@/firebase/modules";
+import { statusFromLastSeen, type UserPresence, type UserPrivacy, type PresenceStatus } from "@/firebase/presence";
+import { formatPlaytime } from "@/firebase/playtime";
+import {
+  useUsers,
+  useModules,
+  usePlaytime,
+  useAchievements,
+} from "@/store/firebaseStores";
 import { sendGameInvitation } from "@/firebase/invitations";
 import { saveProfileCustomization, uploadProfileBanner } from "@/firebase/userProfile";
 import {
@@ -57,21 +61,10 @@ export function PublicProfilePage() {
 
   const targetUid = route.name === "user-profile" ? route.uid : null;
 
-  const [users, setUsers] = useState<UserPresence[]>([]);
-  const [modules, setModules] = useState<LauncherModule[]>([]);
-  const [playtime, setPlaytime] = useState<PlaytimeEntry[]>([]);
-  const [unlocked, setUnlocked] = useState<UnlockedAchievement[]>([]);
-
-  useEffect(() => watchAllUsers(setUsers), []);
-  useEffect(() => watchModules(setModules), []);
-  useEffect(() => {
-    if (!targetUid) return;
-    return watchPlaytime(targetUid, setPlaytime);
-  }, [targetUid]);
-  useEffect(() => {
-    if (!targetUid) return;
-    return watchAchievements(targetUid, setUnlocked);
-  }, [targetUid]);
+  const users = useUsers();
+  const modules = useModules();
+  const playtime = usePlaytime(targetUid);
+  const unlocked = useAchievements(targetUid);
 
   const profile = useMemo(() => users.find((u) => u.uid === targetUid) ?? null, [users, targetUid]);
   const status = profile ? statusFromLastSeen(profile.lastSeen) : "offline";

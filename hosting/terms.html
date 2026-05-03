@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <title>Simple Launcher — Conditions d'utilisation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Audiowide&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #07090d;
+        --bg-soft: #0d1117;
+        --fg: #f5f7fa;
+        --fg-muted: #97a3b6;
+        --fg-dim: #5e6b7e;
+        --accent: #a855f7;
+        --accent-soft: rgba(168, 85, 247, 0.18);
+        --accent-glow: rgba(168, 85, 247, 0.5);
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: "Inter", system-ui, sans-serif;
+        min-height: 100vh;
+        line-height: 1.65;
+      }
+      .blob {
+        position: fixed;
+        border-radius: 50%;
+        filter: blur(120px);
+        z-index: 0;
+        pointer-events: none;
+        opacity: 0.18;
+      }
+      .blob-1 { top: -20%; left: -10%; width: 50vw; height: 50vw; background: var(--accent); }
+      .blob-2 { bottom: -30%; right: -15%; width: 60vw; height: 60vw; background: #00d4ff; opacity: 0.1; }
+      header {
+        position: relative;
+        z-index: 1;
+        max-width: 820px;
+        margin: 0 auto;
+        padding: 60px 32px 32px;
+      }
+      header a.back {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--fg-muted);
+        text-decoration: none;
+        font-size: 13px;
+        margin-bottom: 32px;
+        transition: color 0.2s;
+      }
+      header a.back:hover { color: var(--fg); }
+      header .badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.25em;
+        margin-bottom: 16px;
+      }
+      h1 {
+        font-family: "Audiowide", sans-serif;
+        font-size: 48px;
+        margin: 0 0 12px;
+        font-weight: 400;
+        line-height: 1.1;
+      }
+      .updated {
+        color: var(--fg-dim);
+        font-size: 13px;
+        margin: 0;
+      }
+      main {
+        position: relative;
+        z-index: 1;
+        max-width: 820px;
+        margin: 0 auto;
+        padding: 16px 32px 80px;
+      }
+      h2 {
+        font-family: "Audiowide", sans-serif;
+        font-size: 22px;
+        margin: 48px 0 12px;
+        font-weight: 400;
+        color: var(--fg);
+      }
+      h2:first-child { margin-top: 0; }
+      h3 {
+        font-size: 16px;
+        margin: 24px 0 8px;
+        color: var(--fg);
+        font-weight: 600;
+      }
+      p, li {
+        color: var(--fg-muted);
+        font-size: 15px;
+      }
+      ul { padding-left: 22px; }
+      li { margin-bottom: 6px; }
+      strong { color: var(--fg); font-weight: 600; }
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      .callout {
+        margin: 20px 0;
+        padding: 16px 20px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.03);
+        border-left: 3px solid var(--accent);
+        font-size: 14px;
+      }
+      footer {
+        position: relative;
+        z-index: 1;
+        max-width: 820px;
+        margin: 0 auto;
+        padding: 32px;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        color: var(--fg-dim);
+        font-size: 13px;
+        text-align: center;
+      }
+      footer a { color: var(--fg-muted); margin: 0 8px; }
+    </style>
+  </head>
+  <body>
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+
+    <header>
+      <a href="/" class="back">← Retour</a>
+      <span class="badge">Légal</span>
+      <h1>Conditions d'utilisation</h1>
+      <p class="updated">Dernière mise à jour : 30 avril 2026</p>
+    </header>
+
+    <main>
+      <p>
+        Bienvenue sur <strong>Simple Launcher</strong>. En téléchargeant, installant ou utilisant le launcher, tu acceptes les conditions ci-dessous. Lis-les attentivement — c'est un document court mais important.
+      </p>
+
+      <h2>1. À propos du service</h2>
+      <p>
+        Simple Launcher est un launcher de jeux pour Windows développé à titre personnel par un développeur indépendant. Il permet de gérer une bibliothèque de modules de jeux, de discuter avec d'autres utilisateurs, de coordonner des sessions de jeu, et d'authentifier des comptes Microsoft pour lancer Minecraft.
+      </p>
+      <p>
+        Le service est <strong>gratuit</strong>, <strong>privé</strong> (réservé à un cercle d'amis), et fourni « tel quel » sans aucune garantie.
+      </p>
+
+      <h2>2. Compte et authentification</h2>
+      <p>
+        L'accès au launcher nécessite une connexion via un compte Discord. Tu peux également connecter un compte Microsoft pour authentifier Minecraft. Tu es responsable de :
+      </p>
+      <ul>
+        <li>La sécurité de tes identifiants (Discord, Microsoft)</li>
+        <li>Toute activité effectuée depuis ton compte</li>
+        <li>Respecter les conditions d'utilisation des services tiers (Discord, Microsoft, Mojang)</li>
+      </ul>
+
+      <h2>3. Authentification Minecraft</h2>
+      <p>
+        Simple Launcher utilise le protocole <strong>OAuth 2.0 de Microsoft</strong> pour authentifier ton compte Microsoft auprès des services Mojang. Tes identifiants Microsoft ne transitent <strong>jamais</strong> par le launcher ou nos serveurs — la fenêtre de login est celle de Microsoft, dans ton navigateur.
+      </p>
+      <div class="callout">
+        Les jetons d'accès Minecraft (refresh tokens) sont stockés <strong>localement</strong> sur ta machine, dans le coffre-fort sécurisé du système d'exploitation (Windows Credential Manager). Ils ne sont jamais transmis à nos serveurs ni aux autres utilisateurs.
+      </div>
+
+      <h2>4. Utilisation acceptable</h2>
+      <p>Tu t'engages à <strong>ne pas</strong> :</p>
+      <ul>
+        <li>Utiliser le launcher pour accéder à du contenu illégal ou pirate</li>
+        <li>Tenter de contourner les systèmes d'authentification ou DRM des jeux</li>
+        <li>Harceler, menacer ou nuire aux autres utilisateurs via les fonctionnalités sociales</li>
+        <li>Décompiler, modifier ou redistribuer le launcher sans autorisation</li>
+        <li>Utiliser le service à des fins commerciales sans accord préalable</li>
+      </ul>
+
+      <h2>5. Contenu utilisateur</h2>
+      <p>
+        Tu peux publier des messages dans les fonctionnalités sociales (DM, salons de clan, sondages, sessions). Tu en restes propriétaire. Tu nous autorises à les stocker et les afficher aux autres utilisateurs concernés. Nous nous réservons le droit de modérer ou supprimer tout contenu inapproprié.
+      </p>
+
+      <h2>6. Services tiers</h2>
+      <p>
+        Simple Launcher s'appuie sur plusieurs services externes :
+      </p>
+      <ul>
+        <li><strong>Discord</strong> — pour l'authentification (<a href="https://discord.com/terms" target="_blank">conditions Discord</a>)</li>
+        <li><strong>Microsoft / Xbox Live / Mojang</strong> — pour l'authentification Minecraft (<a href="https://www.minecraft.net/eula" target="_blank">EULA Mojang</a>)</li>
+        <li><strong>Firebase (Google)</strong> — pour l'hébergement et le stockage en temps réel (<a href="https://firebase.google.com/terms" target="_blank">conditions Firebase</a>)</li>
+        <li><strong>CurseForge / Modrinth</strong> — pour les modpacks Minecraft</li>
+      </ul>
+      <p>
+        Tu acceptes leurs conditions respectives en utilisant ces fonctionnalités.
+      </p>
+
+      <h2>7. Disponibilité du service</h2>
+      <p>
+        Le launcher est fourni <strong>« tel quel »</strong> sans garantie de disponibilité. Le développeur peut, à tout moment et sans préavis :
+      </p>
+      <ul>
+        <li>Modifier ou retirer des fonctionnalités</li>
+        <li>Suspendre temporairement le service pour maintenance</li>
+        <li>Désactiver ou supprimer un compte qui violerait ces conditions</li>
+      </ul>
+
+      <h2>8. Limitation de responsabilité</h2>
+      <p>
+        Simple Launcher est un projet hobby, non commercial. Le développeur ne pourra être tenu responsable de :
+      </p>
+      <ul>
+        <li>Pertes de données (sauvegardes Minecraft, logs, etc.) — fais des backups</li>
+        <li>Indisponibilité ponctuelle des services tiers (Discord down, Mojang down, etc.)</li>
+        <li>Dommages indirects liés à l'utilisation du launcher</li>
+      </ul>
+
+      <h2>9. Propriété intellectuelle</h2>
+      <p>
+        Le code, le design et le branding de Simple Launcher sont la propriété du développeur. Les marques tierces (Minecraft, Discord, etc.) appartiennent à leurs propriétaires respectifs.
+      </p>
+
+      <h2>10. Modifications de ces conditions</h2>
+      <p>
+        Ces conditions peuvent être modifiées. La version en vigueur est toujours celle accessible à <a href="https://simplelaunche.web.app/terms.html">simplelaunche.web.app/terms.html</a>. Une notification dans le launcher préviendra des changements majeurs.
+      </p>
+
+      <h2>11. Droit applicable</h2>
+      <p>
+        Ces conditions sont régies par le droit français. Tout litige sera soumis aux tribunaux compétents de France.
+      </p>
+
+      <h2>12. Contact</h2>
+      <p>
+        Pour toute question concernant ces conditions, contacte le développeur via le serveur Discord du launcher ou via les paramètres du launcher (« Signaler un problème »).
+      </p>
+    </main>
+
+    <footer>
+      <a href="/">Accueil</a> ·
+      <a href="/terms.html">Conditions d'utilisation</a> ·
+      <a href="/privacy.html">Politique de confidentialité</a>
+      <p style="margin-top: 12px;">© 2026 Simple Launcher. Tous droits réservés.</p>
+    </footer>
+  </body>
+</html>

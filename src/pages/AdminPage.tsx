@@ -13,15 +13,22 @@ import {
   Gamepad2,
   Palette,
   Sparkles,
-  Wand2,
   Server,
   Activity,
   Layout,
+  TerminalSquare,
+  Loader2,
+  Plus,
+  ExternalLink,
+  GitBranch,
+  HelpCircle,
 } from "lucide-react";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/auth";
 import { NewsManager } from "@/components/admin/NewsManager";
 import { CrewsManager } from "@/components/admin/CrewsManager";
+import { LogsManager } from "@/components/admin/LogsManager";
+import { MinecraftNativeBuilder } from "@/components/admin/MinecraftNativeBuilder";
 import { isAdmin } from "@/lib/admin";
 import {
   deleteHostedZip,
@@ -32,11 +39,11 @@ import {
   uploadHostedModule,
   uploadModpackZip,
   uploadModuleAsset,
-  watchModules,
   watchModuleVersions,
   type ModuleVersionRecord,
   type UploadProgress,
 } from "@/firebase/modules";
+import { useModules } from "@/store/firebaseStores";
 import type { LauncherModule, ModulePage, ParticlesConfig, PageSection } from "@/types/module";
 import { isModulePageV2 } from "@/types/module";
 import { ModulePreviewCard } from "@/components/library/ModulePreviewCard";
@@ -79,6 +86,22 @@ type FormState = {
   modLoader: ModLoader;
   // Heap allocation in MiB. 0 = "let Prism decide" (default).
   maxRamMb: number;
+  // ─── Native MC fields (no Prism) ────────────────────────────────
+  /** Master toggle: when on, the launcher uses the in-house native
+   *  chain instead of Prism for this module. */
+  nativeMc: boolean;
+  /** Vanilla MC version pinned for the native install. */
+  nativeMcVersion: string;
+  /** Loader pick for the native install. */
+  nativeLoader: "vanilla" | "fabric" | "forge" | "neoforge";
+  /** Loader version (e.g. Fabric `0.16.0`, Forge `47.4.0`). */
+  nativeLoaderVersion: string;
+  /** Modpack overlay applied on top of vanilla + loader. */
+  nativeModpackKind: "none" | "modrinth" | "zip";
+  /** URL of the .mrpack (modrinth) or generic .zip pack. */
+  nativeModpackUrl: string;
+  /** Optional Modrinth project id for display. */
+  nativeModrinthProjectId: string;
 };
 
 const EMPTY_FORM: FormState = {
@@ -109,11 +132,19 @@ const EMPTY_FORM: FormState = {
   minecraftVersion: "",
   modLoader: "",
   maxRamMb: 4096,
+  nativeMc: false,
+  nativeMcVersion: "",
+  nativeLoader: "vanilla",
+  nativeLoaderVersion: "",
+  nativeModpackKind: "none",
+  nativeModpackUrl: "",
+  nativeModrinthProjectId: "",
 };
 
 export function AdminPage() {
   const user = useAuthStore((s) => s.user);
-  const [modules, setModules] = useState<LauncherModule[]>([]);
+  const [activeTab, setActiveTab] = useState<"modules" | "news" | "crews" | "logs" | "mc-native">("modules");
+  const modules = useModules();
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [file, setFile] = useState<File | null>(null);
   const [progress, setProgress] = useState<UploadProgress | null>(null);
@@ -122,13 +153,8 @@ export function AdminPage() {
   const [iconUploading, setIconUploading] = useState(false);
   const [bannerUploading, setBannerUploading] = useState(false);
   const [modpackUploading, setModpackUploading] = useState<{ percent: number; uploaded: number; total: number } | null>(null);
-  const [showCustom, setShowCustom] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const isEditing = editingId !== null;
-
-  useEffect(() => {
-    return watchModules(setModules);
-  }, []);
 
   if (!isAdmin(user)) {
     return (
@@ -151,7 +177,6 @@ export function AdminPage() {
     setForm(EMPTY_FORM);
     setFile(null);
     setProgress(null);
-    setShowCustom(false);
     setEditingId(null);
   };
 
@@ -202,10 +227,33 @@ export function AdminPage() {
       minecraftVersion: m.type === "minecraft" ? m.minecraftVersion ?? "" : "",
       modLoader: m.type === "minecraft" ? ((m.modLoader ?? "") as ModLoader) : "",
       maxRamMb: m.type === "minecraft" ? m.maxRamMb ?? 4096 : 4096,
+      // Native MC config — load from existing module or default off.
+      nativeMc: m.type === "minecraft" ? m.nativeMc === true : false,
+      nativeMcVersion: m.type === "minecraft" ? m.nativeMcVersion ?? "" : "",
+      nativeLoader:
+        m.type === "minecraft" && m.nativeLoader ? m.nativeLoader : "vanilla",
+      nativeLoaderVersion:
+        m.type === "minecraft" ? m.nativeLoaderVersion ?? "" : "",
+      nativeModpackKind:
+        m.type === "minecraft" && m.nativeModpack
+          ? m.nativeModpack.kind
+          : "none",
+      nativeModpackUrl:
+        m.type === "minecraft" && m.nativeModpack
+          ? m.nativeModpack.kind === "modrinth"
+            ? m.nativeModpack.mrpackUrl
+            : m.nativeModpack.kind === "zip"
+              ? m.nativeModpack.zipUrl
+              : ""
+          : "",
+      nativeModrinthProjectId:
+        m.type === "minecraft" &&
+        m.nativeModpack?.kind === "modrinth"
+          ? m.nativeModpack.modrinthProjectId ?? ""
+          : "",
     });
     setFile(null);
     setProgress(null);
-    setShowCustom(true);
     setEditingId(m.id);
     setFeedback(null);
     // Scroll to top of form
@@ -300,6 +348,22 @@ export function AdminPage() {
       if (form.type === "minecraft") {
         // Save covers both create and update — Firestore setDoc with merge.
         const useManual = form.mcSource === "manual";
+        // Compose the optional native modpack overlay so the same shape
+        // round-trips into Firestore + back into `startEdit`.
+        const nativeModpack =
+          form.nativeMc && form.nativeModpackKind === "modrinth" && form.nativeModpackUrl
+            ? {
+                kind: "modrinth" as const,
+                mrpackUrl: form.nativeModpackUrl,
+                ...(form.nativeModrinthProjectId && {
+                  modrinthProjectId: form.nativeModrinthProjectId,
+                }),
+              }
+            : form.nativeMc && form.nativeModpackKind === "zip" && form.nativeModpackUrl
+              ? { kind: "zip" as const, zipUrl: form.nativeModpackUrl }
+              : form.nativeMc
+                ? { kind: "none" as const }
+                : undefined;
         await saveMinecraftModule({
           type: "minecraft",
           id: form.id,
@@ -316,6 +380,17 @@ export function AdminPage() {
           ...(form.minecraftVersion && { minecraftVersion: form.minecraftVersion }),
           ...(form.modLoader && { modLoader: form.modLoader }),
           ...(form.maxRamMb >= 512 && { maxRamMb: form.maxRamMb }),
+          // Native MC config — only persisted when explicitly enabled
+          // by the toggle, so legacy modules stay legacy.
+          ...(form.nativeMc && {
+            nativeMc: true,
+            ...(form.nativeMcVersion && { nativeMcVersion: form.nativeMcVersion }),
+            nativeLoader: form.nativeLoader,
+            ...(form.nativeLoaderVersion && {
+              nativeLoaderVersion: form.nativeLoaderVersion,
+            }),
+            ...(nativeModpack && { nativeModpack }),
+          }),
           ...(page && { page }),
           ...(server && { server }),
         });
@@ -366,6 +441,18 @@ export function AdminPage() {
     try {
       await deleteModule(mod.id);
       if (mod.type === "hosted") await deleteHostedZip(mod.id, mod.version);
+      // Native MC modules: wipe the per-instance .minecraft/ dir on the
+      // local machine too. Best-effort — failures (e.g. file in use) are
+      // ignored, the daily Cloud Function won't help here since this is
+      // a local-only directory.
+      if (mod.type === "minecraft" && mod.nativeMc === true) {
+        try {
+          const { mcNativeUninstallInstance } = await import("@/lib/mcVanilla");
+          await mcNativeUninstallInstance(mod.id);
+        } catch (err) {
+          console.warn("[admin] native uninstall failed:", err);
+        }
+      }
       setFeedback({ kind: "ok", message: `Module "${mod.name}" supprimé.` });
     } catch (e) {
       setFeedback({ kind: "error", message: e instanceof Error ? e.message : String(e) });
@@ -377,15 +464,55 @@ export function AdminPage() {
       setFeedback({ kind: "error", message: "Renseigne d'abord l'ID du module avant d'uploader le modpack." });
       return;
     }
-    setModpackUploading({ percent: 0, uploaded: 0, total: uploadedFile.size });
     setFeedback(null);
+
+    // Step 1: parse the manifest LOCALLY before uploading. fflate is
+    // fast enough that even a 1 GB modpack only takes a couple of
+    // seconds — saves us a re-download from Firebase/GitHub afterwards.
+    // Failures here are non-fatal; we still upload and the admin can
+    // fill MC version / loader manually.
+    let detectedManifest: import("@/lib/mcZip").CurseforgeManifestSummary | null = null;
+    try {
+      const { readCfManifestFromFile } = await import("@/lib/mcZip");
+      detectedManifest = await readCfManifestFromFile(uploadedFile);
+      if (detectedManifest.mcVersion) updateForm("nativeMcVersion", detectedManifest.mcVersion);
+      if (
+        detectedManifest.loader &&
+        ["vanilla", "fabric", "forge", "neoforge"].includes(detectedManifest.loader)
+      ) {
+        updateForm("nativeLoader", detectedManifest.loader as FormState["nativeLoader"]);
+      }
+      if (detectedManifest.loaderVersion)
+        updateForm("nativeLoaderVersion", detectedManifest.loaderVersion);
+    } catch (manifestErr) {
+      console.warn("[admin] local CF manifest parse failed (non-fatal):", manifestErr);
+    }
+
+    // Step 2: upload to Firebase Storage + populate URL fields.
+    setModpackUploading({ percent: 0, uploaded: 0, total: uploadedFile.size });
     try {
       const { url, size } = await uploadModpackZip(form.id, uploadedFile, (p) => {
         setModpackUploading({ percent: p.percent, uploaded: p.bytesUploaded, total: p.bytesTotal });
       });
+      // Populate BOTH the legacy and native modpack URL fields. The
+      // user uploads once, the same Storage object is consumed by
+      // whichever path they end up using (legacy Prism via
+      // `customZipUrl`, native via `nativeModpackUrl`). Switching modes
+      // later doesn't require re-uploading.
       updateForm("customZipUrl", url);
       updateForm("customZipSize", size);
-      setFeedback({ kind: "ok", message: `Modpack uploadé (${(size / 1_048_576).toFixed(1)} Mo). Pense à publier pour que tes potes le voient.` });
+      updateForm("nativeModpackUrl", url);
+      if (detectedManifest && detectedManifest.name) {
+        setFeedback({
+          kind: "ok",
+          message: `Modpack « ${detectedManifest.name} » uploadé (${(size / 1_048_576).toFixed(1)} Mo). MC ${detectedManifest.mcVersion ?? "?"} · ${detectedManifest.loader ?? "?"} ${detectedManifest.loaderVersion ?? ""} · ${detectedManifest.fileCount} mods.`,
+        });
+      } else {
+        setFeedback({
+          kind: "ok",
+          message: `Modpack uploadé (${(size / 1_048_576).toFixed(1)} Mo).`,
+        });
+      }
     } catch (e) {
       setFeedback({ kind: "error", message: e instanceof Error ? e.message : String(e) });
     } finally {
@@ -410,18 +537,146 @@ export function AdminPage() {
     }
   };
 
+  // Tab metadata — single source of truth for the nav row + headings.
+  const tabs = [
+    {
+      id: "modules" as const,
+      label: "Modules",
+      icon: Cloud,
+      title: "Modules",
+      description: "Crée, met à jour et supprime les jeux disponibles dans le launcher.",
+    },
+    {
+      id: "news" as const,
+      label: "News",
+      icon: Sparkles,
+      title: "News du launcher",
+      description: "Annonces diffusées en temps réel sur l'accueil de tous les launchers.",
+    },
+    {
+      id: "crews" as const,
+      label: "Clans",
+      icon: Shield,
+      title: "Clans / Crews",
+      description: "Mini-Discord textuel. Crée des clans et leurs salons.",
+    },
+    {
+      id: "logs" as const,
+      label: "Logs",
+      icon: TerminalSquare,
+      title: "Logs des launchers",
+      description:
+        "Consulte les fichiers de session de chaque user. Sélectionne un launcher → choisis un fichier → lis, télécharge ou supprime. Rétention auto 7 jours.",
+    },
+    {
+      id: "mc-native" as const,
+      label: "MC natif",
+      icon: Gamepad2,
+      title: "Minecraft natif (sans Prism)",
+      description:
+        "Banc de test pour la chaîne complète d'install et de lancement Minecraft sans dépendance externe. Vanilla + Fabric + Forge + NeoForge.",
+    },
+  ];
+  const currentTab = tabs.find((t) => t.id === activeTab) ?? tabs[0];
+
   return (
     <div className="relative h-full overflow-y-auto p-12">
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-10 flex items-end justify-between">
-        <div>
-          <p className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-accent">
-            <Shield className="size-3" /> Administration
-          </p>
-          <h1 className="mt-2 font-display text-5xl text-fg-primary">Modules</h1>
-          <p className="mt-2 text-sm text-fg-muted">Crée, met à jour et supprime les jeux disponibles dans le launcher.</p>
-        </div>
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
+        <p className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-accent">
+          <Shield className="size-3" /> Administration
+        </p>
+        <h1 className="mt-2 font-display text-5xl text-fg-primary">{currentTab.title}</h1>
+        <p className="mt-2 text-sm text-fg-muted">{currentTab.description}</p>
       </motion.div>
 
+      {/* Tab nav — pill row with active underline animation. Switching tabs
+          collapses the editing form (stay-in-context: the edit flow lives
+          on the modules tab only). */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 }}
+        className="mb-8 flex gap-1 rounded-2xl bg-bg-soft/40 p-1.5 ring-1 ring-white/[0.06]"
+      >
+        {tabs.map((t) => {
+          const Icon = t.icon;
+          const active = activeTab === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => {
+                if (active) return;
+                if (isEditing && t.id !== "modules") reset();
+                setActiveTab(t.id);
+              }}
+              className={cn(
+                "relative inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm transition-colors",
+                active ? "text-bg-base" : "text-fg-muted hover:text-fg-primary",
+              )}
+            >
+              {active && (
+                <motion.div
+                  layoutId="admin-tab-pill"
+                  className="absolute inset-0 rounded-xl bg-accent shadow-[0_0_18px_var(--color-accent-soft)]"
+                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                />
+              )}
+              <span className="relative z-10 inline-flex items-center gap-2">
+                <Icon className="size-4" />
+                {t.label}
+              </span>
+            </button>
+          );
+        })}
+      </motion.div>
+
+      {activeTab === "news" && (
+        <motion.div
+          key="tab-news"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+        >
+          <NewsManager />
+        </motion.div>
+      )}
+
+      {activeTab === "crews" && (
+        <motion.div
+          key="tab-crews"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+        >
+          <CrewsManager />
+        </motion.div>
+      )}
+
+      {activeTab === "logs" && (
+        <motion.div
+          key="tab-logs"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+        >
+          <LogsManager />
+        </motion.div>
+      )}
+
+      {activeTab === "mc-native" && (
+        <motion.div
+          key="tab-mc-native"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+        >
+          <MinecraftNativeBuilder />
+        </motion.div>
+      )}
+
+      {activeTab !== "modules" ? null : (
+      <>
       {/* Published modules — full-width strip above the grid in *create*
           mode (so the admin can pick one to edit at a glance). In *edit* mode
           we replace it with a compact "currently editing" indicator since the
@@ -435,30 +690,6 @@ export function AdminPage() {
         />
       ) : (
         <EditingChip name={form.name || form.id} onExit={reset} />
-      )}
-
-      {/* News broadcast manager — admin-only, edits propagate live to every
-          launcher home page via Firestore onSnapshot. */}
-      {!isEditing && (
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="my-8"
-        >
-          <NewsManager />
-        </motion.div>
-      )}
-
-      {!isEditing && (
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.18 }}
-          className="my-8"
-        >
-          <CrewsManager />
-        </motion.div>
       )}
 
       <div className="grid grid-cols-12 gap-6">
@@ -509,7 +740,7 @@ export function AdminPage() {
               <div className="flex-1">
                 <div className="font-display text-lg text-fg-primary">Personnaliser la page du module</div>
                 <div className="mt-0.5 text-xs text-fg-muted">
-                  Builder visuel drag &amp; drop : hero parallax, screenshots, vidéos, textes stylisés, timeline, comparateur avant/après, etc. — 19 types de blocs paramétrables.
+                  Une seule UI pour tout : thème (couleurs, polices), particules, background, bouton Lancer, et 19 blocs (hero parallax, galerie, vidéo, timeline, etc.) à glisser-déposer.
                 </div>
               </div>
               <div className="shrink-0 text-xs font-semibold uppercase tracking-wider text-accent">Ouvrir →</div>
@@ -587,102 +818,24 @@ export function AdminPage() {
             )}
           </div>
 
-          <button
-            onClick={() => setShowCustom((v) => !v)}
-            className="mt-6 flex w-full items-center gap-2 rounded-xl bg-accent/[0.06] px-4 py-2.5 text-sm text-accent ring-1 ring-accent/20 transition-colors hover:bg-accent/[0.1]"
-          >
-            <Wand2 className="size-4" />
-            Personnalisation de la page module {showCustom ? "—" : "+"}
-          </button>
-
-          <AnimatePresence>
-            {showCustom && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.25 }}
-                className="overflow-hidden"
-              >
-                <div className="mt-5 grid gap-5 rounded-2xl bg-bg-base/30 p-5 ring-1 ring-white/[0.04]">
-                  <SectionHeader icon={Palette} title="Thème" />
-                  <div className="grid grid-cols-2 gap-4">
-                    <ColorField label="Couleur primaire" value={form.themePrimary} onChange={(v) => updateForm("themePrimary", v)} />
-                    <ColorField label="Couleur accent" value={form.themeAccent} onChange={(v) => updateForm("themeAccent", v)} />
-                  </div>
-                  <Field label="Police titre (optionnel)" hint="ex: Audiowide, Orbitron…">
-                    <Input value={form.fontDisplay} onChange={(v) => updateForm("fontDisplay", v)} placeholder="Audiowide" />
-                  </Field>
-
-                  <SectionHeader icon={Sparkles} title="Particules" />
-                  <div className="grid gap-3">
-                    <PresetSelect value={form.particlesPreset} onChange={(v) => updateForm("particlesPreset", v)} />
-                    {form.particlesPreset !== "none" && (
-                      <div className="grid grid-cols-2 gap-4">
-                        <ColorField label="Couleur" value={form.particlesColor} onChange={(v) => updateForm("particlesColor", v)} />
-                        <Field label="Densité" hint="20–200">
-                          <input
-                            type="range"
-                            min={20}
-                            max={200}
-                            value={form.particlesDensity}
-                            onChange={(e) => updateForm("particlesDensity", Number(e.target.value))}
-                            className="no-drag w-full accent-[var(--color-accent)]"
-                          />
-                          <div className="mt-1 text-xs text-fg-muted">{form.particlesDensity} particules</div>
-                        </Field>
-                      </div>
-                    )}
-                  </div>
-
-                  <SectionHeader icon={ImageIcon} title="Background hero" />
-                  <BgTypeSelect value={form.bgType} onChange={(v) => updateForm("bgType", v)} />
-                  {form.bgType !== "none" && (
-                    <Field
-                      label={form.bgType === "video" ? "URL vidéo (mp4/webm)" : "URL image"}
-                      hint="optionnel · sinon utilise la bannière"
-                      icon={LinkIcon}
-                    >
-                      <Input value={form.bgUrl} onChange={(v) => updateForm("bgUrl", v)} placeholder="https://…" />
-                    </Field>
-                  )}
-
-                  <SectionHeader icon={Server} title="Serveur Minecraft (optionnel)" />
-                  <Field label="Adresse" hint="ex: play.manchoworld.fr · ip:port">
-                    <Input
-                      value={form.serverAddress}
-                      onChange={(v) => updateForm("serverAddress", v)}
-                      placeholder="play.example.com"
-                      mono
-                    />
-                  </Field>
-                  <p className="text-xs text-fg-dim">
-                    Si renseigné, le statut du serveur (joueurs en ligne, version, MOTD) s'affichera sur la carte et la page détail.
-                  </p>
-
-                  <SectionHeader icon={ImageIcon} title="Captures d'écran" />
-                  <Field label="URLs d'images" hint="une URL par ligne · grille auto sur la page module">
-                    <Textarea
-                      value={form.screenshots}
-                      onChange={(v) => updateForm("screenshots", v)}
-                      rows={3}
-                      placeholder={"https://example.com/screen1.png\nhttps://example.com/screen2.png"}
-                    />
-                  </Field>
-
-                  <SectionHeader icon={Activity} title="Stats" />
-                  <Field label="Lignes label = valeur" hint="ex: Joueurs = 1k+">
-                    <Textarea
-                      value={form.stats}
-                      onChange={(v) => updateForm("stats", v)}
-                      rows={3}
-                      placeholder={"Joueurs = 1k+\nVersion = 1.20.4\nUptime = 99.9%"}
-                    />
-                  </Field>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* Server Minecraft — module data, not page styling. Lives here
+              standalone, always visible. The CTA above already covers ALL
+              visual customization (thème, particules, background, blocs)
+              via le builder, donc on n'a plus de doublon de section. */}
+          <div className="mt-6 grid gap-3 rounded-2xl bg-bg-base/30 p-5 ring-1 ring-white/[0.04]">
+            <SectionHeader icon={Server} title="Serveur Minecraft (optionnel)" />
+            <Field label="Adresse" hint="ex: play.manchoworld.fr · ip:port">
+              <Input
+                value={form.serverAddress}
+                onChange={(v) => updateForm("serverAddress", v)}
+                placeholder="play.example.com"
+                mono
+              />
+            </Field>
+            <p className="text-xs text-fg-dim">
+              Si renseigné, le statut du serveur (joueurs en ligne, version, MOTD) s'affichera sur la carte et la page détail.
+            </p>
+          </div>
 
           {progress && (
             <div className="mt-5">
@@ -801,6 +954,8 @@ export function AdminPage() {
           </div>
         </motion.div>
       </div>
+      </>
+      )}
     </div>
   );
 }
@@ -950,119 +1105,131 @@ function MinecraftFields({
 
   return (
     <div className="grid gap-4 rounded-2xl bg-bg-base/30 p-5 ring-1 ring-white/[0.04]">
-      <div className="flex items-center gap-2 border-b border-white/[0.04] pb-2 text-xs uppercase tracking-[0.2em] text-accent">
-        <Cloud className="size-3" /> Source du modpack
-      </div>
-
-      <div className="grid grid-cols-2 gap-2 rounded-xl bg-white/[0.03] p-1.5 ring-1 ring-white/[0.06]">
-        {sources.map((s) => (
-          <button
-            key={s.value}
-            onClick={() => updateForm("mcSource", s.value)}
-            className={cn(
-              "relative rounded-lg px-3 py-2.5 text-left transition-colors",
-              form.mcSource === s.value ? "text-bg-base" : "text-fg-muted hover:text-fg-primary",
-            )}
-          >
-            {form.mcSource === s.value && (
-              <motion.div
-                layoutId="mc-source-pill"
-                className="absolute inset-0 rounded-lg bg-accent shadow-[0_0_18px_var(--color-accent-soft)]"
-                transition={{ type: "spring", stiffness: 380, damping: 30 }}
-              />
-            )}
-            <span className="relative z-10 block text-sm font-medium">{s.label}</span>
-            <span className={cn("relative z-10 block text-xs", form.mcSource === s.value ? "text-bg-base/70" : "text-fg-dim")}>
-              {s.hint}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      {form.mcSource === "manual" ? (
-        <ModpackZipPicker
-          currentUrl={form.customZipUrl}
-          currentSize={form.customZipSize}
-          uploading={modpackUploading}
-          onPick={onUploadModpack}
-          onClear={() => {
-            updateForm("customZipUrl", "");
-            updateForm("customZipSize", 0);
-          }}
-        />
-      ) : (
-        <>
-          <Field label="URL du fichier modpack" hint="optionnel · auto-extrait le File ID">
-            <Input
-              value=""
-              onChange={handleUrlPaste}
-              placeholder="https://www.curseforge.com/minecraft/modpacks/.../files/6051892"
-            />
-          </Field>
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Project ID" hint="numérique · cf. About Project sur CF">
-              <Input
-                value={form.curseforgeProjectId}
-                onChange={(v) => updateForm("curseforgeProjectId", v.replace(/\D/g, ""))}
-                placeholder="520914"
-                mono
-              />
-            </Field>
-            <Field label="File ID" hint="version spécifique du modpack">
-              <Input
-                value={form.curseforgeFileId}
-                onChange={(v) => updateForm("curseforgeFileId", v.replace(/\D/g, ""))}
-                placeholder="6051892"
-                mono
-              />
-            </Field>
-          </div>
-        </>
-      )}
-
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Version Minecraft" hint="affichage uniquement">
-          <Input value={form.minecraftVersion} onChange={(v) => updateForm("minecraftVersion", v)} placeholder="1.20.1" />
-        </Field>
-        <Field label="Mod loader" hint="affichage uniquement">
-          <select
-            value={form.modLoader}
-            onChange={(e) => updateForm("modLoader", e.target.value as ModLoader)}
-            className="no-drag w-full rounded-lg bg-bg-base/40 px-3.5 py-2.5 text-sm text-fg-primary ring-1 ring-white/[0.06] focus:outline-none focus:ring-1 focus:ring-accent/60"
-          >
-            {loaders.map((l) => (
-              <option key={l.value} value={l.value}>
-                {l.label}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </div>
+      {/* Native MC config — the recommended path. Holds version, loader,
+          loader version, modpack overlay (Modrinth or local zip upload),
+          and the RAM slider. */}
+      <NativeMinecraftBlock
+        form={form}
+        updateForm={updateForm}
+        modpackUploading={modpackUploading}
+        onUploadModpack={onUploadModpack}
+      />
 
       <RamSlider value={form.maxRamMb} onChange={(v) => updateForm("maxRamMb", v)} />
 
-      {form.mcSource === "manual" ? (
-        <div className="space-y-2 text-xs leading-relaxed text-fg-dim">
-          <p>
-            📦 Upload un <strong className="text-fg-muted">« fat zip »</strong> contenant l'export CurseForge <em>plus les .jar des mods bundled directement dedans</em>. Le launcher écrit l'instance Prism (instance.cfg + mmc-pack.json) lui-même et copie les mods : <strong className="text-fg-muted">aucune fenêtre Prism, aucun popup navigateur, aucun appel CurseForge</strong> — tes potes voient juste la barre de progression du launcher puis MC qui démarre.
-          </p>
-          <p>
-            Structure attendue à la racine du <code>.zip</code> :
-          </p>
-          <ul className="ml-4 list-disc space-y-0.5 font-mono text-[11px] text-fg-muted">
-            <li><code>manifest.json</code> <span className="font-sans text-fg-dim">— pour la version MC + le mod loader</span></li>
-            <li><code>overrides/mods/*.jar</code> <span className="font-sans text-fg-dim">— les fichiers .jar de tous les mods (à copier depuis ton install qui marche)</span></li>
-            <li><code>overrides/config/</code>, <code>overrides/resourcepacks/</code>, <code>overrides/shaderpacks/</code>… <span className="font-sans text-fg-dim">— le reste du contenu CF normal</span></li>
-          </ul>
-          <p className="text-fg-dim">
-            ⚠ <strong className="text-fg-muted">Les <code>files[]</code> du manifest sont ignorés</strong> en mode manuel : si un mod n'est pas bundled dans <code>overrides/mods/</code>, il sera absent de l'instance.
-          </p>
+      {/* Legacy Prism config — kept behind a disclosure for backwards
+          compatibility with modules created before the native chain
+          existed. New modules should ignore this section entirely. */}
+      <details className="group rounded-2xl bg-bg-base/30 ring-1 ring-white/[0.04]">
+        <summary className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl px-5 py-3 text-sm text-fg-muted hover:bg-white/[0.02]">
+          <div className="flex items-center gap-2">
+            <Cloud className="size-3.5" />
+            <span>
+              Configuration legacy Prism{" "}
+              <span className="ml-1 rounded-full bg-fg-dim/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-fg-dim">
+                Modules anciens uniquement
+              </span>
+            </span>
+          </div>
+          <span className="text-xs text-fg-dim group-open:hidden">Cliquer pour déplier</span>
+        </summary>
+        <div className="grid gap-4 border-t border-white/[0.04] p-5">
+          <div className="grid grid-cols-2 gap-2 rounded-xl bg-white/[0.03] p-1.5 ring-1 ring-white/[0.06]">
+            {sources.map((s) => (
+              <button
+                key={s.value}
+                onClick={() => updateForm("mcSource", s.value)}
+                className={cn(
+                  "relative rounded-lg px-3 py-2.5 text-left transition-colors",
+                  form.mcSource === s.value ? "text-bg-base" : "text-fg-muted hover:text-fg-primary",
+                )}
+              >
+                {form.mcSource === s.value && (
+                  <motion.div
+                    layoutId="mc-source-pill"
+                    className="absolute inset-0 rounded-lg bg-accent shadow-[0_0_18px_var(--color-accent-soft)]"
+                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                  />
+                )}
+                <span className="relative z-10 block text-sm font-medium">{s.label}</span>
+                <span
+                  className={cn(
+                    "relative z-10 block text-xs",
+                    form.mcSource === s.value ? "text-bg-base/70" : "text-fg-dim",
+                  )}
+                >
+                  {s.hint}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {form.mcSource === "manual" ? (
+            <ModpackZipPicker
+              currentUrl={form.customZipUrl}
+              currentSize={form.customZipSize}
+              uploading={modpackUploading}
+              onPick={onUploadModpack}
+              onClear={() => {
+                updateForm("customZipUrl", "");
+                updateForm("customZipSize", 0);
+              }}
+            />
+          ) : (
+            <>
+              <Field label="URL du fichier modpack" hint="optionnel · auto-extrait le File ID">
+                <Input
+                  value=""
+                  onChange={handleUrlPaste}
+                  placeholder="https://www.curseforge.com/minecraft/modpacks/.../files/6051892"
+                />
+              </Field>
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Project ID" hint="numérique · cf. About Project sur CF">
+                  <Input
+                    value={form.curseforgeProjectId}
+                    onChange={(v) => updateForm("curseforgeProjectId", v.replace(/\D/g, ""))}
+                    placeholder="520914"
+                    mono
+                  />
+                </Field>
+                <Field label="File ID" hint="version spécifique du modpack">
+                  <Input
+                    value={form.curseforgeFileId}
+                    onChange={(v) => updateForm("curseforgeFileId", v.replace(/\D/g, ""))}
+                    placeholder="6051892"
+                    mono
+                  />
+                </Field>
+              </div>
+            </>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Version Minecraft" hint="affichage uniquement">
+              <Input
+                value={form.minecraftVersion}
+                onChange={(v) => updateForm("minecraftVersion", v)}
+                placeholder="1.20.1"
+              />
+            </Field>
+            <Field label="Mod loader" hint="affichage uniquement">
+              <select
+                value={form.modLoader}
+                onChange={(e) => updateForm("modLoader", e.target.value as ModLoader)}
+                className="no-drag w-full rounded-lg bg-bg-base/40 px-3.5 py-2.5 text-sm text-fg-primary ring-1 ring-white/[0.06] focus:outline-none focus:ring-1 focus:ring-accent/60"
+              >
+                {loaders.map((l) => (
+                  <option key={l.value} value={l.value}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
         </div>
-      ) : (
-        <p className="text-xs leading-relaxed text-fg-dim">
-          ⚠ Marche uniquement si <strong className="text-fg-muted">tous</strong> les mods autorisent la distribution tiers. Si tu hits un 403, bascule sur « Upload manuel » (fat zip).
-        </p>
-      )}
+      </details>
+
     </div>
   );
 }
@@ -1313,7 +1480,10 @@ function Field({
   children,
 }: {
   label: string;
-  hint?: string;
+  // ReactNode rather than `string` so callers can embed clickable
+  // links / inline `<code>` snippets in the help line (e.g. the
+  // loader version field points at fabricmc.net / files.minecraftforge.net).
+  hint?: React.ReactNode;
   icon?: typeof ImageIcon;
   children: React.ReactNode;
 }) {
@@ -1328,101 +1498,6 @@ function Field({
       </div>
       {children}
     </label>
-  );
-}
-
-function ColorField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <Field label={label} hint="hex">
-      <div className="flex items-center gap-2">
-        <input
-          type="color"
-          value={value || "#00d4ff"}
-          onChange={(e) => onChange(e.target.value)}
-          className="no-drag size-10 cursor-pointer rounded-lg bg-bg-base/40 ring-1 ring-white/[0.06]"
-        />
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="#00d4ff"
-          className="no-drag flex-1 rounded-lg bg-bg-base/40 px-3 py-2 font-mono text-xs text-fg-primary placeholder:text-fg-dim ring-1 ring-white/[0.06] focus:outline-none focus:ring-1 focus:ring-accent/60"
-        />
-        {value && (
-          <button
-            onClick={() => onChange("")}
-            type="button"
-            className="rounded-lg bg-white/[0.03] px-2 py-2 text-xs text-fg-muted ring-1 ring-white/[0.06] transition-colors hover:bg-white/[0.06]"
-          >
-            ×
-          </button>
-        )}
-      </div>
-    </Field>
-  );
-}
-
-function PresetSelect({
-  value,
-  onChange,
-}: {
-  value: ParticlesPreset;
-  onChange: (v: ParticlesPreset) => void;
-}) {
-  const presets: { value: ParticlesPreset; label: string }[] = [
-    { value: "none", label: "Aucune" },
-    { value: "stars", label: "Étoiles" },
-    { value: "snow", label: "Neige" },
-    { value: "fireflies", label: "Lucioles" },
-    { value: "sparkles", label: "Étincelles" },
-  ];
-  return (
-    <div className="grid grid-cols-5 gap-1 rounded-xl bg-bg-base/40 p-1 ring-1 ring-white/[0.06]">
-      {presets.map((p) => (
-        <button
-          key={p.value}
-          onClick={() => onChange(p.value)}
-          className={cn(
-            "rounded-lg px-2 py-2 text-xs font-medium transition-colors",
-            value === p.value ? "bg-accent text-bg-base" : "text-fg-muted hover:bg-white/[0.04] hover:text-fg-primary",
-          )}
-        >
-          {p.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function BgTypeSelect({ value, onChange }: { value: BgType; onChange: (v: BgType) => void }) {
-  const types: { value: BgType; label: string }[] = [
-    { value: "none", label: "Aucun (utilise la bannière)" },
-    { value: "image", label: "Image" },
-    { value: "video", label: "Vidéo" },
-  ];
-  return (
-    <div className="grid grid-cols-3 gap-1 rounded-xl bg-bg-base/40 p-1 ring-1 ring-white/[0.06]">
-      {types.map((t) => (
-        <button
-          key={t.value}
-          onClick={() => onChange(t.value)}
-          className={cn(
-            "rounded-lg px-2 py-2 text-xs font-medium transition-colors",
-            value === t.value ? "bg-accent text-bg-base" : "text-fg-muted hover:bg-white/[0.04] hover:text-fg-primary",
-          )}
-        >
-          {t.label}
-        </button>
-      ))}
-    </div>
   );
 }
 
@@ -1451,28 +1526,6 @@ function Input({
         mono && "font-mono text-xs",
         disabled && "cursor-not-allowed opacity-60",
       )}
-    />
-  );
-}
-
-function Textarea({
-  value,
-  onChange,
-  placeholder,
-  rows = 3,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  rows?: number;
-}) {
-  return (
-    <textarea
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      rows={rows}
-      className="no-drag w-full resize-none rounded-lg bg-bg-base/40 px-3.5 py-2.5 font-mono text-xs text-fg-primary placeholder:text-fg-dim ring-1 ring-white/[0.06] transition-shadow focus:outline-none focus:ring-1 focus:ring-accent/60 focus:shadow-[0_0_0_3px_var(--color-accent-soft)]"
     />
   );
 }
@@ -1674,5 +1727,1160 @@ function ModuleCard({
         </button>
       </div>
     </motion.div>
+  );
+}
+
+/**
+ * Compact configuration block for the *native* Minecraft launch path
+ * (no Prism). Renders inline inside `MinecraftFields` so admins can
+ * decide per-module whether to use Prism (legacy) or the in-house chain.
+ *
+ * The toggle is OFF by default — existing modules keep their Prism
+ * behaviour unchanged. Once enabled, the admin sets a pinned MC version,
+ * a loader (vanilla / Fabric / Forge / NeoForge), an optional loader
+ * version, and an optional modpack overlay (Modrinth `.mrpack` URL or
+ * raw ZIP). All of this gets persisted into Firestore alongside the
+ * existing module fields and consumed by `ModuleDetailPage` at launch
+ * time.
+ */
+function NativeMinecraftBlock({
+  form,
+  updateForm,
+  modpackUploading,
+  onUploadModpack,
+}: {
+  form: FormState;
+  updateForm: <K extends keyof FormState>(key: K, value: FormState[K]) => void;
+  /** Same upload progress channel the legacy ModpackZipPicker uses —
+   *  shared so the admin doesn't need two upload UIs. */
+  modpackUploading: { percent: number; uploaded: number; total: number } | null;
+  onUploadModpack: (file: File) => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-2xl ring-1 p-4 transition-colors",
+        form.nativeMc
+          ? "bg-emerald-400/[0.03] ring-emerald-400/30"
+          : "bg-bg-base/30 ring-white/[0.06]",
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <button
+          type="button"
+          onClick={() => updateForm("nativeMc", !form.nativeMc)}
+          className={cn(
+            "mt-0.5 grid size-5 shrink-0 place-items-center rounded-md ring-1 transition-colors",
+            form.nativeMc
+              ? "bg-emerald-400 ring-emerald-400 text-bg-base"
+              : "bg-bg-elevated ring-white/[0.08] text-fg-dim",
+          )}
+        >
+          {form.nativeMc && <CheckCircle2 className="size-3.5" strokeWidth={3} />}
+        </button>
+        <div className="flex-1 min-w-0">
+          <button
+            type="button"
+            onClick={() => updateForm("nativeMc", !form.nativeMc)}
+            className="block text-left"
+          >
+            <div className="text-sm font-medium text-fg-primary">
+              Mode natif (sans Prism){" "}
+              <span className="ml-1 rounded-full bg-emerald-400/15 px-2 py-0.5 text-[10px] uppercase tracking-wider text-emerald-300 ring-1 ring-emerald-400/30">
+                Bêta
+              </span>
+            </div>
+            <div className="text-xs text-fg-muted">
+              Utilise le launcher Minecraft intégré (auth Microsoft + DL
+              libs/assets + Forge/Fabric/NeoForge + modpack Modrinth ou ZIP).
+              Les utilisateurs n'ont rien à installer côté.
+            </div>
+          </button>
+        </div>
+      </div>
+
+      {form.nativeMc && (
+        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+          <Field label="Version Minecraft" hint='Ex. "1.20.1" ou "26.1.2"'>
+            <input
+              type="text"
+              value={form.nativeMcVersion}
+              onChange={(e) => updateForm("nativeMcVersion", e.target.value)}
+              placeholder="1.20.1"
+              className="w-full rounded-xl bg-bg-base/60 px-3 py-2 text-sm text-fg-primary ring-1 ring-white/[0.08] focus:ring-emerald-400/50 focus:outline-none"
+            />
+          </Field>
+          <Field label="Loader">
+            <select
+              value={form.nativeLoader}
+              onChange={(e) =>
+                updateForm("nativeLoader", e.target.value as FormState["nativeLoader"])
+              }
+              className="w-full rounded-xl bg-bg-base/60 px-3 py-2 text-sm text-fg-primary ring-1 ring-white/[0.08] focus:ring-emerald-400/50 focus:outline-none"
+            >
+              <option value="vanilla">Vanilla (aucun)</option>
+              <option value="fabric">Fabric</option>
+              <option value="forge">Forge</option>
+              <option value="neoforge">NeoForge</option>
+            </select>
+          </Field>
+          {form.nativeLoader !== "vanilla" && (
+            <Field
+              label="Version du loader"
+              hint={
+                <>
+                  {form.nativeLoader === "fabric" && (
+                    <>
+                      Format <code className="rounded bg-white/5 px-1 font-mono">X.Y.Z</code>{" "}
+                      (ex. <code className="rounded bg-white/5 px-1 font-mono">0.16.0</code>).
+                      Trouve la dernière sur{" "}
+                      <a
+                        className="text-emerald-300 underline hover:text-emerald-200"
+                        href="https://fabricmc.net/use/installer/"
+                        onClick={async (e) => {
+                          e.preventDefault();
+                          const { openUrl } = await import("@tauri-apps/plugin-opener");
+                          await openUrl("https://fabricmc.net/use/installer/");
+                        }}
+                      >
+                        fabricmc.net
+                      </a>{" "}
+                      → « Loader Version ».
+                    </>
+                  )}
+                  {form.nativeLoader === "forge" && (
+                    <>
+                      Format <code className="rounded bg-white/5 px-1 font-mono">XX.Y.Z</code>{" "}
+                      (ex. <code className="rounded bg-white/5 px-1 font-mono">47.4.0</code>).
+                      Liste complète sur{" "}
+                      <a
+                        className="text-emerald-300 underline hover:text-emerald-200"
+                        href="https://files.minecraftforge.net/net/minecraftforge/forge/"
+                        onClick={async (e) => {
+                          e.preventDefault();
+                          const { openUrl } = await import("@tauri-apps/plugin-opener");
+                          await openUrl("https://files.minecraftforge.net/net/minecraftforge/forge/");
+                        }}
+                      >
+                        files.minecraftforge.net
+                      </a>{" "}
+                      → choisir ta MC version → la 1ère colonne (ex. « Latest 1.20.1 - 47.4.0 »).
+                    </>
+                  )}
+                  {form.nativeLoader === "neoforge" && (
+                    <>
+                      Format <code className="rounded bg-white/5 px-1 font-mono">XX.Y.Z[-beta]</code>{" "}
+                      (ex. <code className="rounded bg-white/5 px-1 font-mono">21.5.34-beta</code>).
+                      Liste complète sur{" "}
+                      <a
+                        className="text-emerald-300 underline hover:text-emerald-200"
+                        href="https://projects.neoforged.net/neoforged/neoforge"
+                        onClick={async (e) => {
+                          e.preventDefault();
+                          const { openUrl } = await import("@tauri-apps/plugin-opener");
+                          await openUrl("https://projects.neoforged.net/neoforged/neoforge");
+                        }}
+                      >
+                        projects.neoforged.net
+                      </a>{" "}
+                      → onglet « Versions ».
+                    </>
+                  )}
+                  <br />
+                  <span className="text-fg-dim">
+                    💡 Si tu uploades un ZIP CurseForge contenant un{" "}
+                    <code className="rounded bg-white/5 px-1 font-mono">manifest.json</code>, ce
+                    champ se remplit auto.
+                  </span>
+                </>
+              }
+            >
+              <input
+                type="text"
+                value={form.nativeLoaderVersion}
+                onChange={(e) => updateForm("nativeLoaderVersion", e.target.value)}
+                placeholder={
+                  form.nativeLoader === "fabric"
+                    ? "0.16.0"
+                    : form.nativeLoader === "forge"
+                      ? "47.4.0"
+                      : "21.5.34-beta"
+                }
+                className="w-full rounded-xl bg-bg-base/60 px-3 py-2 text-sm font-mono text-fg-primary ring-1 ring-white/[0.08] focus:ring-emerald-400/50 focus:outline-none"
+              />
+            </Field>
+          )}
+          <Field label="Modpack">
+            <select
+              value={form.nativeModpackKind}
+              onChange={(e) =>
+                updateForm(
+                  "nativeModpackKind",
+                  e.target.value as FormState["nativeModpackKind"],
+                )
+              }
+              className="w-full rounded-xl bg-bg-base/60 px-3 py-2 text-sm text-fg-primary ring-1 ring-white/[0.08] focus:ring-emerald-400/50 focus:outline-none"
+            >
+              <option value="none">Aucun (vanilla + loader nu)</option>
+              <option value="modrinth">Modrinth (.mrpack)</option>
+              <option value="zip">ZIP custom (CurseForge bundled)</option>
+            </select>
+          </Field>
+          {form.nativeModpackKind !== "none" && (
+            <div className="md:col-span-2 space-y-3">
+              <Field
+                label={
+                  form.nativeModpackKind === "modrinth"
+                    ? "URL du .mrpack"
+                    : "URL du ZIP modpack"
+                }
+                hint={
+                  form.nativeModpackKind === "modrinth"
+                    ? "Colle un lien direct (.mrpack), ou upload depuis ton PC ci-dessous"
+                    : "Hôtes supportés : GitHub Releases (recommandé — gratuit, 2 GB/fichier, jamais expiré), Pixeldrain (pixeldrain.com/u/…), Google Drive (drive.google.com/file/d/…), Firebase Storage (bouton Upload ci-dessous), Catbox, n'importe quelle URL de DL direct. Évite Discord et OneDrive (URLs qui expirent / API anonyme verrouillée par Microsoft en 2024)."
+                }
+              >
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={form.nativeModpackUrl}
+                    onChange={(e) => updateForm("nativeModpackUrl", e.target.value)}
+                    placeholder={
+                      form.nativeModpackKind === "modrinth"
+                        ? "https://cdn.modrinth.com/data/.../pack.mrpack"
+                        : "github.com/.../releases/download/...  ·  pixeldrain.com/u/XXX  ·  drive.google.com/file/d/XXX"
+                    }
+                    className="flex-1 rounded-xl bg-bg-base/60 px-3 py-2 text-xs font-mono text-fg-primary ring-1 ring-white/[0.08] focus:ring-emerald-400/50 focus:outline-none"
+                  />
+                  {form.nativeModpackKind === "zip" && form.nativeModpackUrl && (
+                    <DetectManifestButton
+                      url={form.nativeModpackUrl}
+                      onDetected={(m) => {
+                        if (m.mcVersion) updateForm("nativeMcVersion", m.mcVersion);
+                        if (m.loader && ["vanilla", "fabric", "forge", "neoforge"].includes(m.loader)) {
+                          updateForm("nativeLoader", m.loader as FormState["nativeLoader"]);
+                        }
+                        if (m.loaderVersion) updateForm("nativeLoaderVersion", m.loaderVersion);
+                      }}
+                    />
+                  )}
+                </div>
+              </Field>
+              <UploadDestinationPicker
+                form={form}
+                updateForm={updateForm}
+                modpackUploading={modpackUploading}
+                onUploadModpack={onUploadModpack}
+                accept={form.nativeModpackKind === "modrinth" ? ".mrpack,.zip" : ".zip"}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {form.nativeMc && (
+        <div className="mt-3 rounded-xl bg-amber-400/[0.06] p-3 text-xs text-amber-200 ring-1 ring-amber-400/20">
+          ℹ️ Quand <strong>Mode natif</strong> est activé, le bouton « Lancer »
+          de la page module utilise la chaîne native. Les champs
+          CurseForge/Prism (section legacy ci-dessous) sont conservés mais
+          ignorés.
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Single host destination picker for the modpack upload. Shows a
+ * pill toggle (Firebase | GitHub Releases) at the top, then renders
+ * **only one** of the two upload UIs based on the selection — no more
+ * "I clicked the wrong picker" confusion.
+ *
+ * The current selection lives in component state (not Firestore) since
+ * it's purely a UX preference for the upload step. The output URL
+ * lands in `nativeModpackUrl` regardless of which destination wins.
+ */
+function UploadDestinationPicker({
+  form,
+  updateForm,
+  modpackUploading,
+  onUploadModpack,
+  accept,
+}: {
+  form: FormState;
+  updateForm: <K extends keyof FormState>(key: K, value: FormState[K]) => void;
+  modpackUploading: { percent: number; uploaded: number; total: number } | null;
+  onUploadModpack: (file: File) => void;
+  accept: string;
+}) {
+  const [destination, setDestination] = useState<"firebase" | "github">("firebase");
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] uppercase tracking-wider text-fg-muted">
+          Destination upload
+        </span>
+        <div className="flex gap-1 rounded-lg bg-bg-base/40 p-1 ring-1 ring-white/[0.06]">
+          {(["firebase", "github"] as const).map((d) => (
+            <button
+              key={d}
+              type="button"
+              onClick={() => setDestination(d)}
+              className={cn(
+                "rounded-md px-3 py-1 text-xs font-medium transition-colors",
+                destination === d
+                  ? d === "github"
+                    ? "bg-amber-400/20 text-amber-300 ring-1 ring-amber-400/40"
+                    : "bg-emerald-400/20 text-emerald-300 ring-1 ring-emerald-400/40"
+                  : "text-fg-muted hover:text-fg-primary",
+              )}
+            >
+              {d === "firebase" ? "Firebase Storage" : "GitHub Releases"}
+            </button>
+          ))}
+        </div>
+      </div>
+      {destination === "firebase" ? (
+        <NativeModpackUpload
+          accept={accept}
+          uploading={modpackUploading}
+          onPick={onUploadModpack}
+          hasUrl={!!form.nativeModpackUrl}
+          onClear={() => updateForm("nativeModpackUrl", "")}
+        />
+      ) : (
+        <GithubReleaseUpload
+          moduleId={form.id}
+          onUploaded={(url) => updateForm("nativeModpackUrl", url)}
+          onLocalManifestDetected={(m) => {
+            if (m.mcVersion) updateForm("nativeMcVersion", m.mcVersion);
+            if (m.loader && ["vanilla", "fabric", "forge", "neoforge"].includes(m.loader)) {
+              updateForm("nativeLoader", m.loader as FormState["nativeLoader"]);
+            }
+            if (m.loaderVersion) updateForm("nativeLoaderVersion", m.loaderVersion);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Modpack-upload-via-GitHub-Releases panel. Sits right under the
+ * Firebase upload card so the admin can choose either host. Workflow:
+ *
+ *   1. First mount: hits `gh_token_status` to see if a PAT is stored.
+ *      Status renders compactly (`Connecté en tant que X` or
+ *      `Configurer GitHub`).
+ *   2. PAT setup: modal with a textarea + "Generate token" link to
+ *      github.com/settings/tokens; on submit, validates + stores in
+ *      keyring.
+ *   3. Upload: pick a file via the system dialog, choose a repo (or
+ *      paste owner/repo), pick a tag (default = today's CalVer).
+ *      On success, the public download URL fills `nativeModpackUrl`.
+ *
+ * Manifest detection runs LOCALLY on the picked file (browser-side
+ * fflate) so the admin sees MC version + loader auto-fill the moment
+ * the file is selected, even before upload completes.
+ */
+function GithubReleaseUpload({
+  moduleId,
+  onUploaded,
+  onLocalManifestDetected,
+}: {
+  moduleId: string;
+  onUploaded: (downloadUrl: string) => void;
+  onLocalManifestDetected: (m: import("@/lib/mcZip").CurseforgeManifestSummary) => void;
+}) {
+  const [status, setStatus] = useState<"loading" | "loggedout" | "loggedin">("loading");
+  const [user, setUser] = useState<import("@/lib/mcGithub").GithubUser | null>(null);
+  const [repos, setRepos] = useState<import("@/lib/mcGithub").GithubRepo[]>([]);
+  // Tracks whether `gh_list_repos` is in flight. We need this distinct
+  // from the array length so the "no repos detected" empty-state doesn't
+  // flash during the boot fetch (`repos = []` initially even when the
+  // user actually has repos).
+  const [reposLoading, setReposLoading] = useState(false);
+  // Forces the manual `<input>` even when `repos.length > 0`. Useful
+  // when a freshly-created repo hasn't shown up in the API response
+  // yet (GitHub sometimes lags a few seconds), or when the PAT scope
+  // filtered it out client-side.
+  const [manualRepo, setManualRepo] = useState(false);
+  const [selectedRepo, setSelectedRepo] = useState<string>("");
+  const [tag, setTag] = useState<string>(() => {
+    const d = new Date();
+    return `v${String(d.getFullYear() % 100).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+  });
+  const [uploading, setUploading] = useState<{ pct: number; phase: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [showSetupModal, setShowSetupModal] = useState(false);
+
+  // Boot: check token + load repos if connected.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { ghTokenStatus, ghListRepos } = await import("@/lib/mcGithub");
+        const u = await ghTokenStatus();
+        if (cancelled) return;
+        if (u) {
+          setUser(u);
+          setStatus("loggedin");
+          setReposLoading(true);
+          try {
+            const rs = await ghListRepos();
+            if (!cancelled) {
+              setRepos(rs);
+              if (rs[0]) setSelectedRepo(rs[0].fullName);
+            }
+          } catch {
+            // Repo listing is best-effort; user can paste full name manually.
+          } finally {
+            if (!cancelled) setReposLoading(false);
+          }
+        } else {
+          setStatus("loggedout");
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.warn("[admin/gh] status check failed:", err);
+          setStatus("loggedout");
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handlePickFile = async () => {
+    if (!moduleId) {
+      setError("Renseigne d'abord l'ID du module avant d'uploader.");
+      return;
+    }
+    if (!selectedRepo) {
+      setError("Sélectionne ou tape un repo (format owner/repo).");
+      return;
+    }
+    setError(null);
+    // Open the system file picker (Tauri dialog) and get an absolute
+    // path back. We can't reuse `<input type=file>` here because the
+    // GitHub upload happens in Rust and needs a real filesystem path.
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const picked = await open({
+      multiple: false,
+      filters: [{ name: "Modpack ZIP", extensions: ["zip"] }],
+    });
+    if (!picked || Array.isArray(picked)) return;
+    const filePath = picked as string;
+
+    // Fire-and-forget local manifest detection: read the file blob
+    // alongside the upload. We can't easily get a File object from a
+    // Tauri path (no FileReader API), so we use the Rust side's
+    // existing read_manifest by passing a `file://` URL. Quick hack
+    // but effective.
+    void (async () => {
+      try {
+        const { mcZipReadManifestUrl } = await import("@/lib/mcZip");
+        const fileUrl = `file:///${filePath.replace(/\\/g, "/")}`;
+        const m = await mcZipReadManifestUrl(fileUrl);
+        onLocalManifestDetected(m);
+      } catch {
+        // Non-fatal — Rust's reqwest doesn't accept file:// schemes by
+        // default. The manifest will still be detected post-upload via
+        // the GitHub URL fallback (fast since GitHub CDN is quick).
+      }
+    })();
+
+    setUploading({ pct: 0, phase: "ensuring-release" });
+    let unlistenFn: (() => void) | undefined;
+    try {
+      const { ghUploadModpack, onGhUploadProgress } = await import("@/lib/mcGithub");
+      unlistenFn = await onGhUploadProgress((p) => {
+        const pct = p.bytesTotal > 0 ? (p.bytesUploaded / p.bytesTotal) * 100 : 0;
+        setUploading({ pct, phase: p.phase });
+      });
+      const result = await ghUploadModpack({
+        repoFullName: selectedRepo,
+        tag,
+        releaseName: `${moduleId} ${tag}`,
+        filePath,
+      });
+      onUploaded(result.downloadUrl);
+      // Once the asset is on the GitHub CDN, do a manifest detect via
+      // the public URL — covers the case where the local detect above
+      // didn't work (file:// scheme not supported).
+      try {
+        const { mcZipReadManifestUrl } = await import("@/lib/mcZip");
+        const m = await mcZipReadManifestUrl(result.downloadUrl);
+        onLocalManifestDetected(m);
+      } catch {
+        // Non-fatal — admin can fill MC + loader manually.
+      }
+      setUploading(null);
+      setError(null);
+      setError(
+        `✓ Uploadé sur ${result.releaseName} (${(result.assetSize / 1_048_576).toFixed(1)} Mo). URL collée dans le champ ci-dessus.`,
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(msg);
+      setUploading(null);
+    } finally {
+      unlistenFn?.();
+    }
+  };
+
+  const handleLogout = async () => {
+    const { ghTokenClear } = await import("@/lib/mcGithub");
+    await ghTokenClear();
+    setUser(null);
+    setRepos([]);
+    setStatus("loggedout");
+  };
+
+  if (status === "loading") {
+    return (
+      <div className="flex items-center gap-2 text-xs text-fg-dim">
+        <Loader2 className="size-3 animate-spin" /> Vérification du token GitHub…
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-dashed border-white/10 bg-bg-base/30 p-3">
+      <div className="flex items-center gap-3">
+        <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-amber-400/10 text-amber-300 ring-1 ring-amber-400/20">
+          <Sparkles className="size-4" />
+        </div>
+        <div className="min-w-0 flex-1 text-xs">
+          <div className="font-medium text-fg-primary">
+            GitHub Releases <span className="text-fg-dim">· alternative au upload Firebase</span>
+          </div>
+          {status === "loggedin" && user ? (
+            <div className="text-fg-muted">
+              Connecté en tant que <strong className="text-fg-primary">@{user.login}</strong>{" "}
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="ml-1 underline hover:text-fg-primary"
+              >
+                Déconnecter
+              </button>
+            </div>
+          ) : (
+            <div className="text-fg-muted">
+              Non connecté. Configure un PAT (Personal Access Token) pour uploader directement
+              vers GitHub Releases (gratuit, 2 GB/fichier, jamais expire).
+            </div>
+          )}
+        </div>
+        {status === "loggedout" && (
+          <button
+            type="button"
+            onClick={() => setShowSetupModal(true)}
+            className="shrink-0 rounded-md bg-amber-400/15 px-3 py-1.5 text-xs font-medium text-amber-300 ring-1 ring-amber-400/30 hover:bg-amber-400/25"
+          >
+            Configurer GitHub
+          </button>
+        )}
+      </div>
+
+      {status === "loggedin" && (
+        <>
+          {/* Empty-state helper: many users get stuck wondering "what do
+              I put as repo name?". When the API returned 0 push-eligible
+              repos (typical for a fresh GitHub account), surface a big
+              one-click button to open GitHub's "new repo" page with a
+              good default name + Public visibility, plus a clear text
+              hint. Once they create the repo, they can refresh the
+              picker. */}
+          {repos.length === 0 && !reposLoading && (
+            <div className="mt-3 rounded-xl bg-amber-400/[0.06] p-3 ring-1 ring-amber-400/20">
+              <div className="flex items-start gap-2">
+                <HelpCircle className="mt-0.5 size-4 shrink-0 text-amber-300" />
+                <div className="flex-1 text-[11px] leading-relaxed text-fg-muted">
+                  <strong className="text-fg-primary">Aucun repo détecté.</strong> Pour héberger
+                  des modpacks sur GitHub Releases, il te faut d'abord un repo (un dossier en
+                  ligne). Crée-en un public et vide — il servira juste de bibliothèque pour les
+                  ZIP. Une fois fait, clique sur « Rafraîchir » pour le voir apparaître.
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const { openUrl } = await import("@tauri-apps/plugin-opener");
+                    await openUrl(
+                      "https://github.com/new?name=simple-launcher-modpacks&description=Modpacks+hosted+for+Simple+Launcher&visibility=public",
+                    );
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-emerald-400/15 px-3 py-1.5 text-[11px] font-medium text-emerald-300 ring-1 ring-emerald-400/30 hover:bg-emerald-400/25"
+                >
+                  <Plus className="size-3" />
+                  Créer un repo sur GitHub
+                  <ExternalLink className="size-2.5 opacity-60" />
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setReposLoading(true);
+                    try {
+                      const { ghListRepos } = await import("@/lib/mcGithub");
+                      const rs = await ghListRepos();
+                      setRepos(rs);
+                      if (rs[0]) setSelectedRepo(rs[0].fullName);
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : String(err));
+                    } finally {
+                      setReposLoading(false);
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-white/5 px-3 py-1.5 text-[11px] font-medium text-fg-muted ring-1 ring-white/10 hover:bg-white/10 hover:text-fg-primary"
+                >
+                  <Loader2 className="size-3" />
+                  Rafraîchir la liste
+                </button>
+              </div>
+            </div>
+          )}
+
+          {reposLoading && (
+            <div className="mt-3 flex items-center gap-2 rounded-xl bg-white/[0.03] p-2.5 text-[11px] text-fg-muted ring-1 ring-white/10">
+              <Loader2 className="size-3 animate-spin" />
+              Chargement de tes repos GitHub…
+            </div>
+          )}
+
+          <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
+            <div>
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-fg-muted">
+                  <GitBranch className="size-3" />
+                  Repo de destination
+                </label>
+                {repos.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setManualRepo((m) => !m)}
+                    className="text-[10px] text-fg-dim hover:text-amber-300"
+                  >
+                    {manualRepo ? "← Choisir dans la liste" : "Saisir manuellement →"}
+                  </button>
+                )}
+              </div>
+              {repos.length > 0 && !manualRepo ? (
+                <select
+                  value={selectedRepo}
+                  onChange={(e) => setSelectedRepo(e.target.value)}
+                  className="mt-1 w-full rounded-md bg-bg-base/60 px-2 py-1.5 text-xs text-fg-primary ring-1 ring-white/[0.08] focus:ring-amber-400/50 focus:outline-none"
+                >
+                  {repos.map((r) => (
+                    <option key={r.id} value={r.fullName}>
+                      {r.fullName} {r.private ? "🔒 privé" : ""}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={selectedRepo}
+                  onChange={(e) => setSelectedRepo(e.target.value)}
+                  placeholder={user ? `${user.login}/simple-launcher-modpacks` : "owner/nom-du-repo"}
+                  className="mt-1 w-full rounded-md bg-bg-base/60 px-2 py-1.5 text-xs font-mono text-fg-primary ring-1 ring-white/[0.08] focus:ring-amber-400/50 focus:outline-none"
+                />
+              )}
+              <div className="mt-1 text-[10px] leading-relaxed text-fg-dim">
+                Format : <code className="rounded bg-white/5 px-1 py-0.5 font-mono">propriétaire/nom-du-repo</code>{" "}
+                (ex.{" "}
+                <code className="rounded bg-white/5 px-1 py-0.5 font-mono">
+                  {user ? user.login : "moncompte"}/mes-modpacks
+                </code>
+                )
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-fg-muted">
+                Tag (= version)
+              </label>
+              <input
+                type="text"
+                value={tag}
+                onChange={(e) => setTag(e.target.value)}
+                placeholder="v26.05.03"
+                className="mt-1 w-full rounded-md bg-bg-base/60 px-2 py-1.5 text-xs font-mono text-fg-primary ring-1 ring-white/[0.08] focus:ring-amber-400/50 focus:outline-none"
+              />
+              <div className="mt-1 text-[10px] leading-relaxed text-fg-dim">
+                Tag unique pour cette version. CalVer auto-rempli.
+              </div>
+            </div>
+            <div className="flex flex-col">
+              <label className="text-[10px] uppercase tracking-wider text-fg-muted">&nbsp;</label>
+              <button
+                type="button"
+                onClick={handlePickFile}
+                disabled={!!uploading || !selectedRepo}
+                className="mt-1 w-full inline-flex items-center justify-center gap-1.5 rounded-md bg-amber-400/15 px-3 py-1.5 text-xs font-medium text-amber-300 ring-1 ring-amber-400/30 hover:bg-amber-400/25 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {uploading ? (
+                  <>
+                    <Loader2 className="size-3 animate-spin" />
+                    {uploading.phase === "ensuring-release"
+                      ? "Préparation…"
+                      : `${uploading.pct.toFixed(0)} %`}
+                  </>
+                ) : (
+                  <>
+                    <Upload className="size-3" />
+                    Upload sur GitHub
+                  </>
+                )}
+              </button>
+              {selectedRepo && repos.length > 0 && (
+                <a
+                  href={`https://github.com/${selectedRepo}`}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    const { openUrl } = await import("@tauri-apps/plugin-opener");
+                    await openUrl(`https://github.com/${selectedRepo}`);
+                  }}
+                  className="mt-1 inline-flex items-center justify-center gap-1 text-[10px] text-fg-dim hover:text-fg-muted"
+                >
+                  <ExternalLink className="size-2.5" />
+                  Ouvrir le repo
+                </a>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {uploading && (
+        <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/[0.06]">
+          <div
+            className="h-full bg-amber-400 transition-all"
+            style={{ width: `${uploading.pct}%` }}
+          />
+        </div>
+      )}
+
+      {error && (
+        <div
+          className={cn(
+            "mt-3 rounded-lg p-2 text-[11px]",
+            error.startsWith("✓")
+              ? "bg-emerald-400/10 text-emerald-300 ring-1 ring-emerald-400/30"
+              : "bg-danger/10 text-danger ring-1 ring-danger/30",
+          )}
+        >
+          {error}
+        </div>
+      )}
+
+      <AnimatePresence>
+        {showSetupModal && (
+          <GithubSetupModal
+            onClose={() => setShowSetupModal(false)}
+            onConnected={async (u) => {
+              setUser(u);
+              setStatus("loggedin");
+              setShowSetupModal(false);
+              try {
+                const { ghListRepos } = await import("@/lib/mcGithub");
+                const rs = await ghListRepos();
+                setRepos(rs);
+                if (rs[0]) setSelectedRepo(rs[0].fullName);
+              } catch {
+                // Ignore — admin can paste owner/repo manually.
+              }
+            }}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/**
+ * One-time GitHub Personal Access Token setup. Modal with:
+ *   1. A clickable link to github.com/settings/tokens with the right
+ *      scopes pre-filled (so the user just clicks "Generate").
+ *   2. A textarea to paste the resulting token.
+ *   3. A submit button that validates via `gh_token_set` (which calls
+ *      GET /user under the hood) and stores in the keyring.
+ */
+function GithubSetupModal({
+  onClose,
+  onConnected,
+}: {
+  onClose: () => void;
+  onConnected: (user: import("@/lib/mcGithub").GithubUser) => void;
+}) {
+  const [pat, setPat] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const openTokenPage = async () => {
+    const { openUrl } = await import("@tauri-apps/plugin-opener");
+    // Pre-filled URL: classic PAT page with `public_repo` scope and a
+    // friendly description. Fine-grained tokens would be more secure
+    // but the UX for those is much heavier (per-repo selection +
+    // expiry).
+    await openUrl(
+      "https://github.com/settings/tokens/new?description=Simple+Launcher+modpack+upload&scopes=public_repo,repo",
+    );
+  };
+
+  const handleSubmit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const { ghTokenSet } = await import("@/lib/mcGithub");
+      const user = await ghTokenSet(pat.trim());
+      onConnected(user);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[60] grid place-items-center bg-bg-base/80 backdrop-blur-sm p-6"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !busy) onClose();
+      }}
+    >
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        className="no-drag w-full max-w-2xl rounded-2xl bg-bg-soft p-6 ring-1 ring-amber-400/30"
+      >
+        <h3 className="font-display text-xl text-fg-primary">Configurer GitHub Releases</h3>
+        <p className="mt-1 text-sm text-fg-muted">
+          Génère un Personal Access Token (PAT) sur GitHub avec le scope <code>public_repo</code>{" "}
+          (ou <code>repo</code> si tu veux poster sur un repo privé), puis colle-le ci-dessous.
+          Le token sera stocké chiffré dans le coffre-fort Windows.
+        </p>
+
+        <div className="mt-4 space-y-3 rounded-xl bg-bg-base/40 p-4 text-sm ring-1 ring-white/[0.06]">
+          <ol className="ml-5 list-decimal space-y-1.5 text-fg-muted">
+            <li>
+              <button
+                type="button"
+                onClick={openTokenPage}
+                className="text-amber-300 underline hover:text-amber-200"
+              >
+                Ouvrir la page « Generate new token » de GitHub
+              </button>{" "}
+              (déjà pré-remplie avec le bon scope)
+            </li>
+            <li>
+              Vérifie que <code>public_repo</code> est coché (ou <code>repo</code> pour les
+              repos privés)
+            </li>
+            <li>Choisis une expiration → clique <strong>Generate token</strong></li>
+            <li>Copie le token (il commence par <code>ghp_</code>) et colle-le ci-dessous</li>
+          </ol>
+        </div>
+
+        <label className="mt-4 block">
+          <span className="text-xs uppercase tracking-wider text-fg-muted">Personal Access Token</span>
+          <textarea
+            value={pat}
+            onChange={(e) => setPat(e.target.value)}
+            placeholder="ghp_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+            rows={2}
+            disabled={busy}
+            className="mt-1.5 w-full rounded-xl bg-bg-base/60 px-3 py-2 text-xs font-mono text-fg-primary ring-1 ring-white/[0.08] focus:ring-amber-400/50 focus:outline-none"
+          />
+        </label>
+
+        {error && (
+          <div className="mt-3 rounded-xl bg-danger/10 p-3 text-xs text-danger ring-1 ring-danger/30">
+            <pre className="whitespace-pre-wrap break-words font-mono">{error}</pre>
+          </div>
+        )}
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="rounded-xl px-4 py-2 text-sm text-fg-muted hover:bg-white/[0.04] hover:text-fg-primary"
+          >
+            Annuler
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={busy || !pat.trim()}
+            className="inline-flex items-center gap-2 rounded-xl bg-amber-400/20 px-5 py-2 text-sm font-medium text-amber-300 ring-1 ring-amber-400/40 hover:bg-amber-400/30 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {busy ? (
+              <>
+                <Loader2 className="size-4 animate-spin" /> Validation…
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="size-4" /> Connecter
+              </>
+            )}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+/**
+ * Inline button next to the modpack URL field. When clicked,
+ * downloads the ZIP at `url`, finds `manifest.json`, and feeds the
+ * parsed CurseForge metadata back via `onDetected` so the form
+ * auto-populates MC version + loader. Useful when the admin pastes a
+ * Discord / MediaFire / external link rather than uploading directly
+ * (the upload path already triggers detection automatically).
+ */
+function DetectManifestButton({
+  url,
+  onDetected,
+}: {
+  url: string;
+  onDetected: (m: import("@/lib/mcZip").CurseforgeManifestSummary) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const handleClick = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const { mcZipReadManifestUrl } = await import("@/lib/mcZip");
+      const m = await mcZipReadManifestUrl(url);
+      onDetected(m);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(msg);
+      setShowErrorModal(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <button
+        type="button"
+        onClick={error ? () => setShowErrorModal(true) : handleClick}
+        disabled={busy || !url}
+        title={
+          error
+            ? "Cliquer pour voir le détail de l'erreur"
+            : "DL le ZIP + lit son manifest.json (CurseForge) pour pré-remplir MC version + loader"
+        }
+        className={cn(
+          "shrink-0 inline-flex items-center gap-1.5 rounded-xl px-3 text-xs ring-1 transition-colors",
+          error
+            ? "bg-danger/10 text-danger ring-danger/30 hover:bg-danger/20"
+            : "bg-emerald-400/10 text-emerald-300 ring-emerald-400/30 hover:bg-emerald-400/20",
+          "disabled:opacity-40 disabled:cursor-not-allowed",
+        )}
+      >
+        {busy ? (
+          <>
+            <Loader2 className="size-3 animate-spin" /> Lecture…
+          </>
+        ) : error ? (
+          <>
+            <AlertTriangle className="size-3" /> Voir l'erreur
+          </>
+        ) : (
+          <>
+            <Sparkles className="size-3" /> Détecter manifest
+          </>
+        )}
+      </button>
+
+      <AnimatePresence>
+        {showErrorModal && error && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] grid place-items-center bg-bg-base/80 backdrop-blur-sm p-6"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowErrorModal(false);
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="no-drag w-full max-w-3xl rounded-2xl bg-bg-soft p-6 ring-1 ring-danger/30 shadow-[0_0_60px_rgba(239,68,68,0.2)]"
+            >
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="size-5 shrink-0 text-danger mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-display text-xl text-fg-primary">
+                    Détection du manifest échouée
+                  </h3>
+                  <p className="mt-1 text-sm text-fg-muted">
+                    Le launcher a essayé de DL le fichier mais quelque chose a
+                    foiré. Détails ci-dessous.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowErrorModal(false)}
+                  className="text-fg-muted hover:text-fg-primary"
+                >
+                  ×
+                </button>
+              </div>
+
+              <pre className="info-scroll mt-4 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-bg-base/60 p-4 font-mono text-[11px] leading-relaxed text-fg-primary ring-1 ring-white/[0.06]">
+                {error}
+              </pre>
+
+              <div className="mt-4 rounded-xl bg-amber-400/[0.06] p-3 text-xs text-amber-200 ring-1 ring-amber-400/20">
+                <p className="font-medium text-amber-100 mb-1">Pistes :</p>
+                <ul className="ml-4 list-disc space-y-1">
+                  <li>
+                    <strong>Permissions</strong> : le partage doit être en{" "}
+                    <em>« Toute personne »</em>, pas{" "}
+                    <em>« Personnes avec accès existantes »</em>.
+                  </li>
+                  <li>
+                    <strong>Pas un fichier CurseForge ?</strong> Si tu utilises
+                    un ZIP hand-built (sans manifest.json), garde l'option «
+                    ZIP custom » mais saisis MC version + loader manuellement
+                    — la détection ne fonctionne que pour les exports CF.
+                  </li>
+                  <li>
+                    <strong>Hôte non supporté</strong> : essaie de copier l'URL
+                    dans un onglet privé du navigateur — si ça ne télécharge
+                    pas direct sans login, le launcher ne pourra pas non plus.
+                  </li>
+                </ul>
+              </div>
+
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError(null);
+                    setShowErrorModal(false);
+                    void handleClick();
+                  }}
+                  className="rounded-xl bg-emerald-400/15 px-4 py-2 text-sm text-emerald-300 ring-1 ring-emerald-400/30 hover:bg-emerald-400/25"
+                >
+                  Réessayer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowErrorModal(false)}
+                  className="rounded-xl bg-bg-elevated/40 px-4 py-2 text-sm text-fg-muted ring-1 ring-white/[0.06] hover:bg-bg-elevated/70 hover:text-fg-primary"
+                >
+                  Fermer
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
+/**
+ * File picker + upload progress for the *native* modpack overlay
+ * (.mrpack or generic .zip). Uploads to Firebase Storage via the
+ * shared `uploadModpackZip` flow and pre-fills `nativeModpackUrl` (and
+ * `customZipUrl` for backwards-compat). Cosmetically simpler than the
+ * legacy `ModpackZipPicker` because we don't show the URL on screen
+ * (the URL lives in the Field above) — just a status row + a button.
+ */
+function NativeModpackUpload({
+  accept,
+  uploading,
+  onPick,
+  hasUrl,
+  onClear,
+}: {
+  accept: string;
+  uploading: { percent: number; uploaded: number; total: number } | null;
+  onPick: (file: File) => void;
+  hasUrl: boolean;
+  onClear: () => void;
+}) {
+  const id = "native-modpack-zip-input";
+  const sizeMb = (b: number) => (b / 1_048_576).toFixed(1);
+  return (
+    <div className="rounded-xl border border-dashed border-white/10 bg-bg-base/30 p-3 transition-colors hover:border-emerald-400/40">
+      <input
+        type="file"
+        id={id}
+        accept={accept}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) onPick(f);
+        }}
+        className="hidden"
+      />
+      {uploading ? (
+        <div className="space-y-1.5">
+          <div className="flex items-baseline justify-between text-xs">
+            <span className="font-medium text-fg-primary">Upload en cours…</span>
+            <span className="text-fg-muted">
+              {sizeMb(uploading.uploaded)} / {sizeMb(uploading.total)} Mo · {uploading.percent.toFixed(0)}%
+            </span>
+          </div>
+          <div className="h-1 overflow-hidden rounded-full bg-white/[0.06]">
+            <motion.div
+              className="h-full bg-emerald-400 shadow-[0_0_8px_rgba(74,222,128,0.5)]"
+              animate={{ width: `${uploading.percent}%` }}
+              transition={{ duration: 0.2 }}
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-3">
+          <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-emerald-400/10 text-emerald-300 ring-1 ring-emerald-400/20">
+            {hasUrl ? <CheckCircle2 className="size-4" /> : <Upload className="size-4" />}
+          </div>
+          <div className="min-w-0 flex-1 text-xs">
+            <div className="font-medium text-fg-primary">
+              {hasUrl ? "Modpack uploadé sur Firebase Storage" : "Upload depuis ton PC"}
+            </div>
+            <div className="text-fg-muted">
+              {hasUrl
+                ? "URL pré-remplie ci-dessus. Tu peux remplacer ou retirer."
+                : `Pick un fichier ${accept} → uploadé automatiquement, l'URL se remplit toute seule.`}
+            </div>
+          </div>
+          <label
+            htmlFor={id}
+            className="no-drag shrink-0 cursor-pointer rounded-md bg-white/[0.04] px-3 py-1.5 text-xs text-fg-primary ring-1 ring-white/[0.06] hover:bg-white/[0.08]"
+          >
+            {hasUrl ? "Remplacer" : "Choisir un fichier"}
+          </label>
+          {hasUrl && (
+            <button
+              type="button"
+              onClick={onClear}
+              className="shrink-0 rounded-md bg-white/[0.02] px-2.5 py-1.5 text-xs text-fg-muted ring-1 ring-white/[0.04] hover:bg-danger/10 hover:text-danger"
+            >
+              Retirer
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

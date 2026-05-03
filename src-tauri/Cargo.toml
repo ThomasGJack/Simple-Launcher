@@ -1,6 +1,6 @@
 [package]
 name = "simple-launcher"
-version = "26.429.9"
+version = "26.503.0"
 description = "Simple Launcher — multi-game launcher"
 authors = ["goule"]
 edition = "2021"
@@ -27,7 +27,19 @@ tokio = { version = "1", features = ["rt-multi-thread", "io-util", "net", "macro
 reqwest = { version = "0.12", default-features = false, features = ["stream", "rustls-tls", "json"] }
 futures-util = "0.3"
 sha2 = "0.10"
+sha1 = "0.10"
 hex = "0.4"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 discord-rich-presence = "1.1"
+base64 = "0.22"
+rand = "0.8"
+# OS-native secret store (Windows Credential Manager / macOS Keychain /
+# Linux Secret Service). Used to encrypt-at-rest the Microsoft refresh
+# tokens used by `mc_auth` so a hand-edited `mc_accounts.json` no longer
+# leaks usable session material.
+keyring = "3"
+# Standard cross-platform "well-known directory" lookups. Used by
+# `mc_github` to find a stable per-user app-data path for the PAT
+# fallback file when keyring write+verify fails.
+dirs = "5"
 

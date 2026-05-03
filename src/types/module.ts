@@ -100,9 +100,25 @@ export type ShortcutModule = BaseModule & {
   workingDirectory?: string;
 };
 
+/**
+ * Native modpack source — describes how the launcher should populate
+ * `.minecraft/` for a Minecraft module that uses the native launch path
+ * (no Prism). Only relevant when `nativeMc === true`.
+ *
+ * - `none`: pure vanilla + loader, no extra mods
+ * - `modrinth`: pull a `.mrpack` from `mrpackUrl` (manifest resolves
+ *   loader + mod URLs)
+ * - `zip`: pull a generic ZIP that already contains a `.minecraft/`
+ *   layout (mods/, config/, etc.) and extract it verbatim
+ */
+export type NativeModpackSource =
+  | { kind: "none" }
+  | { kind: "modrinth"; mrpackUrl: string; modrinthProjectId?: string; versionLabel?: string }
+  | { kind: "zip"; zipUrl: string };
+
 export type MinecraftModule = BaseModule & {
   type: "minecraft";
-  // CurseForge IDs are optional when the modpack is self-hosted (customZipUrl).
+  // ─── Legacy Prism-based config (still used when nativeMc !== true) ──
   curseforgeProjectId?: number;
   curseforgeFileId?: number;
   /**
@@ -127,6 +143,25 @@ export type MinecraftModule = BaseModule & {
    * heavy modpacks. The min heap is automatically set to ~half this value.
    */
   maxRamMb?: number;
+
+  // ─── Native launch path (no Prism dependency) ──────────────────────
+  /**
+   * When `true`, the launcher uses the in-house native chain (mc_auth +
+   * mc_java + mc_vanilla + mc_fabric/mc_forge + mc_modrinth/mc_zip +
+   * mc_launch) instead of Prism. The Prism-related fields above are
+   * ignored — the native config below drives the install + launch.
+   */
+  nativeMc?: boolean;
+  /** Vanilla MC version pinned for this module, e.g. "1.20.1" or
+   *  "26.1.2". Required when `nativeMc === true`. */
+  nativeMcVersion?: string;
+  /** Loader pick: "vanilla" (no loader) / fabric / forge / neoforge. */
+  nativeLoader?: "vanilla" | "fabric" | "forge" | "neoforge";
+  /** Loader version (e.g. "0.16.0" for Fabric, "47.4.0" for Forge,
+   *  "21.5.34-beta" for NeoForge). Ignored when loader === "vanilla". */
+  nativeLoaderVersion?: string;
+  /** Optional modpack overlay applied on top of vanilla + loader. */
+  nativeModpack?: NativeModpackSource;
 };
 
 export type LauncherModule = HostedModule | ShortcutModule | MinecraftModule;

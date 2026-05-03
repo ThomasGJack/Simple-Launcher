@@ -1,4 +1,14 @@
 mod discord_rpc;
+mod log_file;
+mod mc_auth;
+mod mc_fabric;
+mod mc_forge;
+mod mc_github;
+mod mc_java;
+mod mc_launch;
+mod mc_modrinth;
+mod mc_vanilla;
+mod mc_zip;
 mod minecraft;
 mod modules;
 mod oauth;
@@ -19,6 +29,8 @@ pub fn run() {
         .manage(minecraft::McLaunchTracker::new())
         .manage(discord_rpc::DiscordRpc::new())
         .manage(rcon::RconRegistry::new())
+        .manage(log_file::LogFileState::new())
+        .manage(mc_auth::McAuthState::new())
         .on_window_event(|window, event| {
             // Intercept the main-window close request: instead of exiting
             // the app, hide the window and let the tray icon stay alive.
@@ -52,6 +64,7 @@ pub fn run() {
             modules::module_launch_shortcut,
             modules::module_uninstall,
             minecraft::mc_find_prism,
+            minecraft::mc_open_prism_instance_dir,
             minecraft::mc_get_state,
             minecraft::mc_install_modpack,
             minecraft::mc_launch,
@@ -59,6 +72,44 @@ pub fn run() {
             rcon::rcon_connect,
             rcon::rcon_send,
             rcon::rcon_close,
+            log_file::logs_append,
+            log_file::logs_read,
+            log_file::logs_take_orphans,
+            log_file::logs_delete,
+            log_file::logs_dir_path,
+            log_file::logs_fetch_text,
+            mc_auth::mc_auth_login,
+            mc_auth::mc_auth_list,
+            mc_auth::mc_auth_logout,
+            mc_auth::mc_auth_refresh,
+            mc_auth::mc_auth_fallback_start,
+            mc_auth::mc_auth_fallback_complete,
+            mc_java::mc_java_list,
+            mc_java::mc_java_install,
+            mc_java::mc_java_resolve,
+            mc_vanilla::mc_vanilla_list_versions,
+            mc_vanilla::mc_vanilla_install,
+            mc_vanilla::mc_vanilla_is_installed,
+            mc_vanilla::mc_native_uninstall_instance,
+            mc_vanilla::mc_native_open_instance_dir,
+            mc_fabric::mc_fabric_list_game_versions,
+            mc_fabric::mc_fabric_list_loader_versions,
+            mc_fabric::mc_fabric_install,
+            mc_forge::mc_forge_list_versions,
+            mc_forge::mc_neoforge_list_versions,
+            mc_forge::mc_forge_install,
+            mc_forge::mc_neoforge_install,
+            mc_modrinth::mc_modrinth_search,
+            mc_modrinth::mc_modrinth_list_versions,
+            mc_modrinth::mc_modrinth_install,
+            mc_zip::mc_zip_install,
+            mc_zip::mc_zip_read_manifest_url,
+            mc_github::gh_token_set,
+            mc_github::gh_token_status,
+            mc_github::gh_token_clear,
+            mc_github::gh_list_repos,
+            mc_github::gh_upload_modpack,
+            mc_launch::mc_native_launch,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

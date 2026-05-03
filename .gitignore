@@ -41,3 +41,6 @@ hosting/download/
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code internal session state (per-machine, not source)
+.claude/

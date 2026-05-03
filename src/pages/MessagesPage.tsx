@@ -7,9 +7,9 @@ import {
   markConversationRead,
   sendMessage,
   watchConversationById,
-  watchConversationsFor,
   watchMessages,
 } from "@/firebase/messaging";
+import { useConversations } from "@/store/firebaseStores";
 import {
   otherParticipant,
   unreadCount,
@@ -34,7 +34,7 @@ export function MessagesPage() {
   const navigate = useUIStore((s) => s.navigate);
   const activeId = route.name === "messages" ? route.conversationId : undefined;
 
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const conversations = useConversations(me?.uid);
   /**
    * Fallback subscription for the *currently selected* conversation.
    *
@@ -47,14 +47,6 @@ export function MessagesPage() {
    * doc exists (even with pending fields) we render the chat, no race.
    */
   const [directActiveConv, setDirectActiveConv] = useState<Conversation | null>(null);
-
-  useEffect(() => {
-    if (!me) {
-      setConversations([]);
-      return;
-    }
-    return watchConversationsFor(me.uid, setConversations);
-  }, [me?.uid]);
 
   useEffect(() => {
     if (!activeId) {

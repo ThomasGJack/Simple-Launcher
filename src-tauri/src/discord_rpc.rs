@@ -94,6 +94,11 @@ impl Inner {
         }
     }
 
+    /// Clears the Discord activity entirely. Currently unused — we
+    /// always set a new activity (idle / playing) on transitions
+    /// rather than clearing — but keep it around so a future "exit
+    /// app cleanly" path can blank the rich-presence on shutdown.
+    #[allow(dead_code)]
     pub async fn clear(&self) {
         let mut guard = self.client.lock().await;
         if let Some(client) = guard.as_mut() {

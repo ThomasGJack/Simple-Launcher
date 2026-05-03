@@ -3,12 +3,13 @@ import { motion } from "framer-motion";
 import { Clock, Play, Gamepad2 } from "lucide-react";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/auth";
-import { watchModules } from "@/firebase/modules";
-import { watchPlaytime, formatPlaytime, type PlaytimeEntry } from "@/firebase/playtime";
+import { useModules, usePlaytime } from "@/store/firebaseStores";
+import { formatPlaytime, type PlaytimeEntry } from "@/firebase/playtime";
+import type { LauncherModule } from "@/types/module";
 import { ModuleParticles } from "@/components/ui/Particles";
 import { FriendsOnlineStrip } from "@/components/home/FriendsOnlineStrip";
 import { NewsCard } from "@/components/home/NewsCard";
-import type { LauncherModule } from "@/types/module";
+import { ActionsChip } from "@/components/home/ActionsChip";
 
 /**
  * Home page — bento-grid social hub. Surfaces in priority:
@@ -25,15 +26,10 @@ import type { LauncherModule } from "@/types/module";
 export function HomePage() {
   const navigate = useUIStore((s) => s.navigate);
   const me = useAuthStore((s) => s.user);
-  const [modules, setModules] = useState<LauncherModule[]>([]);
-  const [playtime, setPlaytime] = useState<PlaytimeEntry[]>([]);
+  const modules = useModules();
+  const playtime = usePlaytime(me?.uid);
   const [, setNow] = useState(Date.now());
 
-  useEffect(() => watchModules(setModules), []);
-  useEffect(() => {
-    if (!me) return;
-    return watchPlaytime(me.uid, setPlaytime);
-  }, [me?.uid]);
   // Re-tick every 30s so relative time strings stay fresh
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30_000);
@@ -73,14 +69,10 @@ export function HomePage() {
 
   return (
     <div className="relative h-full overflow-y-auto px-10 py-10">
-      {/* Time-of-day-tinted halo behind the greeting hero */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-[420px] opacity-60 blur-3xl"
-        style={{
-          background: greeting.heroGradient,
-        }}
-      />
+      {/* Animated gradient mesh — three colored radial blobs layered with
+          time-of-day-tinted hues, each pulsing at its own slow tempo so
+          the background "breathes" without becoming distracting. */}
+      <GradientMesh accent={greeting.particleColor} heroGradient={greeting.heroGradient} />
 
       {/* Subtle ambient particles tinted to time-of-day */}
       <div aria-hidden className="pointer-events-none absolute inset-0">
@@ -97,53 +89,124 @@ export function HomePage() {
           distracting from the content. Two orbs in opposite quadrants. */}
       <FloatingOrbs accent={greeting.particleColor} />
 
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-        className="relative mx-auto w-full max-w-3xl"
-      >
-        <GreetingHero
-          firstName={firstName}
-          greetingLabel={greeting.label}
-          greetingEmoji={greeting.emoji}
-          avatar={me?.photoURL ?? null}
-        />
-        <FriendsOnlineStrip />
-        <NewsCard />
-        {lastPlayed && (
-          <ContinueCard
-            module={lastPlayed}
-            entry={lastPlayedEntry}
-            onPlay={() => navigate({ name: "module", moduleId: lastPlayed.id })}
+      <div className="relative mx-auto w-full max-w-7xl">
+        {/* ─── Top band: greeting full-width ──────────────────────── */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+        >
+          <GreetingHero
+            firstName={firstName}
+            greetingLabel={greeting.label}
+            greetingEmoji={greeting.emoji}
+            avatar={me?.photoURL ?? null}
           />
-        )}
+          <ActionsChip />
+        </motion.div>
 
-        {quickLaunch.length > 0 && (
+        {/* ─── 2-column split: Continue + Quick launch | Amis + News ─ */}
+        <div className="grid grid-cols-12 gap-6">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2, ease: "easeOut" }}
-            className="mt-6"
+            transition={{ duration: 0.5, delay: 0.1, ease: "easeOut" }}
+            className="col-span-12 lg:col-span-7"
           >
-            <div className="mb-3 flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-fg-muted">
-              <Gamepad2 className="size-3" />
-              Lancement rapide
-            </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {quickLaunch.map((mod, i) => (
-                <QuickLaunchCard
-                  key={mod.id}
-                  module={mod}
-                  delay={0.25 + i * 0.05}
-                  onClick={() => navigate({ name: "module", moduleId: mod.id })}
-                />
-              ))}
-            </div>
+            {lastPlayed && (
+              <ContinueCard
+                module={lastPlayed}
+                entry={lastPlayedEntry}
+                onPlay={() => navigate({ name: "module", moduleId: lastPlayed.id })}
+              />
+            )}
+
+            {quickLaunch.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.2, ease: "easeOut" }}
+                className="mt-6"
+              >
+                <div className="mb-3 flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-fg-muted">
+                  <Gamepad2 className="size-3" />
+                  Lancement rapide
+                </div>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {quickLaunch.map((mod, i) => (
+                    <QuickLaunchCard
+                      key={mod.id}
+                      module={mod}
+                      delay={0.25 + i * 0.05}
+                      onClick={() => navigate({ name: "module", moduleId: mod.id })}
+                    />
+                  ))}
+                </div>
+              </motion.div>
+            )}
           </motion.div>
-        )}
-      </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.15, ease: "easeOut" }}
+            className="col-span-12 lg:col-span-5"
+          >
+            <FriendsOnlineStrip />
+            <NewsCard />
+          </motion.div>
+        </div>
+      </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+//                              GRADIENT MESH
+// ---------------------------------------------------------------------------
+
+/**
+ * Layered animated gradient mesh shown behind the greeting hero. Three
+ * radial blobs at different positions and sizes, each pulsing on its own
+ * tempo so the wall feels alive without ever drawing attention. The base
+ * `heroGradient` (time-of-day) sits underneath as a static tint.
+ */
+function GradientMesh({ accent, heroGradient }: { accent: string; heroGradient: string }) {
+  return (
+    <>
+      {/* Static time-of-day tint (cheap, no animation) */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-[420px] opacity-50 blur-3xl"
+        style={{ background: heroGradient }}
+      />
+      {/* Three pulsing blobs that breathe at different rates. `willChange`
+          + `transform: translateZ(0)` promote each blob to its own GPU
+          layer so the browser caches the rendered blur and only re-paints
+          the cheap opacity/scale tween — measurable CPU win on lower-end
+          machines (no functional/visual change). */}
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute -top-12 left-[-6%] size-[460px] rounded-full blur-3xl"
+        style={{ background: accent, willChange: "transform, opacity", transform: "translateZ(0)" }}
+        animate={{ opacity: [0.18, 0.32, 0.18], scale: [1, 1.08, 1] }}
+        transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute -top-24 right-[8%] size-[360px] rounded-full blur-3xl"
+        style={{ background: "#a855f7", willChange: "transform, opacity", transform: "translateZ(0)" }}
+        animate={{ opacity: [0.14, 0.26, 0.14], scale: [1.05, 1, 1.05] }}
+        transition={{ duration: 11, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+      />
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute top-32 left-[40%] size-[300px] rounded-full blur-3xl"
+        style={{ background: "#ec4899", willChange: "transform, opacity", transform: "translateZ(0)" }}
+        animate={{ opacity: [0.08, 0.18, 0.08], scale: [1, 1.06, 1] }}
+        transition={{ duration: 13, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+      />
+    </>
   );
 }
 
@@ -157,14 +220,26 @@ function FloatingOrbs({ accent }: { accent: string }) {
       <motion.div
         aria-hidden
         className="pointer-events-none absolute size-[420px] rounded-full opacity-25 blur-3xl"
-        style={{ background: accent, top: "8%", left: "-10%" }}
+        style={{
+          background: accent,
+          top: "8%",
+          left: "-10%",
+          willChange: "transform",
+          transform: "translateZ(0)",
+        }}
         animate={{ x: [0, 60, 20, 0], y: [0, 30, 80, 0] }}
         transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
       />
       <motion.div
         aria-hidden
         className="pointer-events-none absolute size-[360px] rounded-full opacity-20 blur-3xl"
-        style={{ background: "#a855f7", bottom: "5%", right: "-8%" }}
+        style={{
+          background: "#a855f7",
+          bottom: "5%",
+          right: "-8%",
+          willChange: "transform",
+          transform: "translateZ(0)",
+        }}
         animate={{ x: [0, -50, -20, 0], y: [0, -40, -10, 0] }}
         transition={{ duration: 28, repeat: Infinity, ease: "easeInOut" }}
       />

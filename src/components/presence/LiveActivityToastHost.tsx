@@ -2,11 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Play, Wifi, X } from "lucide-react";
 import { useAuthStore } from "@/store/auth";
-import {
-  watchAllUsers,
-  statusFromLastSeen,
-  type UserPresence,
-} from "@/firebase/presence";
+import { statusFromLastSeen, type UserPresence } from "@/firebase/presence";
+import { useUsers } from "@/store/firebaseStores";
 import { useUIStore } from "@/store/ui";
 import { sounds } from "@/lib/sounds";
 
@@ -37,6 +34,7 @@ const TOAST_DURATION_MS = 5500;
 export function LiveActivityToastHost() {
   const me = useAuthStore((s) => s.user);
   const navigate = useUIStore((s) => s.navigate);
+  const users = useUsers();
   const [toasts, setToasts] = useState<Toast[]>([]);
   /** Last known state per uid — used to detect transitions. Populated
    *  with the first snapshot so the boot doesn't trigger a flood. */
@@ -46,12 +44,12 @@ export function LiveActivityToastHost() {
   /** Did we receive the very first snapshot yet? */
   const primed = useRef(false);
 
+  // Reacts to changes in the centralised users feed instead of opening
+  // its own watcher.
   useEffect(() => {
-    return watchAllUsers((users) => {
-      handleSnapshot(users, me?.uid ?? null);
-    });
+    handleSnapshot(users, me?.uid ?? null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [me?.uid]);
+  }, [users, me?.uid]);
 
   const handleSnapshot = (users: UserPresence[], myUid: string | null) => {
     const newToasts: Toast[] = [];

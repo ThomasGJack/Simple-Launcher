@@ -2,7 +2,6 @@ import {
   addDoc,
   collection,
   onSnapshot,
-  orderBy,
   query,
   serverTimestamp,
   Timestamp,
@@ -90,6 +89,13 @@ export async function setInvitationStatus(
  * Subscribes to invitations *received* by `meUid`. Filters out anything
  * older than the TTL or already resolved — we only surface live, actionable
  * pings to the user. Sorted newest-first.
+ *
+ * NB: We deliberately do NOT use `orderBy("createdAt", "desc")` in the
+ * query — that would require a composite index on `(toUid asc, createdAt
+ * desc)`. While such an index is BUILDING (e.g. just deployed), Firestore
+ * throws an INTERNAL ASSERTION FAILED that cascades through every active
+ * watcher and can black-screen the app. Sorting client-side over the small
+ * filtered result set is essentially free and avoids the dependency.
  */
 export function watchIncomingInvitations(
   meUid: string,
@@ -103,7 +109,6 @@ export function watchIncomingInvitations(
   const q = query(
     collection(fb.db, "invitations"),
     where("toUid", "==", meUid),
-    orderBy("createdAt", "desc"),
   );
   return onSnapshot(
     q,
@@ -133,6 +138,8 @@ export function watchIncomingInvitations(
             data.resolvedAt instanceof Timestamp ? data.resolvedAt.toMillis() : null,
         });
       }
+      // Sort newest-first client-side (no composite index needed).
+      out.sort((a, b) => b.createdAt - a.createdAt);
       callback(out);
     },
     (err) => {
