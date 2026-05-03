@@ -3,7 +3,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { getVersion } from "@tauri-apps/api/app";
-import { CheckCircle2, RefreshCw, Sparkles, X } from "lucide-react";
+import { listen } from "@tauri-apps/api/event";
+import { CheckCircle2, Loader2, RefreshCw, Sparkles, X } from "lucide-react";
 import { sounds } from "@/lib/sounds";
 import { formatDisplay } from "@/lib/version";
 import { ChangelogRenderer } from "./ChangelogRenderer";
@@ -13,7 +14,12 @@ type Status =
   | { kind: "available"; update: Update } // mid-session detection only
   | { kind: "downloading"; progress: number; total: number; auto: boolean }
   | { kind: "ready" }
-  | { kind: "error"; message: string };
+  | { kind: "error"; message: string }
+  // User-triggered manual check states (from tray "Chercher une mise à
+  // jour"). The silent poll skips all of these — they're only emitted
+  // when the user explicitly asked, so we owe them feedback.
+  | { kind: "manual-checking" }
+  | { kind: "up-to-date"; version: string };
 
 /** Re-check every 2 min while the app is open — covers the mid-session case
  *  where a release lands while the user is already playing. */
@@ -129,6 +135,64 @@ export function UpdateBanner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ─── 2.b. Manual update check from tray menu ───────────────────────
+  //
+  // The user clicked "Chercher une mise à jour" from the tray context
+  // menu. Re-runs `check()` and surfaces feedback ALWAYS — including
+  // when no update is available (which the silent poll just ignores).
+  // The "no update" feedback is a small auto-fading toast, the "update
+  // found" feedback re-uses the existing FreshArrivalModal flow.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    listen("tray-check-update", async () => {
+      if (cancelled) return;
+      setStatus({ kind: "manual-checking" });
+      sounds.click();
+      try {
+        const update = await check();
+        if (cancelled) return;
+        if (!update) {
+          // Already on the latest. Tiny success toast, auto-clears
+          // after 3 seconds so it doesn't sit on the screen forever.
+          const currentVer = await getVersion();
+          setStatus({ kind: "up-to-date", version: currentVer });
+          setDismissed(false);
+          window.setTimeout(() => {
+            setStatus((s) => (s.kind === "up-to-date" ? { kind: "idle" } : s));
+          }, 3000);
+          return;
+        }
+        // Update found — short-circuit the startup-grace check and just
+        // ask the user (manual click ⇒ they're awake, surface the modal).
+        seenVersion.current = update.version;
+        setFreshArrival({
+          version: update.version,
+          date: update.date,
+          notes: update.body,
+          update,
+        });
+        setStatus({ kind: "idle" });
+        sounds.updateArrived();
+      } catch (err) {
+        if (cancelled) return;
+        const message = err instanceof Error ? err.message : String(err);
+        setStatus({ kind: "error", message });
+        sounds.error();
+      }
+    }).then((u) => {
+      if (cancelled) {
+        u();
+      } else {
+        unlisten = u;
+      }
+    });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, []);
+
   // ─── 3. Install pipeline ──────────────────────────────────────────────
   const runInstall = async (update: Update, auto: boolean) => {
     let downloaded = 0;
@@ -179,6 +243,13 @@ export function UpdateBanner() {
             {status.kind === "ready" && <Ready />}
             {status.kind === "error" && (
               <ErrorState message={status.message} onClose={() => setDismissed(true)} />
+            )}
+            {status.kind === "manual-checking" && <ManualChecking />}
+            {status.kind === "up-to-date" && (
+              <UpToDate
+                version={status.version}
+                onClose={() => setStatus({ kind: "idle" })}
+              />
             )}
           </motion.div>
         </AnimatePresence>
@@ -259,6 +330,54 @@ function ErrorState({ message, onClose }: { message: string; onClose: () => void
         </button>
       </div>
       <p className="text-xs text-fg-muted">{message}</p>
+    </div>
+  );
+}
+
+/** Banner shown while the user-triggered (tray menu) manual check is
+ *  in flight. Tiny — usually clears in < 1 second. */
+function ManualChecking() {
+  return (
+    <div className="flex items-center gap-3 p-4">
+      <div className="grid size-9 place-items-center rounded-lg bg-accent/15 text-accent ring-1 ring-accent/30">
+        <Loader2 className="size-4 animate-spin" strokeWidth={2.5} />
+      </div>
+      <div className="flex-1">
+        <div className="text-sm font-medium text-fg-primary">
+          Recherche de mises à jour…
+        </div>
+        <div className="text-xs text-fg-muted">Connexion au serveur</div>
+      </div>
+    </div>
+  );
+}
+
+/** "You're already on the latest version" feedback — auto-dismisses
+ *  after 3 s but the X button lets the user close it earlier. Only
+ *  shown for manual checks (the silent 2-min poll never surfaces this
+ *  to avoid notification spam). */
+function UpToDate({ version, onClose }: { version: string; onClose: () => void }) {
+  return (
+    <div className="flex items-center gap-3 p-4">
+      <div className="grid size-9 place-items-center rounded-lg bg-success/15 text-success ring-1 ring-success/30">
+        <CheckCircle2 className="size-4" strokeWidth={2.5} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-medium text-fg-primary">
+          Tu es déjà à jour
+        </div>
+        <div className="truncate text-xs text-fg-muted">
+          Version actuelle : {formatDisplay(version)}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onClose}
+        className="rounded-md p-1.5 text-fg-muted transition-colors hover:bg-white/[0.06] hover:text-fg-primary"
+        aria-label="Fermer"
+      >
+        <X className="size-3.5" />
+      </button>
     </div>
   );
 }

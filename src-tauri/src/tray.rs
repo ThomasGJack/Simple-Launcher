@@ -32,13 +32,25 @@ pub fn install<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     let community = MenuItem::with_id(app, "community", "Communauté", true, None::<&str>)?;
     let messages = MenuItem::with_id(app, "messages", "Messages", true, None::<&str>)?;
     let library = MenuItem::with_id(app, "library", "Bibliothèque", true, None::<&str>)?;
+    let check_update = MenuItem::with_id(
+        app,
+        "check-update",
+        "Chercher une mise à jour",
+        true,
+        None::<&str>,
+    )?;
     let separator = PredefinedMenuItem::separator(app)?;
+    let separator2 = PredefinedMenuItem::separator(app)?;
     let quit = MenuItem::with_id(app, "quit", "Quitter", true, None::<&str>)?;
 
     // A submenu groups the navigation shortcuts so the top-level menu stays
-    // short. Order is: Open / [Quick nav submenu] / -- / Quit.
+    // short. Order is:
+    //   Open / [Quick nav submenu] / -- / Check update / -- / Quit.
     let nav = Submenu::with_items(app, "Naviguer vers", true, &[&community, &messages, &library])?;
-    let menu = Menu::with_items(app, &[&open, &nav, &separator, &quit])?;
+    let menu = Menu::with_items(
+        app,
+        &[&open, &nav, &separator, &check_update, &separator2, &quit],
+    )?;
 
     let icon = Image::from_bytes(TRAY_ICON_BYTES)?;
 
@@ -62,6 +74,17 @@ fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         "community" => navigate_to(app, "community", None),
         "messages" => navigate_to(app, "messages", None),
         "library" => navigate_to(app, "library", None),
+        "check-update" => {
+            // Make sure the main window is up so the user can see the
+            // result toast/modal, then forward to the frontend updater.
+            // The TS side (UpdateBanner) listens for `tray-check-update`,
+            // re-runs the same `check()` it does on its 2-min poll, and
+            // surfaces feedback even when no update is available
+            // ("Tu es déjà à jour" toast) — which the silent poll never
+            // does.
+            show_main_window(app);
+            let _ = app.emit("tray-check-update", ());
+        }
         "quit" => {
             app.exit(0);
         }
