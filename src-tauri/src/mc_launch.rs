@@ -1077,3 +1077,179 @@ pub async fn mc_native_launch<R: Runtime>(
 // outside of internals; silence the unused warning if it ever lands.
 #[allow(dead_code)]
 fn _unused_path_marker(_p: &Path) {}
+
+// ─── Tests ────────────────────────────────────────────────────────────
+//
+// Pure-function unit tests : `subst_vars`, `dotted_uuid`, `flatten_args`,
+// `library_applies_on_windows`. No tokio runtime needed, no Tauri state,
+// no file system. Run with `cargo test -p simple-launcher mc_launch`.
+//
+// The integration-shaped paths (`launch`, `mc_native_launch`) require a
+// full Tauri AppHandle + state setup that's not worth mocking — those
+// are exercised end-to-end by manual testing via `tauri dev`.
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn subst_vars_replaces_known_keys() {
+        let mut vars: HashMap<&str, String> = HashMap::new();
+        vars.insert("name", "Alice".into());
+        vars.insert("version", "1.21.1".into());
+        let out = subst_vars("Hello ${name}, version ${version}", &vars);
+        assert_eq!(out, "Hello Alice, version 1.21.1");
+    }
+
+    #[test]
+    fn subst_vars_leaves_unknown_keys_intact() {
+        let vars: HashMap<&str, String> = HashMap::new();
+        let out = subst_vars("Hello ${missing}!", &vars);
+        // Unknown placeholder stays as-is so it's spottable in the
+        // emitted command line — used for diagnostics.
+        assert_eq!(out, "Hello ${missing}!");
+    }
+
+    #[test]
+    fn subst_vars_handles_no_placeholders() {
+        let vars: HashMap<&str, String> = HashMap::new();
+        assert_eq!(subst_vars("plain string", &vars), "plain string");
+        assert_eq!(subst_vars("", &vars), "");
+    }
+
+    #[test]
+    fn subst_vars_handles_dollar_without_brace() {
+        let mut vars: HashMap<&str, String> = HashMap::new();
+        vars.insert("x", "REPLACED".into());
+        // A bare `$` not followed by `{` should pass through.
+        let out = subst_vars("$5 and ${x} and $foo", &vars);
+        assert_eq!(out, "$5 and REPLACED and $foo");
+    }
+
+    #[test]
+    fn dotted_uuid_inserts_dashes_at_correct_positions() {
+        let raw = "030db5be395342b7938bdf13c6d2d618";
+        let dotted = dotted_uuid(raw);
+        assert_eq!(dotted, "030db5be-3953-42b7-938b-df13c6d2d618");
+    }
+
+    #[test]
+    fn dotted_uuid_passes_through_already_dotted() {
+        // Passing a dashed UUID strips the dashes first via the filter,
+        // then re-inserts them at the canonical positions. Result =
+        // canonical form.
+        let dashed = "030db5be-3953-42b7-938b-df13c6d2d618";
+        assert_eq!(dotted_uuid(dashed), dashed);
+    }
+
+    #[test]
+    fn dotted_uuid_returns_input_unchanged_for_wrong_length() {
+        assert_eq!(dotted_uuid("tooshort"), "tooshort");
+        assert_eq!(dotted_uuid(""), "");
+    }
+
+    #[test]
+    fn library_applies_on_windows_no_rules_means_apply() {
+        assert!(library_applies_on_windows(&None));
+    }
+
+    #[test]
+    fn library_applies_on_windows_allow_default_then_disallow_for_other_os() {
+        // Mojang manifest pattern: default allow, disallow on osx.
+        let rules = vec![
+            LibraryRule {
+                action: "allow".into(),
+                os: None,
+            },
+            LibraryRule {
+                action: "disallow".into(),
+                os: Some(RuleOs {
+                    name: Some("osx".into()),
+                }),
+            },
+        ];
+        // The `name == "windows"` check is true when os.name is missing
+        // OR when explicitly "windows". For "osx" entries the rule
+        // doesn't apply on Windows, so the previous "allow" wins.
+        assert!(library_applies_on_windows(&Some(rules)));
+    }
+
+    #[test]
+    fn library_applies_on_windows_disallow_default_then_allow_windows() {
+        let rules = vec![
+            LibraryRule {
+                action: "disallow".into(),
+                os: None,
+            },
+            LibraryRule {
+                action: "allow".into(),
+                os: Some(RuleOs {
+                    name: Some("windows".into()),
+                }),
+            },
+        ];
+        assert!(library_applies_on_windows(&Some(rules)));
+    }
+
+    #[test]
+    fn flatten_args_passes_through_plain_strings() {
+        let items = vec![json!("--username"), json!("${auth_player_name}")];
+        let out = flatten_args(&items);
+        assert_eq!(out, vec!["--username", "${auth_player_name}"]);
+    }
+
+    #[test]
+    fn flatten_args_drops_macos_only_args() {
+        // Mojang ships `-XstartOnFirstThread` gated by `os.name == osx`.
+        // On Windows we should drop it.
+        let items = vec![json!({
+            "rules": [{ "action": "allow", "os": { "name": "osx" } }],
+            "value": "-XstartOnFirstThread",
+        })];
+        let out = flatten_args(&items);
+        assert!(out.is_empty());
+    }
+
+    #[test]
+    fn flatten_args_keeps_windows_only_args() {
+        let items = vec![json!({
+            "rules": [{ "action": "allow", "os": { "name": "windows" } }],
+            "value": ["-Dos.name=Windows 10", "-Dos.version=10.0"],
+        })];
+        let out = flatten_args(&items);
+        assert_eq!(out, vec!["-Dos.name=Windows 10", "-Dos.version=10.0"]);
+    }
+
+    #[test]
+    fn flatten_args_drops_unenabled_features() {
+        // Mojang gates `--quickPlayRealms` behind a feature we never
+        // enable in `launcher_features()`. Should be dropped.
+        let items = vec![json!({
+            "rules": [{
+                "action": "allow",
+                "features": { "is_quick_play_realms": true }
+            }],
+            "value": ["--quickPlayRealms", "${quickPlayRealms}"],
+        })];
+        let out = flatten_args(&items);
+        assert!(out.is_empty());
+    }
+
+    #[test]
+    fn flatten_args_keeps_enabled_features() {
+        // `has_custom_resolution` IS enabled in `launcher_features()`.
+        let items = vec![json!({
+            "rules": [{
+                "action": "allow",
+                "features": { "has_custom_resolution": true }
+            }],
+            "value": ["--width", "${resolution_width}", "--height", "${resolution_height}"],
+        })];
+        let out = flatten_args(&items);
+        assert_eq!(
+            out,
+            vec!["--width", "${resolution_width}", "--height", "${resolution_height}"],
+        );
+    }
+}

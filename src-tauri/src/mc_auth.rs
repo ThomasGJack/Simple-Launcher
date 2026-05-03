@@ -1098,3 +1098,136 @@ fn open_in_browser(url: &str) -> Result<(), String> {
         .map(|_| ())
         .map_err(|e| e.to_string())
 }
+
+// ─── Tests ────────────────────────────────────────────────────────────
+//
+// Pure helpers : `short_uuid`, `urlencode`, `urldecode`,
+// `extract_query_param`, `pkce_challenge`. The flow paths
+// (`mc_auth_login`, `mc_auth_refresh`, fallback flows) all hit external
+// HTTP services + the OS keyring, not realistically unit-testable
+// without integration scaffolding — those are validated end-to-end via
+// `tauri dev`.
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn short_uuid_takes_first_8_chars() {
+        assert_eq!(short_uuid("030db5be395342b7938bdf13c6d2d618"), "030db5be");
+    }
+
+    #[test]
+    fn short_uuid_returns_full_when_too_short() {
+        assert_eq!(short_uuid("abc"), "abc");
+        assert_eq!(short_uuid(""), "");
+    }
+
+    #[test]
+    fn urlencode_passes_unreserved_through() {
+        // RFC 3986 unreserved set: A-Z a-z 0-9 - _ . ~
+        assert_eq!(urlencode("Hello-World_1.0~"), "Hello-World_1.0~");
+    }
+
+    #[test]
+    fn urlencode_percent_encodes_reserved_and_spaces() {
+        assert_eq!(urlencode("a b"), "a%20b");
+        assert_eq!(urlencode("a/b"), "a%2Fb");
+        assert_eq!(urlencode("hello world"), "hello%20world");
+    }
+
+    #[test]
+    fn urlencode_handles_utf8() {
+        // Each UTF-8 byte gets percent-encoded individually.
+        assert_eq!(urlencode("é"), "%C3%A9");
+    }
+
+    #[test]
+    fn urldecode_inverts_urlencode_for_ascii() {
+        // Round-trip preserves all input. `urlencode` percent-escapes
+        // anything outside the unreserved set (so `+` becomes `%2B`,
+        // not a literal `+`), and `urldecode` of `%2B` returns `+`.
+        // Therefore `urldecode(urlencode(s)) == s` for any ASCII s.
+        let original = "hello world / foo+bar";
+        let encoded = urlencode(original);
+        assert_eq!(urldecode(&encoded), original);
+    }
+
+    #[test]
+    fn urldecode_treats_plus_as_space() {
+        // application/x-www-form-urlencoded : + → space.
+        assert_eq!(urldecode("a+b+c"), "a b c");
+    }
+
+    #[test]
+    fn urldecode_handles_percent_sequences() {
+        assert_eq!(urldecode("hello%20world"), "hello world");
+        assert_eq!(urldecode("%C3%A9"), "é");
+    }
+
+    #[test]
+    fn extract_query_param_finds_param() {
+        let url = "https://example.com/cb?code=abc123&state=xyz";
+        assert_eq!(
+            extract_query_param(url, "code"),
+            Some("abc123".to_string())
+        );
+        assert_eq!(
+            extract_query_param(url, "state"),
+            Some("xyz".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_query_param_returns_none_when_absent() {
+        let url = "https://example.com/cb?code=abc";
+        assert_eq!(extract_query_param(url, "missing"), None);
+    }
+
+    #[test]
+    fn extract_query_param_returns_none_when_no_query() {
+        assert_eq!(extract_query_param("https://example.com/", "code"), None);
+    }
+
+    #[test]
+    fn extract_query_param_strips_fragment() {
+        let url = "https://example.com/cb?code=abc#fragment-here";
+        assert_eq!(extract_query_param(url, "code"), Some("abc".to_string()));
+    }
+
+    #[test]
+    fn extract_query_param_decodes_percent_encoded_value() {
+        let url = "https://example.com/cb?msg=hello%20world";
+        assert_eq!(
+            extract_query_param(url, "msg"),
+            Some("hello world".to_string())
+        );
+    }
+
+    #[test]
+    fn pkce_challenge_is_base64url_no_padding() {
+        // The verifier is a fixed string here; the resulting challenge
+        // is its SHA-256 hash, base64url-encoded without trailing `=`.
+        // Don't hardcode the exact challenge value — assert the shape.
+        let challenge = pkce_challenge("a-fixed-verifier-string-of-sufficient-length");
+        // Base64URL of a 32-byte SHA-256 hash is 43 chars (no padding).
+        assert_eq!(challenge.len(), 43);
+        // No padding char allowed.
+        assert!(!challenge.contains('='));
+        // Only base64url-safe chars : A-Z a-z 0-9 - _
+        assert!(challenge
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_'));
+    }
+
+    #[test]
+    fn pkce_challenge_is_deterministic_for_same_verifier() {
+        let v = "verifier-xyz";
+        assert_eq!(pkce_challenge(v), pkce_challenge(v));
+    }
+
+    #[test]
+    fn pkce_challenge_differs_for_different_verifiers() {
+        assert_ne!(pkce_challenge("a"), pkce_challenge("b"));
+    }
+}

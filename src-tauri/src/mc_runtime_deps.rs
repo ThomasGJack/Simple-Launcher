@@ -291,3 +291,55 @@ pub async fn mc_runtime_deps_install<R: Runtime>(
 
     Ok(installed)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn known_deps_lists_three_redists_in_dependency_order() {
+        let deps = known_deps();
+        assert_eq!(deps.len(), 3, "Expected exactly 3 redists");
+        assert_eq!(deps[0].id, "vc2012", "VC++ 2012 must be first (oldest)");
+        assert_eq!(deps[1].id, "vc2013");
+        assert_eq!(deps[2].id, "vc2015");
+    }
+
+    #[test]
+    fn known_deps_have_sentinel_dlls_pointing_to_msvcrt_versions() {
+        let deps = known_deps();
+        // The sentinels are well-known DLLs shipped by each redist —
+        // pointing at the wrong one would break the detection silently.
+        assert_eq!(deps[0].dll, "msvcr110.dll", "VC++ 2012 sentinel");
+        assert_eq!(deps[1].dll, "msvcr120.dll", "VC++ 2013 sentinel");
+        assert_eq!(deps[2].dll, "vcruntime140.dll", "VC++ 2015-2022 sentinel");
+    }
+
+    #[test]
+    fn known_deps_urls_use_microsoft_domains() {
+        let deps = known_deps();
+        for dep in &deps {
+            assert!(
+                dep.url.contains("microsoft.com") || dep.url.contains("aka.ms"),
+                "Redist URL should be on a Microsoft domain (got {}): {}",
+                dep.id,
+                dep.url,
+            );
+        }
+    }
+
+    #[test]
+    fn system32_path_uses_windir_or_default() {
+        // The function reads $WINDIR. We can't reliably stub env vars
+        // in tests without breaking parallel test execution, so just
+        // assert the path ends in "System32" (regardless of WINDIR
+        // value).
+        let path = system32_path();
+        let s = path.to_string_lossy();
+        assert!(
+            s.ends_with("System32"),
+            "Expected System32 suffix, got: {}",
+            s
+        );
+    }
+}
