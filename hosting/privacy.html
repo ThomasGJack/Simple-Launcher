@@ -1,351 +1,414 @@
 <!doctype html>
 <html lang="fr">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="icon" type="image/png" href="/logo.png" />
-    <title>Simple Launcher — Politique de confidentialité</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Audiowide&display=swap"
-      rel="stylesheet"
-    />
-    <style>
-      :root {
-        --bg: #07090d;
-        --bg-soft: #0d1117;
-        --fg: #f5f7fa;
-        --fg-muted: #97a3b6;
-        --fg-dim: #5e6b7e;
-        --accent: #a855f7;
-        --accent-soft: rgba(168, 85, 247, 0.18);
-        --accent-glow: rgba(168, 85, 247, 0.5);
-      }
-      * { box-sizing: border-box; }
-      html, body {
-        margin: 0;
-        padding: 0;
-        background: var(--bg);
-        color: var(--fg);
-        font-family: "Inter", system-ui, sans-serif;
-        min-height: 100vh;
-        line-height: 1.65;
-      }
-      .blob {
-        position: fixed;
-        border-radius: 50%;
-        filter: blur(120px);
-        z-index: 0;
-        pointer-events: none;
-        opacity: 0.18;
-      }
-      .blob-1 { top: -20%; left: -10%; width: 50vw; height: 50vw; background: var(--accent); }
-      .blob-2 { bottom: -30%; right: -15%; width: 60vw; height: 60vw; background: #00d4ff; opacity: 0.1; }
-      header {
-        position: relative;
-        z-index: 1;
-        max-width: 820px;
-        margin: 0 auto;
-        padding: 60px 32px 32px;
-      }
-      header a.back {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        color: var(--fg-muted);
-        text-decoration: none;
-        font-size: 13px;
-        margin-bottom: 32px;
-        transition: color 0.2s;
-      }
-      header a.back:hover { color: var(--fg); }
-      header .badge {
-        display: inline-block;
-        padding: 4px 12px;
-        border-radius: 999px;
-        background: var(--accent-soft);
-        color: var(--accent);
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.25em;
-        margin-bottom: 16px;
-      }
-      h1 {
-        font-family: "Audiowide", sans-serif;
-        font-size: 48px;
-        margin: 0 0 12px;
-        font-weight: 400;
-        line-height: 1.1;
-      }
-      .updated {
-        color: var(--fg-dim);
-        font-size: 13px;
-        margin: 0;
-      }
-      main {
-        position: relative;
-        z-index: 1;
-        max-width: 820px;
-        margin: 0 auto;
-        padding: 16px 32px 80px;
-      }
-      h2 {
-        font-family: "Audiowide", sans-serif;
-        font-size: 22px;
-        margin: 48px 0 12px;
-        font-weight: 400;
-        color: var(--fg);
-      }
-      h2:first-child { margin-top: 0; }
-      h3 {
-        font-size: 16px;
-        margin: 24px 0 8px;
-        color: var(--fg);
-        font-weight: 600;
-      }
-      p, li, td {
-        color: var(--fg-muted);
-        font-size: 15px;
-      }
-      ul { padding-left: 22px; }
-      li { margin-bottom: 6px; }
-      strong { color: var(--fg); font-weight: 600; }
-      a { color: var(--accent); text-decoration: none; }
-      a:hover { text-decoration: underline; }
-      .callout {
-        margin: 20px 0;
-        padding: 16px 20px;
-        border-radius: 12px;
-        background: rgba(255, 255, 255, 0.03);
-        border-left: 3px solid var(--accent);
-        font-size: 14px;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        margin: 16px 0;
-        background: rgba(255, 255, 255, 0.02);
-        border-radius: 8px;
-        overflow: hidden;
-      }
-      th {
-        padding: 12px 14px;
-        text-align: left;
-        background: rgba(255, 255, 255, 0.04);
-        color: var(--fg);
-        font-size: 13px;
-        font-weight: 600;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-      }
-      td {
-        padding: 10px 14px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-        font-size: 14px;
-        vertical-align: top;
-      }
-      tr:last-child td { border-bottom: none; }
-      footer {
-        position: relative;
-        z-index: 1;
-        max-width: 820px;
-        margin: 0 auto;
-        padding: 32px;
-        border-top: 1px solid rgba(255, 255, 255, 0.06);
-        color: var(--fg-dim);
-        font-size: 13px;
-        text-align: center;
-      }
-      footer a { color: var(--fg-muted); margin: 0 8px; }
-    </style>
-  </head>
-  <body>
-    <div class="blob blob-1"></div>
-    <div class="blob blob-2"></div>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#07090d" />
+  <link rel="icon" type="image/png" href="/logo.png" />
+  <title>Confidentialité — Simple Launcher</title>
+  <meta name="description" content="Politique de confidentialité de Simple Launcher : ce qu'on collecte, ce qu'on ne collecte pas, et tes droits RGPD." />
 
-    <header>
-      <a href="/" class="back">← Retour</a>
-      <span class="badge">Vie privée</span>
-      <h1>Politique de confidentialité</h1>
-      <p class="updated">Dernière mise à jour : 30 avril 2026</p>
-    </header>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Audiowide&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
 
-    <main>
-      <p>
-        Cette politique explique <strong>quelles données personnelles</strong> Simple Launcher collecte, <strong>pourquoi</strong>, où elles sont stockées, et quels sont tes droits. Le launcher est conforme au <strong>RGPD (UE 2016/679)</strong>.
-      </p>
-      <div class="callout">
-        <strong>TL;DR</strong> : on collecte le minimum nécessaire pour faire fonctionner le launcher (ton profil Discord, tes statistiques de jeu, tes messages avec d'autres users). Aucune publicité, aucune revente de données, aucun tracker tiers. Tes identifiants Microsoft ne transitent jamais par nous.
+  <style>
+    .doc {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 0 8px;
+    }
+    .doc-head {
+      text-align: center;
+      margin-bottom: 56px;
+    }
+    .doc-head h1 {
+      font-family: var(--font-display);
+      font-size: clamp(36px, 6vw, 56px);
+      margin: 16px 0 8px;
+      text-shadow: 0 0 40px rgba(168, 85, 247, 0.4);
+    }
+    .doc-head .updated {
+      color: var(--fg-dim);
+      font-size: 13px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .doc-body { color: var(--fg-muted); font-size: 15px; line-height: 1.75; }
+    .doc-body p { margin: 16px 0; }
+    .doc-body strong { color: var(--fg-strong); }
+
+    .doc-body h2 {
+      font-family: var(--font-body);
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--fg-strong);
+      margin: 56px 0 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--line);
+      scroll-margin-top: 80px;
+    }
+    .doc-body h2:first-child { margin-top: 0; }
+
+    .doc-body ul {
+      margin: 14px 0;
+      padding-left: 22px;
+    }
+    .doc-body li { margin: 6px 0; }
+    .doc-body a {
+      color: var(--accent);
+      text-decoration: none;
+      border-bottom: 1px dashed color-mix(in srgb, var(--accent) 40%, transparent);
+    }
+    .doc-body a:hover { border-bottom-style: solid; }
+
+    .doc-body table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 18px 0;
+      background: var(--bg-card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      font-size: 13px;
+    }
+    .doc-body table th,
+    .doc-body table td {
+      padding: 12px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    .doc-body table tr:last-child th,
+    .doc-body table tr:last-child td {
+      border-bottom: none;
+    }
+    .doc-body table th {
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--fg-strong);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .callout {
+      margin: 22px 0;
+      padding: 18px 22px;
+      border-radius: var(--radius-sm);
+      background: linear-gradient(135deg, rgba(168, 85, 247, 0.08), rgba(0, 212, 255, 0.04));
+      border: 1px solid color-mix(in srgb, var(--accent-2) 22%, transparent);
+      color: var(--fg-primary);
+      font-size: 14px;
+      line-height: 1.65;
+    }
+    .callout strong:first-child { color: var(--accent-2); }
+
+    .toc {
+      margin: 40px 0 56px;
+      padding: 22px 26px;
+      border-radius: var(--radius);
+      background: var(--bg-card);
+      border: 1px solid var(--line);
+    }
+    .toc h3 {
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--fg-dim);
+      margin-bottom: 12px;
+    }
+    .toc ol {
+      list-style: decimal-leading-zero;
+      padding-left: 32px;
+      columns: 2;
+      column-gap: 24px;
+      font-size: 14px;
+    }
+    @media (max-width: 600px) {
+      .toc ol { columns: 1; }
+    }
+    .toc li { margin: 6px 0; break-inside: avoid; }
+    .toc a { color: var(--fg-muted); text-decoration: none; border: none; }
+    .toc a:hover { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="fx-blobs"></div>
+  <div class="fx-grid"></div>
+
+  <header class="site-header">
+    <div class="container">
+      <nav class="nav">
+        <a href="/" class="nav-brand">
+          <img src="/logo.png" alt="" />
+          <span>SIMPLE LAUNCHER</span>
+        </a>
+        <button class="nav-toggle" aria-label="Menu" onclick="document.getElementById('nav-links').classList.toggle('is-open')">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+        </button>
+        <div class="nav-links" id="nav-links">
+          <a href="/#features">Fonctionnalités</a>
+          <a href="/#how">Comment ça marche</a>
+          <a href="/#tech">Sous le capot</a>
+          <a href="/#faq">FAQ</a>
+          <a href="/changelog.html">Changelog</a>
+          <a class="btn btn-primary nav-cta" href="/download/SimpleLauncher-Setup.exe" download>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Télécharger
+          </a>
+        </div>
+      </nav>
+    </div>
+  </header>
+
+  <section class="section section--hero">
+    <div class="container">
+      <div class="doc">
+        <header class="doc-head">
+          <span class="eyebrow">Vie privée</span>
+          <h1>Politique de confidentialité</h1>
+          <div class="updated">Dernière mise à jour : 30 avril 2026</div>
+        </header>
+
+        <main class="doc-body">
+          <p>
+            Cette politique explique <strong>quelles données personnelles</strong> Simple Launcher collecte,
+            <strong>pourquoi</strong>, où elles sont stockées, et quels sont tes droits. Le launcher est conforme
+            au <strong>RGPD (UE 2016/679)</strong>.
+          </p>
+
+          <div class="callout">
+            <strong>TL;DR</strong> — on collecte le minimum nécessaire pour faire fonctionner le launcher (ton
+            profil Discord, tes statistiques de jeu, tes messages avec d'autres users). Aucune publicité,
+            aucune revente de données, aucun tracker tiers. Tes identifiants Microsoft ne transitent jamais
+            par nous.
+          </div>
+
+          <nav class="toc" aria-label="Sommaire">
+            <h3>Sommaire</h3>
+            <ol>
+              <li><a href="#s1">Responsable du traitement</a></li>
+              <li><a href="#s2">Données collectées</a></li>
+              <li><a href="#s3">Ce qu'on ne collecte pas</a></li>
+              <li><a href="#s4">Authentification Microsoft</a></li>
+              <li><a href="#s5">Stockage des données</a></li>
+              <li><a href="#s6">Durée de conservation</a></li>
+              <li><a href="#s7">Tes droits RGPD</a></li>
+              <li><a href="#s8">Cookies et stockage local</a></li>
+              <li><a href="#s9">Partage des données</a></li>
+              <li><a href="#s10">Sécurité</a></li>
+              <li><a href="#s11">Mineurs</a></li>
+              <li><a href="#s12">Modifications</a></li>
+              <li><a href="#s13">Contact</a></li>
+            </ol>
+          </nav>
+
+          <h2 id="s1">1. Responsable du traitement</h2>
+          <p>
+            Simple Launcher est un projet personnel développé par un particulier en France. Pour toute question
+            concernant tes données, contacte le développeur via le serveur Discord ou via les paramètres du
+            launcher.
+          </p>
+
+          <h2 id="s2">2. Données collectées</h2>
+          <p>Voici la liste exhaustive des données que le launcher stocke :</p>
+          <table>
+            <thead>
+              <tr><th>Donnée</th><th>Source</th><th>Finalité</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>UID Discord</strong></td>
+                <td>OAuth Discord</td>
+                <td>Identifier ton compte de manière unique</td>
+              </tr>
+              <tr>
+                <td><strong>Pseudo</strong> + avatar Discord</td>
+                <td>OAuth Discord</td>
+                <td>Affichage dans la communauté, messages, sessions</td>
+              </tr>
+              <tr>
+                <td><strong>UUID Minecraft</strong> + pseudo MC</td>
+                <td>OAuth Microsoft (si tu connectes un compte MC)</td>
+                <td>Lancer les modules Minecraft avec ton compte</td>
+              </tr>
+              <tr>
+                <td><strong>Statistiques de jeu</strong></td>
+                <td>Mesurées localement</td>
+                <td>Affichage profil + classement amis</td>
+              </tr>
+              <tr>
+                <td><strong>Messages</strong> (DM, clan, sondages)</td>
+                <td>Saisis par toi</td>
+                <td>Communication entre utilisateurs</td>
+              </tr>
+              <tr>
+                <td><strong>Présence</strong> (en ligne, lastSeen)</td>
+                <td>Mesurée par le launcher</td>
+                <td>Surface aux amis (désactivable)</td>
+              </tr>
+              <tr>
+                <td><strong>Logs techniques</strong></td>
+                <td>Générés par le launcher</td>
+                <td>Diagnostic bugs, rétention 7 jours</td>
+              </tr>
+              <tr>
+                <td><strong>Préférences</strong> (thème, RAM, favoris)</td>
+                <td>Saisies par toi</td>
+                <td>Personnalisation</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h2 id="s3">3. Ce que nous NE collectons PAS</h2>
+          <ul>
+            <li><strong>Pas d'email</strong> — OAuth Discord/Microsoft, on ne voit jamais ton email</li>
+            <li><strong>Pas de mot de passe</strong> — l'auth passe par les pages officielles, dans ton navigateur</li>
+            <li><strong>Pas de carte bancaire</strong> — le launcher est gratuit</li>
+            <li><strong>Pas de tracker tiers</strong> — pas de Google Analytics, pas de Facebook Pixel, pas de Sentry</li>
+            <li><strong>Pas de scan de fichiers</strong> — accès uniquement aux dossiers d'instances de jeu créés par le launcher</li>
+            <li><strong>Pas de données biométriques, religieuses, politiques, médicales</strong></li>
+          </ul>
+
+          <h2 id="s4">4. Authentification Microsoft / Minecraft</h2>
+          <p>Quand tu connectes un compte Microsoft pour Minecraft :</p>
+          <ul>
+            <li>La fenêtre de login est <strong>celle de Microsoft</strong>, ouverte dans ton navigateur — pas dans le launcher</li>
+            <li>Microsoft nous renvoie un <strong>jeton d'accès Minecraft</strong> et ton <strong>UUID/pseudo de jeu</strong></li>
+            <li>Le jeton est stocké <strong>localement</strong> dans Windows Credential Manager, jamais sur nos serveurs</li>
+            <li>Tu peux te déconnecter à tout moment depuis les paramètres du launcher → le jeton est supprimé immédiatement</li>
+          </ul>
+
+          <h2 id="s5">5. Où sont stockées tes données</h2>
+          <p>
+            Les données du launcher sont hébergées sur <strong>Firebase (Google Cloud)</strong>, dans la région
+            <strong>europe-west1 (Belgique)</strong>. Cela inclut :
+          </p>
+          <ul>
+            <li><strong>Firestore</strong> : profil, messages, présence, statistiques</li>
+            <li><strong>Firebase Storage</strong> : avatars, bannières, fichiers de logs</li>
+            <li><strong>Firebase Auth</strong> : session de connexion (lié à ton OAuth Discord)</li>
+          </ul>
+          <p>
+            Les jetons Microsoft / Mojang sont <strong>uniquement</strong> stockés sur ta machine locale (coffre-fort
+            OS) — jamais sur Firebase.
+          </p>
+
+          <h2 id="s6">6. Durée de conservation</h2>
+          <table>
+            <tbody>
+              <tr><td><strong>Profil + statistiques</strong></td><td>Conservés tant que ton compte existe</td></tr>
+              <tr><td><strong>Messages privés (DM)</strong></td><td>Conservés tant que la conversation existe</td></tr>
+              <tr><td><strong>Logs techniques</strong></td><td>7 jours, puis suppression automatique</td></tr>
+              <tr><td><strong>Présence (lastSeen)</strong></td><td>Mise à jour en continu, pas d'historique</td></tr>
+              <tr><td><strong>Compte supprimé</strong></td><td>Effacement complet sous 30 jours</td></tr>
+            </tbody>
+          </table>
+
+          <h2 id="s7">7. Tes droits (RGPD)</h2>
+          <p>Tu as le droit de :</p>
+          <ul>
+            <li><strong>Accès</strong> — consulter toutes tes données depuis ton profil dans le launcher</li>
+            <li><strong>Rectification</strong> — modifier ton bio, banner, pseudo, etc. depuis ton profil</li>
+            <li><strong>Effacement</strong> — demander la suppression complète de ton compte</li>
+            <li><strong>Portabilité</strong> — récupérer tes données sous forme de JSON sur demande</li>
+            <li><strong>Opposition</strong> — refuser certains traitements (ex. masquer ta présence aux autres users)</li>
+            <li><strong>Réclamation</strong> — déposer une plainte auprès de la <a href="https://www.cnil.fr" target="_blank" rel="noopener">CNIL</a> en France</li>
+          </ul>
+
+          <h2 id="s8">8. Cookies et stockage local</h2>
+          <p>Le launcher (application Windows) utilise le stockage local pour mémoriser :</p>
+          <ul>
+            <li>Ta session OAuth Discord</li>
+            <li>Tes jetons Microsoft (chiffrés)</li>
+            <li>Tes préférences (thème, RAM Minecraft, favoris)</li>
+          </ul>
+          <p>
+            La page web (simplelaunche.web.app) ne dépose <strong>aucun cookie de tracking</strong>. Seulement
+            les cookies fonctionnels stricts si tu te connectes pour voir ton profil partageable.
+          </p>
+
+          <h2 id="s9">9. Partage des données</h2>
+          <p>
+            Tes données ne sont <strong>jamais vendues</strong>, <strong>jamais louées</strong>,
+            <strong>jamais partagées avec des annonceurs</strong>. Elles sont uniquement visibles par :
+          </p>
+          <ul>
+            <li>Toi-même</li>
+            <li>Les autres utilisateurs du launcher (selon tes réglages de confidentialité)</li>
+            <li>Le développeur du launcher (admin) à des fins de debug et modération</li>
+            <li>Les sous-traitants techniques nécessaires (Google Firebase) sous contrat</li>
+          </ul>
+
+          <h2 id="s10">10. Sécurité</h2>
+          <ul>
+            <li>Communication chiffrée HTTPS / TLS 1.3 avec tous les services tiers</li>
+            <li>Règles d'accès Firestore restrictives — tu ne peux lire/modifier que tes propres données</li>
+            <li>Jetons Microsoft chiffrés via le coffre-fort OS</li>
+            <li>Mises à jour de sécurité régulières via l'auto-updater Tauri</li>
+          </ul>
+
+          <h2 id="s11">11. Mineurs</h2>
+          <p>
+            Le launcher est destiné aux utilisateurs <strong>de 13 ans ou plus</strong> (limite minimale de
+            Discord). Les comptes Microsoft de mineurs nécessitent une autorisation parentale via Microsoft
+            Family Safety pour fonctionner avec Minecraft.
+          </p>
+
+          <h2 id="s12">12. Modifications de cette politique</h2>
+          <p>
+            Cette politique peut être mise à jour. La version en vigueur est toujours celle accessible à
+            <a href="https://simplelaunche.web.app/privacy.html">simplelaunche.web.app/privacy.html</a>.
+            Une notification dans le launcher préviendra des changements majeurs.
+          </p>
+
+          <h2 id="s13">13. Contact</h2>
+          <p>
+            Pour toute question, demande d'accès ou suppression de données, contacte le développeur via le
+            serveur Discord du launcher ou via les paramètres du launcher (« Signaler un problème »).
+          </p>
+        </main>
       </div>
+    </div>
+  </section>
 
-      <h2>1. Responsable du traitement</h2>
-      <p>
-        Simple Launcher est un projet personnel développé par un particulier en France. Pour toute question concernant tes données, contacte le développeur via le serveur Discord ou via les paramètres du launcher.
-      </p>
-
-      <h2>2. Données collectées</h2>
-      <p>Voici la liste exhaustive des données que le launcher stocke :</p>
-
-      <table>
-        <thead>
-          <tr><th>Donnée</th><th>Source</th><th>Finalité</th></tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><strong>UID Discord</strong> (identifiant numérique)</td>
-            <td>OAuth Discord</td>
-            <td>Identifier de manière unique ton compte dans le launcher</td>
-          </tr>
-          <tr>
-            <td><strong>Pseudo Discord</strong> + avatar</td>
-            <td>OAuth Discord</td>
-            <td>Affichage dans la communauté, les messages, les sessions</td>
-          </tr>
-          <tr>
-            <td><strong>UUID Minecraft</strong> + pseudo en jeu</td>
-            <td>OAuth Microsoft (si tu connectes un compte MC)</td>
-            <td>Lancer les modules Minecraft avec ton compte</td>
-          </tr>
-          <tr>
-            <td><strong>Statistiques de jeu</strong> (temps joué, lancements par module)</td>
-            <td>Mesurées localement par le launcher</td>
-            <td>Affichage sur ton profil + classement amis</td>
-          </tr>
-          <tr>
-            <td><strong>Messages</strong> (DM, salons de clan, sondages, sessions)</td>
-            <td>Saisis par toi</td>
-            <td>Communication entre utilisateurs</td>
-          </tr>
-          <tr>
-            <td><strong>Présence</strong> (en ligne / dernière activité / module en cours)</td>
-            <td>Mesurée par le launcher</td>
-            <td>Surface aux amis qui est en ligne (désactivable)</td>
-          </tr>
-          <tr>
-            <td><strong>Logs techniques</strong> (actions, erreurs, navigation)</td>
-            <td>Générés par le launcher</td>
-            <td>Diagnostic des bugs (consultables par l'admin uniquement, rétention 7 jours)</td>
-          </tr>
-          <tr>
-            <td><strong>Préférences personnelles</strong> (thème, RAM Minecraft, favoris)</td>
-            <td>Saisies par toi</td>
-            <td>Personnalisation de ton expérience</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <h2>3. Ce que nous NE collectons PAS</h2>
-      <ul>
-        <li><strong>Pas d'email</strong> — le launcher utilise OAuth Discord/Microsoft, on ne voit jamais ton email</li>
-        <li><strong>Pas de mot de passe</strong> — l'auth passe par les pages officielles Discord/Microsoft, dans ton navigateur</li>
-        <li><strong>Pas de carte bancaire</strong> — le launcher est gratuit, aucun paiement</li>
-        <li><strong>Pas de tracker tiers</strong> — pas de Google Analytics, pas de Facebook Pixel, pas de Sentry</li>
-        <li><strong>Pas de scan de tes fichiers</strong> — le launcher accède uniquement aux dossiers d'instances de jeu qu'il crée lui-même</li>
-        <li><strong>Pas de données biométriques, religieuses, politiques, médicales</strong></li>
-      </ul>
-
-      <h2>4. Authentification Microsoft / Minecraft</h2>
-      <p>
-        Quand tu connectes un compte Microsoft pour Minecraft :
-      </p>
-      <ul>
-        <li>La fenêtre de login est <strong>celle de Microsoft</strong>, ouverte dans ton navigateur — pas dans le launcher</li>
-        <li>Microsoft nous renvoie un <strong>jeton d'accès Minecraft</strong> et ton <strong>UUID/pseudo de jeu</strong></li>
-        <li>Le jeton est stocké <strong>localement</strong> dans le coffre-fort sécurisé de Windows (Credential Manager), <strong>jamais sur nos serveurs</strong></li>
-        <li>Tu peux te déconnecter à tout moment depuis les paramètres du launcher → le jeton est immédiatement supprimé</li>
-      </ul>
-
-      <h2>5. Où sont stockées tes données</h2>
-      <p>
-        Les données du launcher sont hébergées sur <strong>Firebase (Google Cloud)</strong>, dans la région <strong>europe-west1 (Belgique)</strong>. Cela inclut :
-      </p>
-      <ul>
-        <li><strong>Firestore</strong> : profil, messages, présence, statistiques</li>
-        <li><strong>Firebase Storage</strong> : avatars, bannières, fichiers de logs</li>
-        <li><strong>Firebase Auth</strong> : session de connexion (lié à ton OAuth Discord)</li>
-      </ul>
-      <p>
-        Les jetons Microsoft / Mojang sont <strong>uniquement</strong> stockés sur ta machine locale (coffre-fort OS) — jamais sur Firebase.
-      </p>
-
-      <h2>6. Durée de conservation</h2>
-      <table>
-        <tbody>
-          <tr><td><strong>Profil + statistiques</strong></td><td>Conservés tant que ton compte existe</td></tr>
-          <tr><td><strong>Messages privés (DM)</strong></td><td>Conservés tant que la conversation existe (pas d'auto-suppression)</td></tr>
-          <tr><td><strong>Logs techniques</strong></td><td>7 jours, puis suppression automatique</td></tr>
-          <tr><td><strong>Présence (lastSeen)</strong></td><td>Mise à jour en continu, pas d'historique</td></tr>
-          <tr><td><strong>Compte supprimé</strong></td><td>Effacement complet sous 30 jours</td></tr>
-        </tbody>
-      </table>
-
-      <h2>7. Tes droits (RGPD)</h2>
-      <p>Tu as le droit de :</p>
-      <ul>
-        <li><strong>Accès</strong> : consulter toutes tes données depuis ton profil dans le launcher</li>
-        <li><strong>Rectification</strong> : modifier ton bio, banner, pseudo, etc. depuis ton profil</li>
-        <li><strong>Effacement</strong> : demander la suppression complète de ton compte (« Supprimer mon compte » dans les paramètres ou par contact)</li>
-        <li><strong>Portabilité</strong> : récupérer tes données sous forme de JSON sur demande</li>
-        <li><strong>Opposition</strong> : refuser certains traitements (ex. masquer ta présence aux autres users via le réglage « Activité visible »)</li>
-        <li><strong>Réclamation</strong> : déposer une plainte auprès de la <a href="https://www.cnil.fr" target="_blank">CNIL</a> en France</li>
-      </ul>
-
-      <h2>8. Cookies et stockage local</h2>
-      <p>
-        Le launcher (application Windows) utilise le stockage local de Windows pour mémoriser :
-      </p>
-      <ul>
-        <li>Ta session OAuth Discord</li>
-        <li>Tes jetons Microsoft (chiffrés)</li>
-        <li>Tes préférences (thème, RAM Minecraft, favoris)</li>
-      </ul>
-      <p>
-        La page web (simplelaunche.web.app) ne dépose <strong>aucun cookie de tracking</strong>. Seulement les cookies fonctionnels stricts si tu te connectes pour voir ton profil partageable.
-      </p>
-
-      <h2>9. Partage des données</h2>
-      <p>
-        Tes données ne sont <strong>jamais vendues</strong>, <strong>jamais louées</strong>, <strong>jamais partagées avec des annonceurs</strong>. Elles sont uniquement visibles par :
-      </p>
-      <ul>
-        <li>Toi-même</li>
-        <li>Les autres utilisateurs du launcher (selon tes réglages de confidentialité — par ex. ton pseudo et ta présence sont visibles par défaut, désactivables)</li>
-        <li>Le développeur du launcher (admin) à des fins de debug et modération</li>
-        <li>Les sous-traitants techniques nécessaires (Google Firebase) sous contrat de traitement des données</li>
-      </ul>
-
-      <h2>10. Sécurité</h2>
-      <p>
-        Le launcher applique les mesures suivantes :
-      </p>
-      <ul>
-        <li>Communication chiffrée HTTPS / TLS 1.3 avec tous les services tiers</li>
-        <li>Règles d'accès Firestore restrictives — tu ne peux lire/modifier que tes propres données et celles que tu es autorisé à voir</li>
-        <li>Jetons Microsoft chiffrés via le coffre-fort OS</li>
-        <li>Mises à jour de sécurité régulières via l'auto-updater Tauri</li>
-      </ul>
-
-      <h2>11. Mineurs</h2>
-      <p>
-        Le launcher est destiné aux utilisateurs <strong>de 13 ans ou plus</strong> (limite minimale de Discord). Les comptes Microsoft de mineurs nécessitent une autorisation parentale via Microsoft Family Safety pour fonctionner avec Minecraft.
-      </p>
-
-      <h2>12. Modifications de cette politique</h2>
-      <p>
-        Cette politique peut être mise à jour. La version en vigueur est toujours celle accessible à <a href="https://simplelaunche.web.app/privacy.html">simplelaunche.web.app/privacy.html</a>. Une notification dans le launcher préviendra des changements majeurs.
-      </p>
-
-      <h2>13. Contact</h2>
-      <p>
-        Pour toute question, demande d'accès ou suppression de données, contacte le développeur via le serveur Discord du launcher ou via les paramètres du launcher (« Signaler un problème »).
-      </p>
-    </main>
-
-    <footer>
-      <a href="/">Accueil</a> ·
-      <a href="/terms.html">Conditions d'utilisation</a> ·
-      <a href="/privacy.html">Politique de confidentialité</a>
-      <p style="margin-top: 12px;">© 2026 Simple Launcher. Tous droits réservés.</p>
-    </footer>
-  </body>
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="/" class="nav-brand">
+            <img src="/logo.png" alt="" />
+            <span>SIMPLE LAUNCHER</span>
+          </a>
+          <p>Le launcher PC pour ton crew. Construit avec Rust et React. Pas de pub, pas de tracking, pas d'abonnement.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Produit</h4>
+          <ul>
+            <li><a href="/#features">Fonctionnalités</a></li>
+            <li><a href="/#how">Comment ça marche</a></li>
+            <li><a href="/#tech">Sous le capot</a></li>
+            <li><a href="/changelog.html">Changelog</a></li>
+            <li><a href="/download/SimpleLauncher-Setup.exe" download>Télécharger</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Légal</h4>
+          <ul>
+            <li><a href="/privacy.html">Confidentialité</a></li>
+            <li><a href="/terms.html">Conditions</a></li>
+            <li><a href="/#faq">FAQ</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bar">
+        <span>&copy; 2026 Simple Launcher · Privé</span>
+        <span>Construit avec Tauri, Rust, React et beaucoup de café</span>
+      </div>
+    </div>
+  </footer>
+</body>
 </html>

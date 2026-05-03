@@ -19,7 +19,13 @@
 // The script will refuse to release if [Unreleased] is empty.
 
 import { execSync } from "node:child_process";
-import { readFileSync, writeFileSync, copyFileSync, existsSync, mkdirSync } from "node:fs";
+import {
+  readFileSync,
+  writeFileSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+} from "node:fs";
 import { join, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -105,6 +111,28 @@ const manifest = {
   },
 };
 writeFileSync(join(root, "hosting", "launcher", "latest.json"), JSON.stringify(manifest, null, 2) + "\n");
+
+// ── Maintain hosting/launcher/versions.json (cumulative history) ──
+//
+// This file is the source of truth for the public /changelog.html page.
+// Each release prepends a fresh entry here (same shape as latest.json
+// but as an array). If the file doesn't exist yet, we initialize it.
+// If a release with the same version already exists in the array
+// (re-running the release script for whatever reason), we replace it
+// in place rather than duplicating.
+const versionsPath = join(root, "hosting", "launcher", "versions.json");
+let versionsList = [];
+if (existsSync(versionsPath)) {
+  try {
+    const raw = JSON.parse(readFileSync(versionsPath, "utf8"));
+    if (Array.isArray(raw)) versionsList = raw;
+  } catch (err) {
+    console.warn(`Existing versions.json was unparseable, starting fresh: ${err.message}`);
+  }
+}
+const dedupedVersions = versionsList.filter((entry) => entry?.version !== version);
+dedupedVersions.unshift(manifest);
+writeFileSync(versionsPath, JSON.stringify(dedupedVersions, null, 2) + "\n");
 
 console.log("[5/5] Rewriting CHANGELOG.md…");
 writeFileSync(changelogPath, rewrittenChangelog);

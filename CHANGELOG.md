@@ -18,6 +18,18 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.05.03.7] - 2026-05-03  · semver `26.503.6`
+
+
+### Ajouté
+
+- **Refonte complète du site simplelaunche.web.app** ([hosting/](hosting/)) — landing page enrichie avec hero animé, grille de 9 features cards, section "Comment ça marche" en 3 étapes, panneau "Sous le capot" avec terminal stylisé montrant le flow auto-update + runtime-deps, FAQ accordion à 7 entrées, teaser de la dernière release et CTA bandeau bottom. Sticky header navigation responsive avec menu burger mobile. Reveal-on-scroll via IntersectionObserver, hover spotlight sur les cards (radial gradient suit la souris). Footer 3 colonnes (brand / produit / légal). Toutes les pages sources de design tokens depuis `hosting/styles.css` partagé (palette, typographie Audiowide + Inter + JetBrains Mono, composants glass / button / card).
+- **Page changelog publique** ([hosting/changelog.html](hosting/changelog.html)) — historique des versions en timeline verticale avec marqueurs animés (point pulsant pour la latest), notes Markdown rendues côté client (sous-set `### h3`, `**bold**`, `*em*`, `` `code` ``, `[link](url)`, listes `- *`), liens directs vers chaque installer + signature ed25519, fallback gracieux sur `latest.json` si `versions.json` n'existe pas encore.
+- **Manifest cumulatif `versions.json`** ([scripts/release-launcher.mjs](scripts/release-launcher.mjs)) — `release-launcher.mjs` maintient désormais `hosting/launcher/versions.json` (array de toutes les releases avec leur signature, URL, notes et pub_date). Dédup par version au cas où le script tourne deux fois sur la même release. Source de vérité pour `/changelog.html`.
+
+### Changé
+
+- **Restyle de privacy.html et terms.html** ([hosting/privacy.html](hosting/privacy.html) + [hosting/terms.html](hosting/terms.html)) — pages légales reconstruites avec le shared design system (header / footer cohérents, sommaire ancré 2-colonnes, callout TL;DR, sections numérotées avec scroll-margin-top). Contenu inchangé sur le fond, juste habillé.
 ## [v26.05.03.6] - 2026-05-03  · semver `26.503.5`
 
 
