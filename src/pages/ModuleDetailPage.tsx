@@ -679,7 +679,13 @@ function NativeMinecraftActionPanel({
       .then(([accs, installed]) => {
         if (cancelled) return;
         setAccounts(accs);
-        if (accs[0]) setSelectedUuid(accs[0].uuid);
+        // Pick the user's saved default account if still available,
+        // otherwise the first one returned by mcAuthList. Honours the
+        // "Définir par défaut" choice from Settings.
+        import("@/lib/mcAuth").then((m) => {
+          if (cancelled) return;
+          setSelectedUuid(m.pickDefaultUuid(accs));
+        });
         setPhase(installed ? "ready" : "ready-to-install");
       })
       .catch((err) => {

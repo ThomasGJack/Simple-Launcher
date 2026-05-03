@@ -90,6 +90,53 @@ export function isAccountExpiringSoon(account: McAccount): boolean {
   return account.expiresAt - Date.now() < 5 * 60_000;
 }
 
+// ─── Default account (per-machine) ────────────────────────────────────
+//
+// When the user has multiple Microsoft accounts connected (frères &
+// sœurs sharing a PC, alt accounts for testing, etc.) we want to
+// remember which one they prefer so every module page defaults to that
+// uuid instead of "whatever was first in the list" (which is install-order
+// dependent and changes when an account is logged out + re-added).
+//
+// Stored in localStorage so it's per-machine — different PCs of the same
+// user keep their own preferred account, no Firestore round-trip.
+
+const DEFAULT_MC_UUID_KEY = "mc-default-account-uuid";
+
+export function getDefaultMcUuid(): string | null {
+  try {
+    return localStorage.getItem(DEFAULT_MC_UUID_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setDefaultMcUuid(uuid: string | null): void {
+  try {
+    if (uuid === null || uuid.length === 0) {
+      localStorage.removeItem(DEFAULT_MC_UUID_KEY);
+    } else {
+      localStorage.setItem(DEFAULT_MC_UUID_KEY, uuid);
+    }
+    // Notify other components on the same page (the module action panel
+    // listens for this so the picker updates if the default changes
+    // while a module page is open).
+    window.dispatchEvent(new CustomEvent("mc-default-account-change"));
+  } catch {
+    /* localStorage might be disabled — fail silently */
+  }
+}
+
+/** Picks which uuid should be selected by default in the launch picker.
+ *  Returns the user's saved default if it's still in the list, otherwise
+ *  the first account, otherwise an empty string. */
+export function pickDefaultUuid(accounts: McAccount[]): string {
+  if (accounts.length === 0) return "";
+  const saved = getDefaultMcUuid();
+  if (saved && accounts.some((a) => a.uuid === saved)) return saved;
+  return accounts[0].uuid;
+}
+
 /** Mojang returns UUIDs with no dashes (`06bcf2c47a5e4f5fb5f9e3cce8a3b94f`).
  *  Most avatar services accept both forms but the dashed form
  *  (`06bcf2c4-7a5e-4f5f-b5f9-e3cce8a3b94f`) is the canonical one and works

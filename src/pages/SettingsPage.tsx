@@ -18,6 +18,7 @@ import {
   AlertTriangle,
   ShieldCheck,
   Stethoscope,
+  Star,
 } from "lucide-react";
 import { getVersion } from "@tauri-apps/api/app";
 import { useSettingsStore } from "@/store/settings";
@@ -33,6 +34,8 @@ import {
   mcAuthFallbackComplete,
   isAccountExpiringSoon,
   avatarUrls,
+  getDefaultMcUuid,
+  setDefaultMcUuid,
   type McAccount,
 } from "@/lib/mcAuth";
 import { cn } from "@/lib/cn";
@@ -376,6 +379,10 @@ function MinecraftAccountsCard() {
   const [fallbackOpen, setFallbackOpen] = useState(false);
   const [fallbackUrl, setFallbackUrl] = useState("");
   const [fallbackBusy, setFallbackBusy] = useState(false);
+  // Per-machine "default account" preference — used by the module
+  // detail page to pre-select the right uuid when multiple accounts
+  // are connected. Stored in localStorage by `setDefaultMcUuid`.
+  const [defaultUuid, setDefaultUuid] = useState<string | null>(getDefaultMcUuid());
 
   // Tick every 30 s so the "expires in X" chip stays fresh without
   // re-polling Tauri.
@@ -579,6 +586,33 @@ function MinecraftAccountsCard() {
                     </span>
                   </div>
                 </div>
+                <button
+                  type="button"
+                  disabled={busyUuid === acc.uuid}
+                  onClick={() => {
+                    sounds.click();
+                    setDefaultMcUuid(defaultUuid === acc.uuid ? null : acc.uuid);
+                    setDefaultUuid(defaultUuid === acc.uuid ? null : acc.uuid);
+                  }}
+                  title={
+                    defaultUuid === acc.uuid
+                      ? "Compte par défaut — cliquer pour retirer"
+                      : "Définir comme compte par défaut (utilisé pour le prochain launch d'un module)"
+                  }
+                  className={cn(
+                    "grid size-8 place-items-center rounded-lg disabled:opacity-40",
+                    defaultUuid === acc.uuid
+                      ? "bg-amber-400/15 text-amber-300 ring-1 ring-amber-400/30"
+                      : "text-fg-muted hover:bg-white/[0.06] hover:text-fg-primary",
+                  )}
+                >
+                  <Star
+                    className={cn(
+                      "size-3.5",
+                      defaultUuid === acc.uuid && "fill-amber-300",
+                    )}
+                  />
+                </button>
                 <button
                   type="button"
                   disabled={busyUuid === acc.uuid}
