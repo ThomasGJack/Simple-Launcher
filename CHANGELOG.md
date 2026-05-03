@@ -18,6 +18,16 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.05.03.3] - 2026-05-03  · semver `26.503.2`
+
+
+### Ajouté
+
+- **Auto-install des Visual C++ Redistributables au premier lancement Minecraft** ([src-tauri/src/mc_runtime_deps.rs](src-tauri/src/mc_runtime_deps.rs) + [src/pages/ModuleDetailPage.tsx](src/pages/ModuleDetailPage.tsx)) — symptôme avant fix : sur un laptop fresh sans aucun build C++ installé, MC affichait du **bruit coloré aléatoire** au lieu du monde 3D (le HUD restait OK). Cause : LWJGL 3.x + plusieurs libs natives bundle de mods (Distant Horizons, Sodium SIMD, JEMalloc) sont compilés contre **VC++ 2012 / 2013** (sentinels `msvcr110.dll` / `msvcr120.dll`) que Windows Update **ne ship pas** par défaut. Sans ces DLLs, `LoadLibrary` réussit mais les imports unresolvable retournent des function pointers nuls → les appels OpenGL produisent des junks au lieu de crasher proprement. **Fix** : nouveau check au premier launch natif qui probe `C:\Windows\System32` pour les sentinel DLLs (VC++ 2012, 2013, 2015-2022). Si manquant, modal qui DL automatiquement les redistributables officiels Microsoft (URLs aka.ms stables) et les exécute en `/quiet /norestart`. UAC prompt une fois par redist (Windows refuse l'écriture de System32 sans elevation), puis install silencieux. Progress streamé via Tauri events `vcredist-progress` (DL → Install → Done) avec barre de progression Mo. En cas d'échec UAC ou réseau, fallback sur les liens Microsoft cliquables dans la modal pour install manuel.
+
+### Corrigé
+
+- **Form admin module Minecraft : impossible de save un loader nu sans modpack** ([src/pages/AdminPage.tsx](src/pages/AdminPage.tsx)) — la validation du form exigeait toujours un Project ID CurseForge OU un ZIP custom même quand le mode natif était activé avec « Aucun modpack ». Du coup tu ne pouvais pas créer un module « NeoForge nu pour debug » utile pour isoler les bugs de mod. **Fix** : quand `nativeMc === true`, on skip la validation Prism-mode et on check juste `nativeMcVersion` (et `nativeLoaderVersion` si loader ≠ vanilla). Bonus : la save logic ne pousse plus `customZipUrl: ""` ou `curseforgeProjectId: NaN` quand on est en native mode (Firestore rejetait avec "Invalid use of NaN").
 ## [v26.05.03.2] - 2026-05-03  · semver `26.503.1`
 
 

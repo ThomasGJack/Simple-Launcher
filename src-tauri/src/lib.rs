@@ -7,6 +7,7 @@ mod mc_github;
 mod mc_java;
 mod mc_launch;
 mod mc_modrinth;
+mod mc_runtime_deps;
 mod mc_vanilla;
 mod mc_zip;
 mod minecraft;
@@ -104,6 +105,8 @@ pub fn run() {
             mc_modrinth::mc_modrinth_install,
             mc_zip::mc_zip_install,
             mc_zip::mc_zip_read_manifest_url,
+            mc_runtime_deps::mc_runtime_deps_check,
+            mc_runtime_deps::mc_runtime_deps_install,
             mc_github::gh_token_set,
             mc_github::gh_token_status,
             mc_github::gh_token_clear,

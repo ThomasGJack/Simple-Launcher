@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Play, Download, RefreshCw, Trash2, Folder, Loader2, AlertTriangle, Star } from "lucide-react";
+import { ArrowLeft, Play, Download, RefreshCw, Trash2, Folder, Loader2, AlertTriangle, Star, CheckCircle2 } from "lucide-react";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/auth";
 import { useFavoritesStore } from "@/store/favorites";
@@ -852,6 +852,20 @@ function NativeMinecraftActionPanel({
   const [showConsole, setShowConsole] = useState(false);
   const [accounts, setAccounts] = useState<import("@/lib/mcAuth").McAccount[]>([]);
   const [selectedUuid, setSelectedUuid] = useState<string>("");
+  // Runtime deps (Visual C++ redistributables) state. We populate
+  // `missingDeps` before any MC launch. If non-empty, we surface a
+  // modal that DLs+installs them; the launch is paused until the
+  // modal resolves. Without this, a fresh Windows laptop will get
+  // garbage 3D rendering because some mod natives need older VC++
+  // runtimes (2012/2013) that aren't shipped via Windows Update.
+  const [missingDeps, setMissingDeps] = useState<
+    import("@/lib/mcRuntimeDeps").RuntimeDep[] | null
+  >(null);
+  const [depsInstalling, setDepsInstalling] = useState(false);
+  const [depsProgress, setDepsProgress] = useState<
+    import("@/lib/mcRuntimeDeps").RuntimeDepInstallProgress | null
+  >(null);
+  const [depsError, setDepsError] = useState<string | null>(null);
 
   // Boot: load accounts + check whether vanilla is already on disk.
   useEffect(() => {
@@ -964,6 +978,25 @@ function NativeMinecraftActionPanel({
       );
       return;
     }
+    // Runtime deps gate. Before spawning Java, make sure the Windows
+    // VC++ redistributables that LWJGL + various mod natives depend
+    // on are present. Missing redists don't crash MC — they cause
+    // garbage 3D rendering — so this gate is the only protection.
+    try {
+      const { checkRuntimeDeps } = await import("@/lib/mcRuntimeDeps");
+      const missing = await checkRuntimeDeps();
+      if (missing.length > 0) {
+        setMissingDeps(missing);
+        setDepsError(null);
+        setDepsProgress(null);
+        return; // The modal takes over. Launch resumes via the modal's "OK" button.
+      }
+    } catch (err) {
+      // Non-fatal — if the check itself errors, we proceed with
+      // launch. Worst case the user gets the visual bug they were
+      // already about to get without the gate.
+      console.warn("[mc-runtime-deps] check failed, proceeding with launch:", err);
+    }
     setError(null);
     setLogLines([]);
     setShowConsole(true);
@@ -988,6 +1021,34 @@ function NativeMinecraftActionPanel({
       sounds.error();
       setError(err instanceof Error ? err.message : String(err));
       setPhase("error");
+    }
+  };
+
+  /** Triggered by the runtime-deps modal's "Installer" button.
+   *  Streams progress events into `depsProgress`, then on success
+   *  closes the modal + retriggers the launch. On failure (UAC
+   *  refused, network error, etc.), keeps the modal open with an
+   *  error so the user can retry or fall back to manual install. */
+  const handleInstallRuntimeDeps = async () => {
+    setDepsInstalling(true);
+    setDepsError(null);
+    let unsubscribe: undefined | (() => void);
+    try {
+      const { installRuntimeDeps, onRuntimeDepsProgress } = await import(
+        "@/lib/mcRuntimeDeps"
+      );
+      unsubscribe = await onRuntimeDepsProgress((p) => setDepsProgress(p));
+      await installRuntimeDeps();
+      setMissingDeps(null);
+      setDepsProgress(null);
+      // Resume the launch the user originally triggered.
+      void handleLaunch();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setDepsError(msg);
+    } finally {
+      setDepsInstalling(false);
+      unsubscribe?.();
     }
   };
 
@@ -1177,7 +1238,196 @@ function NativeMinecraftActionPanel({
           </div>
         </div>
       )}
+
+      <RuntimeDepsModal
+        missing={missingDeps}
+        installing={depsInstalling}
+        progress={depsProgress}
+        error={depsError}
+        onInstall={handleInstallRuntimeDeps}
+        onCancel={() => {
+          if (!depsInstalling) {
+            setMissingDeps(null);
+            setDepsError(null);
+            setDepsProgress(null);
+          }
+        }}
+      />
     </div>
+  );
+}
+
+/**
+ * One-shot modal that surfaces missing Visual C++ redistributables and
+ * offers to download + install them silently. Shown right before the
+ * first Minecraft launch on machines that don't have all the required
+ * native runtimes (typical for fresh laptops where Windows Update
+ * doesn't ship VC++ 2012 / 2013). Without this, MC renders garbage
+ * 3D output because some mod natives load with unresolvable imports.
+ *
+ * UAC will prompt once per redist when the install kicks off — that's
+ * normal, the redist installers themselves require admin to write
+ * `System32`. Running them from our launcher just inherits whatever
+ * elevation Windows grants per-process.
+ */
+function RuntimeDepsModal({
+  missing,
+  installing,
+  progress,
+  error,
+  onInstall,
+  onCancel,
+}: {
+  missing: import("@/lib/mcRuntimeDeps").RuntimeDep[] | null;
+  installing: boolean;
+  progress: import("@/lib/mcRuntimeDeps").RuntimeDepInstallProgress | null;
+  error: string | null;
+  onInstall: () => void;
+  onCancel: () => void;
+}) {
+  if (!missing) return null;
+  const totalBytesPretty = (n: number) => `${(n / 1_048_576).toFixed(1)} Mo`;
+  const phaseLabel: Record<string, string> = {
+    downloading: "Téléchargement",
+    installing: "Installation (UAC peut s'afficher)",
+    done: "Terminé",
+  };
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[60] grid place-items-center bg-bg-base/80 backdrop-blur-sm p-6"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !installing) onCancel();
+      }}
+    >
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        className="no-drag w-full max-w-2xl rounded-2xl bg-bg-soft p-6 ring-1 ring-amber-400/30 shadow-[0_0_60px_rgba(251,191,36,0.2)]"
+      >
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="size-5 shrink-0 text-amber-300 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <h3 className="font-display text-xl text-fg-primary">
+              Dépendances Microsoft manquantes
+            </h3>
+            <p className="mt-1 text-sm text-fg-muted">
+              Minecraft + ses mods utilisent plusieurs versions du runtime
+              Visual C++ Microsoft. Sans ces DLLs, certaines libs natives se
+              chargent à moitié et MC affiche du bruit coloré au lieu du
+              monde 3D. On va les installer pour toi (~30 Mo total).
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-xl bg-bg-base/40 p-4 ring-1 ring-white/[0.06]">
+          <div className="text-xs uppercase tracking-wider text-fg-muted mb-2">
+            À installer ({missing.length})
+          </div>
+          <ul className="space-y-1.5 text-sm text-fg-primary">
+            {missing.map((d) => (
+              <li key={d.id} className="flex items-center gap-2">
+                <CheckCircle2 className="size-3.5 text-emerald-400 shrink-0" />
+                <span>{d.displayName}</span>
+                <span className="text-fg-dim text-[11px] font-mono">{d.dll}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {installing && progress && (
+          <div className="mt-4 rounded-xl bg-emerald-400/[0.06] p-4 ring-1 ring-emerald-400/20">
+            <div className="flex items-center gap-2 text-sm text-fg-primary">
+              <Loader2 className="size-4 animate-spin text-emerald-300" />
+              <span className="font-medium">
+                {progress.currentLabel || "Préparation…"}
+              </span>
+              <span className="text-fg-dim text-xs ml-auto">
+                {progress.currentIndex} / {progress.total}
+              </span>
+            </div>
+            <div className="mt-2 text-xs text-fg-muted">
+              {phaseLabel[progress.phase] ?? progress.phase}
+              {progress.phase === "downloading" &&
+                progress.bytesTotal > 0 &&
+                ` · ${totalBytesPretty(progress.bytesDownloaded)} / ${totalBytesPretty(progress.bytesTotal)}`}
+            </div>
+            {progress.bytesTotal > 0 && progress.phase === "downloading" && (
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+                <div
+                  className="h-full bg-emerald-400 transition-all"
+                  style={{
+                    width: `${Math.round((progress.bytesDownloaded / progress.bytesTotal) * 100)}%`,
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {error && (
+          <div className="mt-4 rounded-xl bg-danger/10 p-3 text-xs text-danger ring-1 ring-danger/30">
+            <div className="font-medium mb-1">L'installation a échoué :</div>
+            <pre className="whitespace-pre-wrap break-words font-mono">{error}</pre>
+            <div className="mt-2 text-fg-muted">
+              Tu peux installer les redists manuellement en ouvrant chaque URL :
+              <ul className="ml-4 mt-1 list-disc space-y-1">
+                {missing.map((d) => (
+                  <li key={d.id}>
+                    <button
+                      type="button"
+                      onClick={async (e) => {
+                        e.preventDefault();
+                        const { openUrl } = await import("@tauri-apps/plugin-opener");
+                        await openUrl(d.url);
+                      }}
+                      className="text-amber-300 underline hover:text-amber-200"
+                    >
+                      {d.displayName}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={installing}
+            className="rounded-xl px-4 py-2 text-sm text-fg-muted hover:bg-white/[0.04] hover:text-fg-primary disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Plus tard
+          </button>
+          <button
+            type="button"
+            onClick={onInstall}
+            disabled={installing}
+            className={cn(
+              "inline-flex items-center gap-2 rounded-xl px-5 py-2 text-sm font-medium",
+              "bg-amber-400/20 text-amber-300 ring-1 ring-amber-400/40",
+              "hover:bg-amber-400/30",
+              "disabled:opacity-50 disabled:cursor-not-allowed",
+            )}
+          >
+            {installing ? (
+              <>
+                <Loader2 className="size-4 animate-spin" /> Installation en cours…
+              </>
+            ) : (
+              <>
+                <Download className="size-4" /> Installer ({missing.length})
+              </>
+            )}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 

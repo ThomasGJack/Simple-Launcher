@@ -269,7 +269,23 @@ export function AdminPage() {
       if (!form.version || !/^\d+\.\d+\.\d+$/.test(form.version)) return "Version semver requise (ex: 1.0.0)";
       if (!form.executable) return "Nom de l'exécutable requis (ex: MyGame.exe)";
     } else if (form.type === "minecraft") {
-      if (form.mcSource === "curseforge") {
+      // When `nativeMc` is enabled, the legacy Prism-mode source
+      // fields (curseforgeProjectId / customZipUrl) are irrelevant —
+      // the native pipeline drives off `nativeMcVersion` + optional
+      // `nativeModpack`. So skip the legacy validation in that case.
+      // We still require an MC version though.
+      if (form.nativeMc) {
+        if (!form.nativeMcVersion) return "Version Minecraft requise (sélectionne-la dans le picker natif)";
+        if (form.nativeLoader !== "vanilla" && !form.nativeLoaderVersion) {
+          return `Version du loader ${form.nativeLoader} requise (ou choisis « Vanilla »)`;
+        }
+        // Modpack source is optional in native mode — "Aucun" is valid
+        // (= NeoForge/Fabric/Forge sans modpack), tested for users
+        // who veulent juste un loader nu pour debug ou test.
+        if (form.nativeModpackKind !== "none" && !form.nativeModpackUrl) {
+          return "URL du modpack requise (ou bascule sur « Aucun modpack » pour un loader nu)";
+        }
+      } else if (form.mcSource === "curseforge") {
         if (!/^\d+$/.test(form.curseforgeProjectId)) return "Project ID CurseForge invalide (numérique)";
         if (!/^\d+$/.test(form.curseforgeFileId)) return "File ID CurseForge invalide (numérique)";
       } else {
@@ -371,12 +387,19 @@ export function AdminPage() {
           ...(form.shortDescription && { shortDescription: form.shortDescription }),
           ...(form.iconUrl && { iconUrl: form.iconUrl }),
           ...(form.bannerUrl && { bannerUrl: form.bannerUrl }),
-          ...(useManual
-            ? { customZipUrl: form.customZipUrl, customZipSize: form.customZipSize }
-            : {
-                curseforgeProjectId: parseInt(form.curseforgeProjectId, 10),
-                curseforgeFileId: parseInt(form.curseforgeFileId, 10),
-              }),
+          // Legacy Prism-mode source fields are only relevant when
+          // `nativeMc !== true`. In native mode we'd otherwise persist
+          // `customZipUrl: ""` or `curseforgeProjectId: NaN` (since
+          // those text inputs are empty in native mode), which
+          // Firestore rejects ("Invalid use of NaN") and which adds
+          // dead config to the doc. Skip them when native is on.
+          ...(!form.nativeMc &&
+            (useManual
+              ? { customZipUrl: form.customZipUrl, customZipSize: form.customZipSize }
+              : {
+                  curseforgeProjectId: parseInt(form.curseforgeProjectId, 10),
+                  curseforgeFileId: parseInt(form.curseforgeFileId, 10),
+                })),
           ...(form.minecraftVersion && { minecraftVersion: form.minecraftVersion }),
           ...(form.modLoader && { modLoader: form.modLoader }),
           ...(form.maxRamMb >= 512 && { maxRamMb: form.maxRamMb }),
