@@ -268,7 +268,6 @@ function parseLink(link: string): Parameters<ReturnType<typeof useUIStore.getSta
   if (link === "community") return { name: "community" };
   if (link === "settings") return { name: "settings" };
   if (link === "profile") return { name: "profile" };
-  if (link === "sessions") return { name: "sessions" };
   const [head, ...rest] = link.split(":");
   const tail = rest.join(":");
   if (head === "module" && tail) return { name: "module", moduleId: tail };

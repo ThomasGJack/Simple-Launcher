@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Library, Settings, LogIn, Shield, Users, Star, MessageCircle, CalendarDays, Castle, Crown, Bell } from "lucide-react";
+import { Library, Settings, LogIn, Shield, Users, Star, MessageCircle, Castle, Crown, Bell } from "lucide-react";
 import { useUIStore, type Route } from "@/store/ui";
 import { useAuthStore } from "@/store/auth";
 import { useFavoritesStore } from "@/store/favorites";
@@ -142,12 +142,6 @@ export function Sidebar() {
             label="Communauté"
             active={isActive({ name: "community" })}
             onClick={() => navigate({ name: "community" })}
-          />
-          <NavButton
-            icon={CalendarDays}
-            label="Sessions"
-            active={isActive({ name: "sessions" })}
-            onClick={() => navigate({ name: "sessions" })}
           />
           <NavButton
             icon={Castle}

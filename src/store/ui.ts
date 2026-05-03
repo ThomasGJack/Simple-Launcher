@@ -9,7 +9,6 @@ export type Route =
   | { name: "admin" }
   | { name: "admin-builder"; moduleId: string }
   | { name: "community" }
-  | { name: "sessions" }
   | { name: "vip" }
   | { name: "crews"; crewId?: string; channelId?: string }
   | { name: "messages"; conversationId?: string }

@@ -39,9 +39,6 @@ const MessagesPage = lazy(() =>
 const PublicProfilePage = lazy(() =>
   import("@/pages/PublicProfilePage").then((m) => ({ default: m.PublicProfilePage })),
 );
-const SessionsPage = lazy(() =>
-  import("@/pages/SessionsPage").then((m) => ({ default: m.SessionsPage })),
-);
 const CrewsPage = lazy(() =>
   import("@/pages/CrewsPage").then((m) => ({ default: m.CrewsPage })),
 );
@@ -108,8 +105,6 @@ function renderRoute(name: string) {
       return <AdminPageBuilder />;
     case "community":
       return <CommunityPage />;
-    case "sessions":
-      return <SessionsPage />;
     case "crews":
       return <CrewsPage />;
     case "vip":
