@@ -4,6 +4,7 @@ mod discord_rpc;
 mod log_file;
 mod mc_auth;
 mod mc_backup;
+mod mc_crash;
 mod mc_fabric;
 mod mc_forge;
 mod mc_github;
@@ -113,6 +114,7 @@ pub fn run() {
             mc_backup::mc_backup_list,
             mc_backup::mc_backup_delete,
             mc_backup::mc_backup_restore,
+            mc_crash::mc_crash_collect,
             mc_github::gh_token_set,
             mc_github::gh_token_status,
             mc_github::gh_token_clear,

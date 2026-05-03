@@ -21,6 +21,7 @@ import {
   useAchievementsPrimed,
 } from "@/store/firebaseStores";
 import { recordUnlock } from "@/firebase/achievements";
+import { recordNotification } from "@/firebase/notifications";
 import { ACHIEVEMENTS, isUnlocked, type AchievementContext } from "@/lib/achievements";
 import { pushAchievementToast, AchievementUnlockToastHost } from "@/components/achievements/AchievementUnlockToast";
 import { InvitationPopupHost } from "@/components/invitations/InvitationPopup";
@@ -262,6 +263,19 @@ function App() {
             `Achievement record failed (rules?): ${err instanceof Error ? err.message : String(err)}`,
             { source: "App.achievements", metadata: { achievementId: ach.id } },
           );
+        });
+        // Mirror the unlock into the notifications subcollection so it
+        // shows up in the bell panel for later reference (the toast is
+        // ephemeral). Best-effort — failure here doesn't break the
+        // unlock itself.
+        recordNotification(user.uid, {
+          kind: "achievement",
+          title: `Achievement débloqué : ${ach.title}`,
+          description: ach.description,
+          link: "profile",
+          meta: { achievementId: ach.id, tier: ach.tier },
+        }).catch((err) => {
+          console.warn("[notifications] achievement notif failed:", err);
         });
         pushAchievementToast(ach.id);
         logger.action(`Achievement débloqué : ${ach.title}`, {

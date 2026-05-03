@@ -32,6 +32,21 @@ service cloud.firestore {
         allow create, update: if request.auth != null && request.auth.uid == uid;
         allow delete: if false;
       }
+
+      // Per-user notification feed (achievements unlocked, invitations
+      // received, news published, etc.) shown in the bell panel of the
+      // sidebar. Read is owner-only — strictly private. Create is open
+      // to any authed user so the *sender* of a cross-user event (e.g.
+      // someone inviting `uid` to a game) can write the recipient's
+      // notification atomically with the source action. The record is
+      // a small fire-and-forget tombstone — it can't impersonate the
+      // recipient's identity. Update is owner-only (markAsRead).
+      match /notifications/{notifId} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow create: if request.auth != null;
+        allow update: if request.auth != null && request.auth.uid == uid;
+        allow delete: if false;
+      }
     }
 
     // Crews — Discord-like text-only clans. Admin-only writes for crew/
@@ -148,6 +163,20 @@ service cloud.firestore {
       );
       // No deletes — the resolved invitation stays as a tiny audit record.
       allow delete: if false;
+    }
+
+    // Crash reports — written by `sendCrashReport` from the
+    // `CrashReportModal` when the user explicitly clicks "Envoyer à
+    // l'admin" after a non-zero MC exit. Owner can create their own
+    // (uid in body must match auth uid). Admins can read every report
+    // for remote debugging. No update / delete — the report is an
+    // immutable audit record.
+    match /crashReports/{reportId} {
+      allow read: if isAdmin() ||
+        (request.auth != null && resource.data.uid == request.auth.uid);
+      allow create: if request.auth != null &&
+        request.resource.data.uid == request.auth.uid;
+      allow update, delete: if false;
     }
 
     // App telemetry / log entries — explicit admin authorization given by

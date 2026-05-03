@@ -28,6 +28,7 @@ import { watchModules } from "@/firebase/modules";
 import { watchConversationsFor } from "@/firebase/messaging";
 import { watchPlaytime, type PlaytimeEntry } from "@/firebase/playtime";
 import { watchAchievements, type UnlockedAchievement } from "@/firebase/achievements";
+import { watchNotifications, type AppNotification } from "@/firebase/notifications";
 import type { LauncherModule } from "@/types/module";
 import type { Conversation } from "@/types/messaging";
 
@@ -170,3 +171,9 @@ export const useAchievements = achievementsStore.useData;
  *  Used by the achievement-toast logic to avoid re-announcing every
  *  already-unlocked achievement at boot, before Firestore has replied. */
 export const useAchievementsPrimed = achievementsStore.usePrimed;
+
+const notificationsStore = makePerUidStore<AppNotification[]>([], (uid, cb) =>
+  watchNotifications(uid, cb),
+);
+/** All notifications for a specific user, newest first, capped at 50. */
+export const useNotifications = notificationsStore.useData;

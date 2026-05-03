@@ -2,6 +2,19 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Play, Download, RefreshCw, Trash2, Folder, Loader2, AlertTriangle, Star, CheckCircle2, KeyRound, Archive } from "lucide-react";
 import { MinecraftBackupsModal } from "@/components/library/MinecraftBackupsModal";
+import { CrashReportModal } from "@/components/library/CrashReportModal";
+
+/** Parses the "exit" line emitted by `mc_launch.rs` :
+ *    "exit code: Some(0)"      → 0
+ *    "exit code: Some(-1)"     → -1
+ *    "exit code: None"         → null  (treated as crash)
+ *    "wait failed: <error>"    → null  (treated as crash)
+ *  Returns null on unparseable input — caller treats null as non-zero. */
+function parseExitCode(line: string): number | null {
+  const m = /Some\((-?\d+)\)/.exec(line);
+  if (m) return parseInt(m[1], 10);
+  return null;
+}
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/auth";
 import { useFavoritesStore } from "@/store/favorites";
@@ -648,6 +661,11 @@ function NativeMinecraftActionPanel({
   const [logLines, setLogLines] = useState<import("@/lib/mcLaunch").LaunchLogLine[]>([]);
   const [showConsole, setShowConsole] = useState(false);
   const [backupsOpen, setBackupsOpen] = useState(false);
+  // Crash detection : when the launch's exit line carries a non-zero
+  // code, we surface the CrashReportModal automatically. Stored as the
+  // exit line itself so the modal can display the parsed exit code +
+  // a snapshot of the console as it was at crash time.
+  const [crashExit, setCrashExit] = useState<{ code: number | null; consoleAtCrash: string } | null>(null);
   const [accounts, setAccounts] = useState<import("@/lib/mcAuth").McAccount[]>([]);
   const [selectedUuid, setSelectedUuid] = useState<string>("");
   // Runtime deps (Visual C++ redistributables) state. We populate
@@ -709,7 +727,25 @@ function NativeMinecraftActionPanel({
       import("@/lib/mcLaunch").then((m) =>
         m.onMcLaunchLog((line) => {
           if (line.instanceId !== module.id) return;
-          setLogLines((prev) => [...prev, line].slice(-500));
+          setLogLines((prev) => {
+            const next = [...prev, line].slice(-500);
+            if (line.stream === "exit") {
+              // Parse the exit code emitted by Rust ("exit code: Some(0)"
+              // / "exit code: Some(-1)" / "wait failed: …"). Anything
+              // not a clean 0 is treated as a crash and triggers the
+              // CrashReportModal. The console snapshot is captured here
+              // because the panel resets logLines on the next launch.
+              const code = parseExitCode(line.line);
+              if (code !== 0) {
+                const consoleAtCrash = next
+                  .map((l) => `[${l.stream}] ${l.line}`)
+                  .join("\n");
+                setCrashExit({ code, consoleAtCrash });
+                sounds.error();
+              }
+            }
+            return next;
+          });
           if (line.stream === "exit") {
             setPhase("ready");
           }
@@ -1097,6 +1133,18 @@ function NativeMinecraftActionPanel({
         open={backupsOpen}
         onClose={() => setBackupsOpen(false)}
         instanceId={module.id}
+      />
+
+      <CrashReportModal
+        open={crashExit !== null}
+        onClose={() => setCrashExit(null)}
+        module={module}
+        exitCode={crashExit?.code ?? null}
+        lastConsoleLines={crashExit?.consoleAtCrash ?? ""}
+        onReinstall={() => {
+          setCrashExit(null);
+          handleInstall();
+        }}
       />
 
       <RuntimeDepsModal

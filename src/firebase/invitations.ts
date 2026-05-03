@@ -70,6 +70,25 @@ export async function sendGameInvitation(opts: {
     createdAt: serverTimestamp(),
     resolvedAt: null,
   });
+  // Mirror into the recipient's notifications subcollection so it shows
+  // in the bell panel for later (the InvitationPopup is ephemeral —
+  // close it once and the invitation visually disappears even though
+  // it's still pending until accepted/declined).
+  // Best-effort — failure here doesn't break the invitation itself.
+  try {
+    const { recordNotification } = await import("./notifications");
+    await recordNotification(opts.toUid, {
+      kind: "invitation",
+      title: `${opts.fromName} t'invite à jouer`,
+      description: opts.note
+        ? `${opts.moduleName} — ${opts.note}`
+        : opts.moduleName,
+      link: `module:${opts.moduleId}`,
+      meta: { invitationId: ref.id, fromUid: opts.fromUid },
+    });
+  } catch (err) {
+    console.warn("[notifications] invitation notif failed:", err);
+  }
   return ref.id;
 }
 

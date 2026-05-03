@@ -1,15 +1,16 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Library, Settings, LogIn, Shield, Users, Star, MessageCircle, CalendarDays, Castle, Crown } from "lucide-react";
+import { Library, Settings, LogIn, Shield, Users, Star, MessageCircle, CalendarDays, Castle, Crown, Bell } from "lucide-react";
 import { useUIStore, type Route } from "@/store/ui";
 import { useAuthStore } from "@/store/auth";
 import { useFavoritesStore } from "@/store/favorites";
 import { isAdmin } from "@/lib/admin";
 import { sounds } from "@/lib/sounds";
-import { useModules, useConversations } from "@/store/firebaseStores";
+import { useModules, useConversations, useNotifications } from "@/store/firebaseStores";
 import { watchUserShortcuts } from "@/firebase/shortcuts";
 import { unreadCount, otherParticipant, type Conversation } from "@/types/messaging";
 import { notify } from "@/lib/notifications";
+import { NotificationsCenter } from "@/components/notifications/NotificationsCenter";
 import type { LauncherModule } from "@/types/module";
 import { cn } from "@/lib/cn";
 
@@ -20,6 +21,9 @@ export function Sidebar() {
   const hosted = useModules();
   const [shortcuts, setShortcuts] = useState<LauncherModule[]>([]);
   const conversations = useConversations(user?.uid);
+  const notifs = useNotifications(user?.uid);
+  const unreadNotifs = notifs.filter((n) => n.readAtMs === null).length;
+  const [notifsOpen, setNotifsOpen] = useState(false);
   // Tracks the last-seen state of each conversation to detect new arrivals.
   // Map: conversationId → lastMessage.sentAt of the last message we observed.
   // When a new message lands AND it's from someone else AND we're not on the
@@ -185,6 +189,22 @@ export function Sidebar() {
       </div>
 
       <div className="flex flex-col items-center gap-2 pt-3">
+        {/* Bell button → toggles the notifications panel. Shows an unread
+            count badge sourced from the same `useNotifications` subscription
+            as the panel so the badge updates live as new notifs come in
+            and disappears as the user marks them read. */}
+        {user && (
+          <NavButton
+            icon={Bell}
+            label="Notifications"
+            active={notifsOpen}
+            onClick={() => {
+              sounds.click();
+              setNotifsOpen((v) => !v);
+            }}
+            badge={unreadNotifs > 0 ? unreadNotifs : undefined}
+          />
+        )}
         {isAdmin(user) && (
           <NavButton
             icon={Shield}
@@ -219,6 +239,8 @@ export function Sidebar() {
           />
         )}
       </div>
+
+      <NotificationsCenter open={notifsOpen} onClose={() => setNotifsOpen(false)} />
     </aside>
   );
 }
