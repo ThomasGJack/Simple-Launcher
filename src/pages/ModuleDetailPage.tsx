@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Play, Download, RefreshCw, Trash2, Folder, Loader2, AlertTriangle, Star, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Play, Download, RefreshCw, Trash2, Folder, Loader2, AlertTriangle, Star, CheckCircle2, KeyRound } from "lucide-react";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/auth";
 import { useFavoritesStore } from "@/store/favorites";
@@ -639,6 +639,7 @@ function NativeMinecraftActionPanel({
   module: import("@/types/module").MinecraftModule;
   themePrimary?: string;
 }) {
+  const navigate = useUIStore((s) => s.navigate);
   type Phase = "checking" | "ready-to-install" | "installing" | "ready" | "launching" | "running" | "error";
   const [phase, setPhase] = useState<Phase>("checking");
   const [progress, setProgress] = useState<import("@/lib/mcVanilla").InstallProgress | null>(null);
@@ -976,15 +977,50 @@ function NativeMinecraftActionPanel({
         </button>
       </div>
 
-      {/* Account picker — surfaced inline so the user always knows
-          which Microsoft account will own the next launch. */}
-      <div className="flex items-center gap-2 text-xs">
-        <span className="text-fg-muted">Compte :</span>
-        {accounts.length === 0 ? (
-          <span className="text-amber-300">
-            Aucun compte connecté — va dans Paramètres → Comptes Minecraft pour en ajouter un.
-          </span>
-        ) : (
+      {/* Account onboarding (when no MS account is connected yet) ─────
+          Replaces the tiny inline "no account" hint with a proper card.
+          Without a Microsoft account the launcher CAN'T launch MC at
+          all — surface that loudly + give a one-click path to fix it
+          rather than burying the explanation in a small line above the
+          Lancer button (which would just throw a confusing error). */}
+      {accounts.length === 0 ? (
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-400/20 bg-amber-400/[0.04] p-4">
+          <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-amber-400/15 text-amber-300 ring-1 ring-amber-400/30">
+            <KeyRound className="size-5" />
+          </div>
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="text-sm font-medium text-fg-primary">
+              Compte Microsoft requis
+            </div>
+            <div className="text-xs leading-relaxed text-fg-muted">
+              Pour lancer Minecraft tu dois connecter au moins un compte
+              Microsoft (le même que celui que tu utilises pour Minecraft Java
+              Edition). La fenêtre de connexion s'ouvre dans ton navigateur,
+              tes identifiants ne transitent jamais par le launcher.
+            </div>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.click();
+                  navigate({ name: "settings" });
+                }}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-amber-400 px-3.5 py-2 text-xs font-medium text-bg-base shadow-[0_0_18px_rgba(251,191,36,0.35)] transition-shadow hover:shadow-[0_0_24px_rgba(251,191,36,0.5)]"
+              >
+                <KeyRound className="size-3.5" />
+                Connecter mon compte
+              </button>
+              <span className="self-center text-[11px] text-fg-dim">
+                Paramètres → Comptes Minecraft
+              </span>
+            </div>
+          </div>
+        </div>
+      ) : (
+        // Picker quand au moins un compte est connecté — montre lequel
+        // va owner le prochain launch.
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-fg-muted">Compte :</span>
           <select
             value={selectedUuid}
             onChange={(e) => setSelectedUuid(e.target.value)}
@@ -996,8 +1032,8 @@ function NativeMinecraftActionPanel({
               </option>
             ))}
           </select>
-        )}
-      </div>
+        </div>
+      )}
 
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
