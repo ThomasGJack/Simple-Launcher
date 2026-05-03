@@ -18,6 +18,20 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.05.03.5] - 2026-05-03  · semver `26.503.4`
+
+
+### Ajouté
+
+- **Hack `MojangTricksIntelDriversForPerformance` injecté à chaque lancement Minecraft natif** ([src-tauri/src/mc_launch.rs](src-tauri/src/mc_launch.rs)) — string-matching trick utilisé par le launcher officiel Mojang depuis ~2012 et repris par Prism / MultiMC. Les drivers GPU AMD / Intel / NVIDIA-Optimus maintiennent une base interne d'exécutables de jeux connus (`minecraft.exe`, `cyberpunk2077.exe`, `bf4.exe`…) et scannent l'argv du process spawné pour des matches : un hit active le profil **gaming** (perf max + tous les chemins OpenGL corrects + GPU dédié sur hybrid), un miss laisse le driver en profil **"background app"** dégradé. Sur certains AMD iGPU (Vega / RDNA sur Ryzen mobile), ce profil dégradé prend silencieusement des **fast paths buggy dans le chunk renderer** qui produisent des **textures en bouillie sur le monde 3D pendant que le HUD 2D reste intact** (le HUD ne passe pas par ces chemins). Symptôme chassé pendant des heures : monde en bruit coloré uniquement via Simple Launcher, jamais via Prism sur le même portable avec les mêmes mods. Diff de la ligne de commande Prism (`prismlauncher_*.log`) a révélé que **ce flag isolé** est ce que Prism passe et qu'on ne passait pas. **Fix** : `-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump` ajouté en première position des JVM args. Aucun heap dump n'est jamais émis (le path est bidon, le flag est cosmétique du point de vue HotSpot), mais la string `minecraft.exe` apparaît désormais dans l'argv du process → drivers GPU détectent → bascule sur profil gaming → OpenGL fonctionne correctement. Ne pas modifier cette string, c'est le pattern exact contre lequel les heuristiques drivers ont été calibrées depuis des années.
+
+### Changé
+
+- **Locale JVM forcée à `en` au lancement Minecraft natif** ([src-tauri/src/mc_launch.rs](src-tauri/src/mc_launch.rs)) — match avec ce que fait Prism par défaut (`-Duser.language=en`). Évite que certains mods qui parsent leurs propres logs JVM-side cassent sur un host `fr_FR`. MC lit son propre `options.txt` pour la langue in-game, donc l'UI utilisateur reste en français.
+
+### Corrigé
+
+- **Aikar's flags GC retirés du chemin de lancement natif** ([src-tauri/src/mc_launch.rs](src-tauri/src/mc_launch.rs)) — ajoutés à tort dans la v26.05.03.4 sur l'hypothèse (fausse) que Prism les injectait par défaut. La capture de la commande Java réelle de Prism a montré que Prism utilise les heuristiques G1 par défaut sans aucun tuning custom. Retrait pour ne pas introduire de divergence GC qu'on aurait ensuite à debug, et parce que ce n'était de toute façon pas la cause du bug bruit coloré (le vrai fix est le hack Mojang ci-dessus).
 ## [v26.05.03.4] - 2026-05-03  · semver `26.503.3`
 
 

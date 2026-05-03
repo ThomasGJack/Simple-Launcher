@@ -659,14 +659,49 @@ pub async fn launch<R: Runtime>(
 
     // 7. Compose JVM args ─────────────────────────────────────────────
     let mut jvm_args: Vec<String> = Vec::new();
-    // Heap.
+
+    // ── GPU-driver profile trick (CRITICAL on hybrid-GPU laptops) ─────
     //
-    // Default bumped from 2 GiB → 4 GiB. Modern modded MC (Sodium +
-    // Iris + Distant Horizons + ~100 mods) routinely needs 4-6 GiB to
-    // avoid GC thrashing. Symptom of GC starvation on this profile is
-    // the world rendering as garbage / colored noise while the HUD stays
-    // intact (chunks fail to upload to GPU on time). Prism / CurseForge
-    // default to 4 GiB for this reason — match them.
+    // The legendary "MojangTricksIntelDriversForPerformance" hack — a
+    // string-matching trick that the official Mojang launcher has been
+    // shipping since ~2012 and that Prism/MultiMC inherit verbatim.
+    //
+    // Why it exists: AMD, Intel and NVIDIA-Optimus drivers all maintain
+    // an internal database of "known game executables" (`minecraft.exe`,
+    // `cyberpunk2077.exe`, `bf4.exe`, …). When a process spawns, the
+    // driver scans BOTH the executable name AND the process command-line
+    // for matches against this DB. A hit activates the gaming GPU
+    // profile (full perf, all OpenGL features, discrete GPU on hybrid
+    // setups). A miss leaves the driver on the "background app" profile
+    // — which on certain AMD iGPUs (Vega/RDNA on Ryzen mobile) silently
+    // takes BUGGY OpenGL fast-paths in the chunk renderer that produce
+    // garbage texture sampling on world geometry while leaving 2D HUD
+    // rendering intact (HUD doesn't go through those paths).
+    //
+    // Symptom we hunted for hours: world renders as random colored noise
+    // while HUD stays correct, only on Simple Launcher, not on Prism on
+    // the SAME laptop with the SAME mods. Diff-ing Prism's command line
+    // (captured from prismlauncher_*.log) revealed this single flag is
+    // what Prism ships and we don't.
+    //
+    // Mechanism: stuff the literal string `minecraft.exe` into the
+    // command line via `-XX:HeapDumpPath=…minecraft.exe…`. The flag is
+    // a no-op for actual heap-dump behavior (no OOM ever happens here),
+    // but the value lands in argv → driver sees `minecraft.exe` → flips
+    // to gaming profile → OpenGL works correctly.
+    //
+    // Don't change this string. The exact filename is what every GPU
+    // vendor's driver heuristic has been calibrated against for years.
+    jvm_args.push(
+        "-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump"
+            .into(),
+    );
+
+    // ── Heap ──
+    //
+    // Default 4 GiB — modern modded MC (Sodium + Iris + Distant Horizons
+    // + ~100 mods) routinely needs at least this. Module-level
+    // `maxRamMb` overrides when the admin set one.
     let ram = if opts.max_ram_mb >= 512 {
         opts.max_ram_mb
     } else {
@@ -674,29 +709,25 @@ pub async fn launch<R: Runtime>(
     };
     jvm_args.push(format!("-Xmx{}M", ram));
     jvm_args.push(format!("-Xms{}M", (ram / 2).max(512)));
-    // Encoding sanity (MC otherwise corrupts accented characters).
+
+    // ── Locale + encoding sanity ──
+    //
+    // `user.language=en` matches Prism's default and keeps the JVM-level
+    // formatting consistent (some mods log in the JVM locale; an
+    // `fr_FR` host can break their parsers). MC itself reads its own
+    // `options.txt` for in-game language, so this doesn't affect the
+    // user-visible UI.
+    jvm_args.push("-Duser.language=en".into());
+    // UTF-8 is needed otherwise MC corrupts accented characters in
+    // chat / file names on French locales.
     jvm_args.push("-Dfile.encoding=UTF-8".into());
     jvm_args.push("-Djava.net.preferIPv4Stack=true".into());
 
-    // GC tuning. Java 9+ defaults to G1GC, but the heuristics out of the
-    // box are tuned for server workloads, not for the alloc-heavy bursts
-    // that modded MC produces (chunk meshing, particle storms, etc.).
-    // The values below are the well-known "Aikar's flags" subset that
-    // Prism injects by default for modded clients on Java 17+. Without
-    // them, on machines with limited iGPU + RAM, we've seen Distant
-    // Horizons + Iris + Sodium thrash the heap badly enough that GPU
-    // uploads stall, producing the same colored-noise rendering.
-    //
-    // Skipped on legacy Java (< 17) where some flags aren't recognized
-    // and Aikar's profile was originally designed for an older HotSpot.
-    if java.major_version >= 17 {
-        jvm_args.push("-XX:+UnlockExperimentalVMOptions".into());
-        jvm_args.push("-XX:+UseG1GC".into());
-        jvm_args.push("-XX:G1NewSizePercent=20".into());
-        jvm_args.push("-XX:G1ReservePercent=20".into());
-        jvm_args.push("-XX:MaxGCPauseMillis=50".into());
-        jvm_args.push("-XX:G1HeapRegionSize=32M".into());
-    }
+    // NB: previous versions injected "Aikar's flags" (G1NewSizePercent,
+    // G1ReservePercent, MaxGCPauseMillis, G1HeapRegionSize). Captured
+    // a real Prism launch and confirmed Prism does NOT inject these —
+    // it relies on default G1 heuristics. Removed to match Prism so we
+    // don't introduce divergent GC behavior we'd then have to debug.
 
     // Pull in the manifest's JVM args (modern format; legacy versions
     // don't have them and rely on hardcoded sensible defaults).
