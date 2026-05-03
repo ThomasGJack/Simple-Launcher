@@ -24,6 +24,20 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Single-instance guard: if a second `simple-launcher.exe` is
+        // launched (double-click while we're already running in the
+        // tray, or someone clicks the start-menu shortcut twice), the
+        // second process forwards its argv here and exits. We use the
+        // callback to surface the existing main window — show / unminimize
+        // / focus — so the user gets "I clicked launch and it came back"
+        // UX instead of a 2nd ghost window or "nothing happened".
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
