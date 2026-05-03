@@ -18,6 +18,16 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.05.03.6] - 2026-05-03  · semver `26.503.5`
+
+
+### Ajouté
+
+- **Toggle "Mode de lancement" dans la sidebar des modules Minecraft natifs** ([src/components/library/MinecraftLaunchModeToggle.tsx](src/components/library/MinecraftLaunchModeToggle.tsx) + [src/lib/minecraft.ts](src/lib/minecraft.ts) + [src/pages/ModuleDetailPage.tsx](src/pages/ModuleDetailPage.tsx)) — sur les modules où l'admin a coché `nativeMc: true`, l'utilisateur a maintenant un sélecteur **Prism / Natif** par module, persisté localement (localStorage, même pattern que l'override RAM utilisateur). Permet de tester le chemin natif quand on veut, et de retomber sur Prism (compatibilité maximale, fonctionne sur tous les iGPU testés) quand le natif foire. Hook `useLaunchMode(module)` réactif : dispatch d'un CustomEvent `mc-launch-mode-change` au write → l'`MinecraftActionPanel` re-render avec le bon backend instantanément, sans rechargement de page.
+
+### Changé
+
+- **Default temporaire `nativeMc: true` → Prism au runtime** ([src/lib/minecraft.ts](src/lib/minecraft.ts)) — `getEffectiveLaunchMode()` retourne `"prism"` par défaut pour TOUS les modules tant qu'aucun override utilisateur n'est posé, y compris ceux flaggés natifs côté admin. Filet de sécurité tant qu'on n'a pas tracé la régression "rendu en bruit coloré" sur certains iGPU AMD via le chemin natif. Une fois le natif fiable partout, retourner à honorer `module.nativeMc` (commentaire TODO en place dans le code). Aucune perte de données : l'admin garde son réglage en Firestore, c'est juste l'exécution qui passe par Prism par défaut.
 ## [v26.05.03.5] - 2026-05-03  · semver `26.503.4`
 
 

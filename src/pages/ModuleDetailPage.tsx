@@ -26,6 +26,7 @@ import { migrateModulePage } from "@/lib/modulePageMigration";
 import { isModulePageV2 } from "@/types/module";
 import { loadFontFace } from "@/lib/dynamicFont";
 import { MinecraftRamControl } from "@/components/library/MinecraftRamControl";
+import { MinecraftLaunchModeToggle } from "@/components/library/MinecraftLaunchModeToggle";
 import { MinecraftServerCard } from "@/components/library/MinecraftServerCard";
 import { RconConsoleModal } from "@/components/admin/RconConsole";
 import { isAdmin } from "@/lib/admin";
@@ -33,6 +34,7 @@ import {
   deriveMinecraftStatus,
   installModpack,
   launchMinecraft,
+  useLaunchMode,
   type MinecraftStatus,
 } from "@/lib/minecraft";
 import { sounds } from "@/lib/sounds";
@@ -315,6 +317,7 @@ export function ModuleDetailPage() {
               </>
             )}
             {module.type === "minecraft" && <MinecraftRamControl module={module} />}
+            {module.type === "minecraft" && <MinecraftLaunchModeToggle module={module} />}
           </div>
         </div>
 
@@ -622,11 +625,18 @@ function MinecraftActionPanel({
   module: import("@/types/module").MinecraftModule;
   themePrimary?: string;
 }) {
-  // Branch on the native-launch toggle: when on, the in-house chain
-  // takes over and Prism is bypassed entirely. The two implementations
-  // are siblings rather than a conditional inside one component to keep
-  // the React hooks order stable on every render.
-  if (module.nativeMc === true) {
+  // Branch on the EFFECTIVE launch mode (resolved from per-machine
+  // localStorage override → admin default → temporary Prism fallback
+  // for native-flagged modules). The hook makes this reactive : when
+  // the user flips the toggle in the sidebar, this panel re-renders
+  // with the new backend without a page reload.
+  //
+  // The two backend implementations stay as separate components rather
+  // than one conditional render so React's hooks order stays stable
+  // across switches (each backend has its own state machine, useEffects,
+  // event listeners, etc.).
+  const { effective } = useLaunchMode(module);
+  if (effective === "native") {
     return <NativeMinecraftActionPanel module={module} themePrimary={themePrimary} />;
   }
   return <PrismMinecraftActionPanel module={module} themePrimary={themePrimary} />;
