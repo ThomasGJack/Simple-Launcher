@@ -2,6 +2,7 @@ mod diagnostic;
 mod discord_rpc;
 mod log_file;
 mod mc_auth;
+mod mc_backup;
 mod mc_fabric;
 mod mc_forge;
 mod mc_github;
@@ -105,6 +106,10 @@ pub fn run() {
             mc_runtime_deps::mc_runtime_deps_check,
             mc_runtime_deps::mc_runtime_deps_install,
             diagnostic::diagnostic_run,
+            mc_backup::mc_backup_create,
+            mc_backup::mc_backup_list,
+            mc_backup::mc_backup_delete,
+            mc_backup::mc_backup_restore,
             mc_github::gh_token_set,
             mc_github::gh_token_status,
             mc_github::gh_token_clear,

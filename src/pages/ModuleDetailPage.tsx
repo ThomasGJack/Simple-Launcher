@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Play, Download, RefreshCw, Trash2, Folder, Loader2, AlertTriangle, Star, CheckCircle2, KeyRound } from "lucide-react";
+import { ArrowLeft, Play, Download, RefreshCw, Trash2, Folder, Loader2, AlertTriangle, Star, CheckCircle2, KeyRound, Archive } from "lucide-react";
+import { MinecraftBackupsModal } from "@/components/library/MinecraftBackupsModal";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/auth";
 import { useFavoritesStore } from "@/store/favorites";
@@ -646,6 +647,7 @@ function NativeMinecraftActionPanel({
   const [error, setError] = useState<string | null>(null);
   const [logLines, setLogLines] = useState<import("@/lib/mcLaunch").LaunchLogLine[]>([]);
   const [showConsole, setShowConsole] = useState(false);
+  const [backupsOpen, setBackupsOpen] = useState(false);
   const [accounts, setAccounts] = useState<import("@/lib/mcAuth").McAccount[]>([]);
   const [selectedUuid, setSelectedUuid] = useState<string>("");
   // Runtime deps (Visual C++ redistributables) state. We populate
@@ -968,6 +970,20 @@ function NativeMinecraftActionPanel({
             Ouvrir le dossier
           </button>
         )}
+        {(phase === "ready" || phase === "running") && (
+          <button
+            type="button"
+            onClick={() => {
+              sounds.click();
+              setBackupsOpen(true);
+            }}
+            title="Snapshots des saves — auto avant chaque launch, restauration en 1 clic"
+            className="inline-flex items-center gap-1.5 rounded-2xl bg-bg-elevated/40 px-3 py-2 text-xs text-fg-muted ring-1 ring-white/[0.06] hover:bg-bg-elevated/70 hover:text-fg-primary"
+          >
+            <Archive className="size-3.5" />
+            Backups
+          </button>
+        )}
         <button
           type="button"
           onClick={() => setShowConsole((v) => !v)}
@@ -1070,6 +1086,12 @@ function NativeMinecraftActionPanel({
           </div>
         </div>
       )}
+
+      <MinecraftBackupsModal
+        open={backupsOpen}
+        onClose={() => setBackupsOpen(false)}
+        instanceId={module.id}
+      />
 
       <RuntimeDepsModal
         missing={missingDeps}

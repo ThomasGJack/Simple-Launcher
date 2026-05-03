@@ -939,6 +939,44 @@ pub async fn launch<R: Runtime>(
         command.env_remove(var);
     }
 
+    // ── Auto-backup of saves before spawning ────────────────────
+    //
+    // Throttled to once per 24 h (see `mc_backup::pre_launch_backup_if_due`)
+    // and only when saves/ has at least one world. Failures are logged
+    // but never fatal — better an unbacked launch than no launch at all.
+    match crate::mc_backup::pre_launch_backup_if_due(&app, &opts.instance_id).await {
+        Ok(Some(b)) => {
+            let mb = (b.size_bytes as f64) / 1_048_576.0;
+            eprintln!(
+                "[mc-launch] auto-backup created: {}.zip ({:.1} MB)",
+                b.id, mb
+            );
+            emit(
+                &app,
+                &LaunchLogLine {
+                    instance_id: opts.instance_id.clone(),
+                    stream: "info".into(),
+                    line: format!(
+                        "Backup auto des saves créé ({:.1} Mo) — restauration possible depuis l'UI.",
+                        mb
+                    ),
+                },
+            );
+        }
+        Ok(None) => { /* not due, or saves/ empty — silent */ }
+        Err(err) => {
+            eprintln!("[mc-launch] auto-backup failed (non-fatal): {}", err);
+            emit(
+                &app,
+                &LaunchLogLine {
+                    instance_id: opts.instance_id.clone(),
+                    stream: "info".into(),
+                    line: format!("Backup auto échoué (lancement continue) : {}", err),
+                },
+            );
+        }
+    }
+
     let mut child = command
         .spawn()
         .map_err(|e| format!("Spawn javaw échoué : {}", e))?;
