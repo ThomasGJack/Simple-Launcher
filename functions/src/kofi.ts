@@ -40,10 +40,12 @@
  * 2. Le launcher copie son UID Firebase dans le presse-papier et ouvre
  *    Ko-fi dans le navigateur système.
  * 3. Le user choisit la membership Ko-fi correspondante et colle son
- *    UID dans le champ "Message" pendant le checkout (étape critique
- *    documentée dans la modal).
+ *    UID dans le champ "Your display name" pendant le checkout (les
+ *    memberships Ko-fi n'exposent pas de champ Message — celui-ci
+ *    n'est dispo que pour les donations one-shot).
  * 4. Ko-fi traite le paiement, puis appelle ce webhook.
- * 5. On parse le message → on retrouve l'UID → on grant le tier.
+ * 5. On parse from_name (et message en fallback) → on retrouve l'UID
+ *    → on grant le tier.
  *
  * ─────────────────────────────────────────────────────────────────
  * 3. ANNULATION / EXPIRATION
@@ -110,17 +112,26 @@ function tierFromKofiName(name: string | null): SupporterTier | null {
 }
 
 /**
- * Extract a Firebase UID from the free-form Ko-fi message. We expect
- * the user to paste their UID (Discord-style "discord_<digits>") into
- * the message field during checkout. The regex is lenient — it'll
- * match the UID even surrounded by other text.
+ * Extract a Firebase UID from the Ko-fi payload. Memberships hide
+ * the "Message" field during checkout, so users paste their UID into
+ * "Your display name" instead — that maps to `from_name` in the
+ * webhook. We check both fields so the system works regardless of
+ * which Ko-fi product the user picks (donation vs membership) or
+ * which Ko-fi UI variant they see.
+ *
+ * Discord auth IDs follow the pattern "discord_<digits>". Other auth
+ * providers might use different patterns later — extend the regex
+ * here.
  */
-function extractUserUid(message: string | null): string | null {
-  if (!message) return null;
-  // Discord auth IDs follow the pattern "discord_<digits>". Other auth
-  // providers might use different patterns later — extend here.
-  const m = message.match(/discord_\d+/);
-  return m ? m[0] : null;
+function extractUserUid(payload: KofiPayload): string | null {
+  const sources = [payload.from_name, payload.message].filter(
+    (s): s is string => typeof s === "string" && s.length > 0,
+  );
+  for (const source of sources) {
+    const m = source.match(/discord_\d+/);
+    if (m) return m[0];
+  }
+  return null;
 }
 
 // ─── Webhook ────────────────────────────────────────────────────────
@@ -200,11 +211,11 @@ export const kofiWebhook = onRequest(
       return;
     }
 
-    const uid = extractUserUid(payload.message);
+    const uid = extractUserUid(payload);
     if (!uid) {
-      logger.warn("kofi: no UID in message", {
+      logger.warn("kofi: no UID in display name or message", {
+        from_name: payload.from_name?.slice(0, 60),
         message: payload.message?.slice(0, 100),
-        from: payload.from_name,
         email: payload.email,
       });
       // Acknowledge so Ko-fi doesn't retry, but flag it so we can

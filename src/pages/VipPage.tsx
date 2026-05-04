@@ -818,9 +818,9 @@ function KofiSubscribeModal({
           <Step n={3}>
             Pendant le paiement, <strong>colle ton code</strong> dans le champ
             <span className="mx-1 rounded bg-bg-base/80 px-1.5 py-0.5 font-mono text-[11px]">
-              Message
+              Your display name
             </span>
-            (Ctrl+V).
+            (Ctrl+V). C'est ce qui permet de matcher le paiement à ton compte.
           </Step>
           <Step n={4}>
             Ton tier <strong>{tier.name}</strong> sera activé automatiquement
