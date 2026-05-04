@@ -23,6 +23,7 @@ import {
   ExternalLink,
   GitBranch,
   HelpCircle,
+  Users,
 } from "lucide-react";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/auth";
@@ -30,6 +31,7 @@ import { NewsManager } from "@/components/admin/NewsManager";
 import { CrewsManager } from "@/components/admin/CrewsManager";
 import { LogsManager } from "@/components/admin/LogsManager";
 import { AdminStatsPanel } from "@/components/admin/AdminStatsPanel";
+import { UsersManager } from "@/components/admin/UsersManager";
 import { isAdmin } from "@/lib/admin";
 import {
   deleteHostedZip,
@@ -129,7 +131,7 @@ const EMPTY_FORM: FormState = {
 
 export function AdminPage() {
   const user = useAuthStore((s) => s.user);
-  const [activeTab, setActiveTab] = useState<"modules" | "news" | "crews" | "logs" | "stats">("modules");
+  const [activeTab, setActiveTab] = useState<"modules" | "news" | "crews" | "users" | "logs" | "stats">("modules");
   const modules = useModules();
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [file, setFile] = useState<File | null>(null);
@@ -524,6 +526,14 @@ export function AdminPage() {
       description: "Mini-Discord textuel. Crée des clans et leurs salons.",
     },
     {
+      id: "users" as const,
+      label: "Utilisateurs",
+      icon: Users,
+      title: "Utilisateurs & tiers",
+      description:
+        "Liste de tous les launchers connectés. Attribue ou retire manuellement les tiers Soutien / VIP / Légende — utile en attendant l'intégration des paiements.",
+    },
+    {
       id: "logs" as const,
       label: "Logs",
       icon: TerminalSquare,
@@ -613,6 +623,17 @@ export function AdminPage() {
           transition={{ duration: 0.35 }}
         >
           <CrewsManager />
+        </motion.div>
+      )}
+
+      {activeTab === "users" && (
+        <motion.div
+          key="tab-users"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+        >
+          <UsersManager />
         </motion.div>
       )}
 

@@ -13,7 +13,13 @@ service cloud.firestore {
     // Sensitive sub-collections below stay locked down.
     match /users/{uid} {
       allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == uid;
+      // Owner can write their own profile. Admin can write any user
+      // doc — used by the UsersManager admin panel to grant supporter
+      // tiers manually (until Stripe is wired up). Could be tightened
+      // to a single field write but the admin panel is fully trusted
+      // and the surface is small.
+      allow write: if (request.auth != null && request.auth.uid == uid)
+        || isAdmin();
 
       // Playtime per module — private to the owner
       match /playtime/{moduleId} {
