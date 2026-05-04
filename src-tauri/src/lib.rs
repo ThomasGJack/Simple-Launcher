@@ -16,6 +16,7 @@ mod mc_vanilla;
 mod mc_zip;
 mod modules;
 mod oauth;
+mod overlay;
 mod rcon;
 mod tray;
 
@@ -47,17 +48,28 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
+        // Global hotkey plugin — drives the in-game overlay toggle
+        // (default Ctrl+Shift+O). The actual binding is created
+        // lazily from the frontend on app boot via
+        // `overlay_register_hotkey` once the saved preference is
+        // loaded from localStorage.
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(modules::LaunchTracker::new())
         .manage(discord_rpc::DiscordRpc::new())
         .manage(rcon::RconRegistry::new())
         .manage(log_file::LogFileState::new())
         .manage(mc_auth::McAuthState::new())
+        .manage(overlay::OverlayState::new())
         .on_window_event(|window, event| {
             // Intercept the main-window close request: instead of exiting
             // the app, hide the window and let the tray icon stay alive.
             // The user explicitly quits from the tray menu when they want
             // to fully close. This matches Discord/Steam UX.
-            if window.label() == "main" {
+            //
+            // Same logic for the overlay window — we want hiding (so the
+            // global hotkey can re-show it later) instead of destroying
+            // the webview each time the user dismisses it.
+            if window.label() == "main" || window.label() == "overlay" {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                     let _ = window.hide();
                     api.prevent_close();
@@ -139,6 +151,11 @@ pub fn run() {
             mc_github::gh_list_repos,
             mc_github::gh_upload_modpack,
             mc_launch::mc_native_launch,
+            overlay::overlay_register_hotkey,
+            overlay::overlay_unregister_hotkey,
+            overlay::overlay_toggle,
+            overlay::overlay_show,
+            overlay::overlay_hide,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

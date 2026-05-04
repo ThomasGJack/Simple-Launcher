@@ -34,6 +34,14 @@ export default defineConfig(async () => ({
     // each lazy page pull only the icons it actually uses, and the eager
     // bundle drops to just the icons used in Sidebar / TitleBar / root.
     rollupOptions: {
+      // Multi-page : `index.html` for the main launcher window, and
+      // `overlay.html` for the in-game transparent overlay window.
+      // Both share the same `src/` codebase so common code is hoisted
+      // into shared chunks automatically.
+      input: {
+        main: path.resolve(__dirname, "index.html"),
+        overlay: path.resolve(__dirname, "overlay.html"),
+      },
       output: {
         manualChunks(id) {
           // Match `…/lucide-react/dist/esm/icons/{name}.mjs` (forward or

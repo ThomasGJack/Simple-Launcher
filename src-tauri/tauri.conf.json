@@ -26,6 +26,25 @@
         "fullscreen": false,
         "alwaysOnTop": false,
         "visible": true
+      },
+      {
+        "label": "overlay",
+        "title": "Simple Launcher Overlay",
+        "url": "/overlay.html",
+        "width": 420,
+        "height": 600,
+        "minWidth": 360,
+        "minHeight": 480,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "center": true,
+        "resizable": true,
+        "fullscreen": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "focus": false
       }
     ],
     "security": {

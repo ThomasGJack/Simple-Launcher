@@ -52,4 +52,10 @@ dirs = "5"
 # (helps users self-debug "le launcher marche pas" issues by surfacing
 # OS version, free RAM, free disk space, etc.).
 sysinfo = "0.32"
+# In-game overlay : binds a global hotkey (default Ctrl+Shift+O) that
+# toggles a transparent always-on-top window over any running game in
+# borderless/windowed mode. The shortcut is registered OS-wide via
+# `RegisterHotKey` on Windows so it triggers even when the game has
+# focus. See `overlay.rs`.
+tauri-plugin-global-shortcut = "2"
 
