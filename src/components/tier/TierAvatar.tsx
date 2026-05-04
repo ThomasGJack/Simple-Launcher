@@ -5,9 +5,12 @@ import { TIER_LABEL } from "@/lib/supporterTier";
 import { cn } from "@/lib/cn";
 
 /**
- * Avatar wrapper that adds a tier-specific decorative frame around any
- * avatar image. Three flavours, each progressively more elaborate :
+ * Avatar wrapper that adds a decorative animated frame around any
+ * avatar image. Four flavours, each progressively more elaborate :
  *
+ *  - **Default** (no tier) : a subtle cyan/indigo rotating shimmer
+ *    ring with a soft breathing aura. Cheap enough to apply to every
+ *    avatar in dense lists — adds life without being distracting.
  *  - **Soutien** : a clean bronze ring with a small heart corner badge.
  *    Static — just shows "this user is a supporter".
  *  - **VIP** : an animated cyan→violet rotating gradient ring with a
@@ -17,9 +20,6 @@ import { cn } from "@/lib/cn";
  *    floating sparkle particles orbiting the avatar, gold+orange
  *    shimmering border, scaled-up crown badge with rainbow text. Tells
  *    everyone this user is a top-tier supporter.
- *
- * No tier (`tier === null`) renders just the avatar with a plain ring,
- * matching the existing avatar style across the launcher.
  *
  * Usage :
  *
@@ -59,9 +59,6 @@ export function TierAvatar({
     <div
       className={cn(
         "relative grid place-items-center overflow-hidden rounded-full",
-        // The plain (no-tier) ring lives here. The tier frames below
-        // visually replace it with their own animated rings.
-        !hasTier && "ring-1 ring-white/10",
         fallbackTone === "fuchsia" && "bg-fuchsia-500/15 text-fuchsia-300",
         fallbackTone === "emerald" && "bg-emerald-500/15 text-emerald-300",
         fallbackTone === "amber" && "bg-amber-500/15 text-amber-300",
@@ -88,16 +85,13 @@ export function TierAvatar({
     </div>
   );
 
-  if (!hasTier) {
-    return <div className={className}>{avatar}</div>;
-  }
-
   return (
     <div
       className={cn("relative", className)}
       style={{ width: dims.frame, height: dims.frame }}
-      title={`Supporter — ${TIER_LABEL[tier]}`}
+      title={hasTier ? `Supporter — ${TIER_LABEL[tier]}` : undefined}
     >
+      {!hasTier && <DefaultFrame size={dims} />}
       {tier === "supporter" && <SupporterFrame size={dims} />}
       {tier === "vip" && <VipFrame size={dims} />}
       {tier === "legend" && <LegendFrame size={dims} />}
@@ -112,7 +106,7 @@ export function TierAvatar({
       </div>
 
       {/* Tier badge in the bottom-right corner */}
-      <TierBadge tier={tier} sizePx={dims.badge} />
+      {hasTier && <TierBadge tier={tier} sizePx={dims.badge} />}
     </div>
   );
 }
@@ -128,6 +122,45 @@ const SIZE_PX = {
 type Dims = (typeof SIZE_PX)[keyof typeof SIZE_PX];
 
 // ─── Frames ───────────────────────────────────────────────────────────
+
+/** Default — subtle cyan→indigo shimmer ring with a soft breathing
+ *  aura. Two GPU-cheap layers (rotation 14s + glow pulse 3.4s) so it
+ *  reads as "alive" without competing with the tier frames. Applied
+ *  to every non-tier avatar across the launcher. */
+function DefaultFrame({ size }: { size: Dims }) {
+  void size;
+  return (
+    <>
+      {/* Soft breathing aura — barely visible but adds life */}
+      <motion.div
+        aria-hidden
+        className="absolute -inset-0.5 rounded-full blur-md"
+        style={{
+          background:
+            "radial-gradient(circle, rgba(0,212,255,0.35) 0%, rgba(129,140,248,0.18) 50%, transparent 75%)",
+        }}
+        animate={{ opacity: [0.3, 0.7, 0.3], scale: [0.94, 1.05, 0.94] }}
+        transition={{ duration: 3.4, repeat: Infinity, ease: "easeInOut" }}
+      />
+      {/* Slow rotating shimmer ring with two accent highlights */}
+      <motion.div
+        aria-hidden
+        className="absolute inset-0 rounded-full"
+        style={{
+          background:
+            "conic-gradient(from 0deg, rgba(255,255,255,0.04), rgba(0,212,255,0.7) 22%, rgba(255,255,255,0.04) 50%, rgba(255,255,255,0.04) 72%, rgba(129,140,248,0.55) 95%, rgba(255,255,255,0.04))",
+          WebkitMask:
+            "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
+          WebkitMaskComposite: "xor",
+          maskComposite: "exclude",
+          padding: 1.5,
+        }}
+        animate={{ rotate: 360 }}
+        transition={{ duration: 14, repeat: Infinity, ease: "linear" }}
+      />
+    </>
+  );
+}
 
 /** Tier 1 — Soutien : static bronze ring + warm shadow. */
 function SupporterFrame({ size }: { size: Dims }) {
