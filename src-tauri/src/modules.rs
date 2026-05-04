@@ -72,6 +72,13 @@ struct LaunchEvent<'a> {
     module_name: &'a str,
     #[serde(rename = "startedAt")]
     started_at: u128,
+    /// PID of the spawned process. The frontend uses this to auto-
+    /// force the game window into borderless mode (Option B) a few
+    /// seconds after launch when the user has the auto-borderless
+    /// setting on. Optional because legacy Tauri `Child::id()` could
+    /// theoretically return None on some niche backends, but in
+    /// practice it's always set.
+    pid: Option<u32>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -282,6 +289,9 @@ async fn spawn_tracked(
         .map_err(|e| format!("spawn: {}", e))?;
 
     let started_at = now_ms();
+    // Capture the PID before `child` moves into the wait-task below.
+    // Used by the frontend auto-borderless hook (see lib/overlay.ts).
+    let child_pid = child.id();
 
     {
         let mut running = tracker.inner.running.lock().await;
@@ -293,6 +303,7 @@ async fn spawn_tracked(
             module_id,
             module_name,
             started_at,
+            pid: child_pid,
         },
     );
     discord.arc().set_playing(module_name).await;

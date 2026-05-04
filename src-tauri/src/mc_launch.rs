@@ -47,6 +47,9 @@ struct ModuleLaunchEvent<'a> {
     module_name: &'a str,
     #[serde(rename = "startedAt")]
     started_at: u128,
+    /// PID of the spawned Java process. The frontend uses this to
+    /// auto-force the game window into borderless mode after launch.
+    pid: Option<u32>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -980,6 +983,10 @@ pub async fn launch<R: Runtime>(
     let mut child = command
         .spawn()
         .map_err(|e| format!("Spawn javaw échoué : {}", e))?;
+    // Capture the PID before `child` moves into the wait-task below
+    // — used by the frontend auto-borderless hook to find the
+    // Minecraft window once it appears.
+    let child_pid = child.id();
 
     // ── Cross-launch tracking ─────────────────────────────────────
     //
@@ -1006,6 +1013,7 @@ pub async fn launch<R: Runtime>(
             module_id: &opts.instance_id,
             module_name: &module_name,
             started_at,
+            pid: child_pid,
         },
     );
     discord.arc().set_playing(&module_name).await;

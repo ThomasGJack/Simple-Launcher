@@ -40,6 +40,7 @@ import { achievementFlags } from "@/lib/achievementFlags";
 import { buildAchievementContext } from "@/lib/achievementContext";
 import { watchUserShortcuts } from "@/firebase/shortcuts";
 import { useLaunchDays } from "@/store/firebaseStores";
+import { forceBorderlessByPid, getAutoBorderless } from "@/lib/overlay";
 import {
   pushAchievementToast,
   pushMilestoneToast,
@@ -294,13 +295,32 @@ function App() {
     }, 30_000);
 
     const launchPromise = listen<ModuleLaunchEvent>("module-launched", (event) => {
-      const { moduleId, moduleName, startedAt } = event.payload;
+      const { moduleId, moduleName, startedAt, pid } = event.payload;
       currentActivityRef.current = { moduleId, moduleName, startedAt };
       pushHeartbeat(uid, currentActivityRef.current).catch(() => {});
       logger.action("Module launched", {
         source: "App.module-launched",
-        metadata: { moduleId, moduleName },
+        metadata: { moduleId, moduleName, pid: pid ?? null },
       });
+      // Auto-borderless hook (Option B). Wait ~3 s for the game's
+      // main window to appear, then strip its fullscreen-y window
+      // styles so the overlay can paint on top. We try twice with
+      // a 2 s gap because some games (Minecraft) take a moment to
+      // create the actual GLFW window after the JVM boot.
+      if (pid != null && getAutoBorderless()) {
+        const tryForce = (attempt: number) => {
+          forceBorderlessByPid(pid).catch((err) => {
+            console.warn(
+              `[overlay] auto-borderless attempt ${attempt} failed:`,
+              err,
+            );
+            // First try might fail because the window isn't up
+            // yet — retry once after another delay.
+            if (attempt === 1) setTimeout(() => tryForce(2), 2500);
+          });
+        };
+        setTimeout(() => tryForce(1), 3000);
+      }
     });
     const exitPromise = listen<ModuleExitEvent>("module-exited", (event) => {
       currentActivityRef.current = null;
