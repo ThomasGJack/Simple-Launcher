@@ -1,0 +1,663 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Simple Launcher — démo sons</title>
+    <style>
+      :root {
+        --bg: #07090d;
+        --bg-soft: #0d1117;
+        --bg-elev: #141a23;
+        --fg: #f5f7fa;
+        --muted: #97a3b6;
+        --dim: #5c6878;
+        --accent: #00d4ff;
+        --border: rgba(255, 255, 255, 0.06);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 32px 48px 64px;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+        min-height: 100vh;
+      }
+      h1 {
+        font-size: 32px;
+        margin: 0 0 8px;
+        font-weight: 700;
+      }
+      .lead {
+        color: var(--muted);
+        margin-bottom: 32px;
+        max-width: 800px;
+        line-height: 1.55;
+      }
+      .styles {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+        gap: 20px;
+      }
+      .card {
+        background: linear-gradient(180deg, var(--bg-soft) 0%, var(--bg-elev) 100%);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .card h2 {
+        margin: 0;
+        font-size: 22px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .card .emoji {
+        font-size: 26px;
+      }
+      .card p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .specs {
+        font-size: 11px;
+        color: var(--dim);
+        line-height: 1.6;
+        padding: 10px 12px;
+        background: rgba(255, 255, 255, 0.02);
+        border-radius: 10px;
+        border-left: 2px solid var(--accent);
+      }
+      .specs strong { color: var(--muted); }
+      .buttons {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+      }
+      .buttons.three {
+        grid-template-columns: repeat(3, 1fr);
+      }
+      button {
+        font-family: inherit;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 10px 14px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--fg);
+        cursor: pointer;
+        transition: all 120ms ease;
+      }
+      button:hover {
+        background: rgba(0, 212, 255, 0.08);
+        border-color: rgba(0, 212, 255, 0.3);
+        color: var(--accent);
+        transform: translateY(-1px);
+      }
+      button:active {
+        transform: translateY(0);
+      }
+      .pick {
+        margin-top: 8px;
+        background: linear-gradient(135deg, var(--accent), #a78bfa);
+        color: #07090d;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        border: none;
+        padding: 12px;
+        font-size: 11px;
+      }
+      .pick:hover {
+        background: linear-gradient(135deg, #00e8ff, #b89dff);
+        color: #07090d;
+        transform: translateY(-1px);
+        box-shadow: 0 0 24px rgba(0, 212, 255, 0.4);
+      }
+      .toolbar {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 24px;
+      }
+      .toolbar button {
+        padding: 8px 14px;
+      }
+      .pinned {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        background: var(--bg-elev);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 14px 18px;
+        font-size: 13px;
+        max-width: 320px;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+        opacity: 0;
+        transform: translateY(20px);
+        pointer-events: none;
+        transition: all 240ms ease;
+      }
+      .pinned.show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .pinned strong {
+        color: var(--accent);
+      }
+      .pinned .label {
+        color: var(--dim);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.15em;
+        margin-bottom: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🎵 Démo des 5 styles de sons</h1>
+    <p class="lead">
+      Clique sur les boutons pour écouter chaque son de chaque style. Quand tu as
+      ton préféré, clique sur le bouton "Choisir ce style" en bas de sa card,
+      copie le nom et envoie-le-moi dans le chat. Je décline ensuite TOUS les
+      sons du launcher (14 au total) dans ce style.
+    </p>
+
+    <div class="toolbar">
+      <button onclick="playAll('crystal')">▶ Tout écouter — Crystal</button>
+      <button onclick="playAll('retro')">▶ Tout écouter — Retro</button>
+      <button onclick="playAll('cyber')">▶ Tout écouter — Cyber</button>
+      <button onclick="playAll('lofi')">▶ Tout écouter — Lofi</button>
+      <button onclick="playAll('rpg')">▶ Tout écouter — RPG</button>
+    </div>
+
+    <div class="styles">
+      <!-- Style 1 — Crystal Glass -->
+      <div class="card">
+        <h2><span class="emoji">💎</span> Crystal Glass</h2>
+        <p>Premium, éthéré, comme tapper du cristal. Sine + triangle avec
+        shimmer haute fréquence. Inspiration iOS/watchOS.</p>
+        <div class="specs">
+          <strong>Timbre</strong> : sine pur + harmoniques aigus<br />
+          <strong>Effet</strong> : shimmer 2-3 octaves au-dessus<br />
+          <strong>Mood</strong> : sophistiqué, polish, calme
+        </div>
+        <div class="buttons three">
+          <button onclick="play('crystal','hover')">hover</button>
+          <button onclick="play('crystal','click')">click</button>
+          <button onclick="play('crystal','success')">success</button>
+          <button onclick="play('crystal','error')">error</button>
+          <button onclick="play('crystal','notification')">notif</button>
+          <button onclick="play('crystal','achievementGold')">achievement</button>
+        </div>
+        <button class="pick" onclick="pickStyle('Crystal Glass')">
+          ✨ Choisir Crystal Glass
+        </button>
+      </div>
+
+      <!-- Style 2 — Retro 8-bit -->
+      <div class="card">
+        <h2><span class="emoji">🎮</span> Retro 8-bit</h2>
+        <p>Arcade, nostalgique, chiptune. Square waves brutes avec pitch
+        sweeps rapides. Inspiration NES, Game Boy.</p>
+        <div class="specs">
+          <strong>Timbre</strong> : square + pulse exclusivement<br />
+          <strong>Effet</strong> : pitch sweeps secs, aucun reverb<br />
+          <strong>Mood</strong> : geek, énergique, ludique
+        </div>
+        <div class="buttons three">
+          <button onclick="play('retro','hover')">hover</button>
+          <button onclick="play('retro','click')">click</button>
+          <button onclick="play('retro','success')">success</button>
+          <button onclick="play('retro','error')">error</button>
+          <button onclick="play('retro','notification')">notif</button>
+          <button onclick="play('retro','achievementGold')">achievement</button>
+        </div>
+        <button class="pick" onclick="pickStyle('Retro 8-bit')">
+          ✨ Choisir Retro 8-bit
+        </button>
+      </div>
+
+      <!-- Style 3 — Cyberpunk Sci-fi -->
+      <div class="card">
+        <h2><span class="emoji">🌃</span> Cyberpunk Sci-fi</h2>
+        <p>Futuriste, métallique, FM synthesis. Pitch bends nerveux et
+        glitches numériques. Inspiration Cyberpunk 2077, Tron.</p>
+        <div class="specs">
+          <strong>Timbre</strong> : FM (carrier × modulator), métallique<br />
+          <strong>Effet</strong> : detuning, sweeps, micro-glitch<br />
+          <strong>Mood</strong> : high-tech, edgy, hacker
+        </div>
+        <div class="buttons three">
+          <button onclick="play('cyber','hover')">hover</button>
+          <button onclick="play('cyber','click')">click</button>
+          <button onclick="play('cyber','success')">success</button>
+          <button onclick="play('cyber','error')">error</button>
+          <button onclick="play('cyber','notification')">notif</button>
+          <button onclick="play('cyber','achievementGold')">achievement</button>
+        </div>
+        <button class="pick" onclick="pickStyle('Cyberpunk Sci-fi')">
+          ✨ Choisir Cyberpunk Sci-fi
+        </button>
+      </div>
+
+      <!-- Style 4 — Soft Lofi -->
+      <div class="card">
+        <h2><span class="emoji">☕</span> Soft Lofi</h2>
+        <p>Cozy, calme, mellow. Sines purs filtrés bas avec attaques
+        douces et longue release. Inspiration Notion, Apple Notes.</p>
+        <div class="specs">
+          <strong>Timbre</strong> : sine pur, low-pass 4 kHz<br />
+          <strong>Effet</strong> : attaque lente, release long<br />
+          <strong>Mood</strong> : doux, posé, anti-fatigue
+        </div>
+        <div class="buttons three">
+          <button onclick="play('lofi','hover')">hover</button>
+          <button onclick="play('lofi','click')">click</button>
+          <button onclick="play('lofi','success')">success</button>
+          <button onclick="play('lofi','error')">error</button>
+          <button onclick="play('lofi','notification')">notif</button>
+          <button onclick="play('lofi','achievementGold')">achievement</button>
+        </div>
+        <button class="pick" onclick="pickStyle('Soft Lofi')">
+          ✨ Choisir Soft Lofi
+        </button>
+      </div>
+
+      <!-- Style 5 — Magical RPG -->
+      <div class="card">
+        <h2><span class="emoji">✨</span> Magical RPG</h2>
+        <p>Magique, héroïque, satisfaisant. Harpe synth + cloches +
+        sparkles octaves hautes. Inspiration Zelda, Genshin.</p>
+        <div class="specs">
+          <strong>Timbre</strong> : pluck harpe (sine attack rapide)<br />
+          <strong>Effet</strong> : arpèges, shimmer, stratification<br />
+          <strong>Mood</strong> : fantasy, épique, gratifiant
+        </div>
+        <div class="buttons three">
+          <button onclick="play('rpg','hover')">hover</button>
+          <button onclick="play('rpg','click')">click</button>
+          <button onclick="play('rpg','success')">success</button>
+          <button onclick="play('rpg','error')">error</button>
+          <button onclick="play('rpg','notification')">notif</button>
+          <button onclick="play('rpg','achievementGold')">achievement</button>
+        </div>
+        <button class="pick" onclick="pickStyle('Magical RPG')">
+          ✨ Choisir Magical RPG
+        </button>
+      </div>
+    </div>
+
+    <div id="picked" class="pinned">
+      <div class="label">Tu as choisi</div>
+      <div><strong id="pickedName"></strong></div>
+      <div style="color:var(--muted); margin-top:6px; font-size:12px">
+        Envoie ce nom dans le chat — je décline les 14 sons dans ce style.
+      </div>
+    </div>
+
+    <script>
+      // ─── Audio engine ────────────────────────────────────────────────
+      let ctx = null;
+      function getCtx() {
+        if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+        if (ctx.state === "suspended") ctx.resume().catch(() => {});
+        return ctx;
+      }
+
+      // Helper : single tone with envelope, optional pitch sweep + filter.
+      function tone(opts) {
+        const c = getCtx();
+        const t = c.currentTime + (opts.delay || 0);
+        const osc = c.createOscillator();
+        const gain = c.createGain();
+        osc.type = opts.type || "sine";
+        osc.frequency.setValueAtTime(opts.freq, t);
+        if (opts.freqEnd !== undefined) {
+          osc.frequency.exponentialRampToValueAtTime(
+            Math.max(0.01, opts.freqEnd),
+            t + opts.duration,
+          );
+        }
+        const peak = opts.volume ?? 0.18;
+        const attack = opts.attack ?? 0.005;
+        const release = opts.release ?? Math.max(0.04, opts.duration - attack);
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(peak, t + attack);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + attack + release);
+        let last = osc;
+        if (opts.filter) {
+          const f = c.createBiquadFilter();
+          f.type = opts.filter.type || "lowpass";
+          f.frequency.value = opts.filter.freq || 4000;
+          f.Q.value = opts.filter.Q ?? 0.7;
+          last.connect(f);
+          last = f;
+        }
+        last.connect(gain);
+        gain.connect(c.destination);
+        osc.start(t);
+        osc.stop(t + opts.duration + 0.05);
+      }
+
+      // FM helper for cyber style — modulator FM-modulates carrier freq.
+      function fm(opts) {
+        const c = getCtx();
+        const t = c.currentTime + (opts.delay || 0);
+        const carrier = c.createOscillator();
+        const modulator = c.createOscillator();
+        const modGain = c.createGain();
+        const gain = c.createGain();
+        carrier.type = "sine";
+        modulator.type = "sine";
+        carrier.frequency.setValueAtTime(opts.freq, t);
+        if (opts.freqEnd !== undefined) {
+          carrier.frequency.exponentialRampToValueAtTime(opts.freqEnd, t + opts.duration);
+        }
+        modulator.frequency.setValueAtTime(opts.freq * (opts.ratio ?? 2), t);
+        modGain.gain.value = opts.freq * (opts.index ?? 2);
+        modulator.connect(modGain);
+        modGain.connect(carrier.frequency);
+        const peak = opts.volume ?? 0.16;
+        const attack = opts.attack ?? 0.003;
+        const release = opts.release ?? opts.duration - attack;
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(peak, t + attack);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + attack + release);
+        carrier.connect(gain);
+        gain.connect(c.destination);
+        carrier.start(t);
+        modulator.start(t);
+        carrier.stop(t + opts.duration + 0.05);
+        modulator.stop(t + opts.duration + 0.05);
+      }
+
+      // Noise burst (for click percussion + glitches).
+      function noise(opts) {
+        const c = getCtx();
+        const t = c.currentTime + (opts.delay || 0);
+        const buf = c.createBuffer(1, c.sampleRate * opts.duration, c.sampleRate);
+        const ch = buf.getChannelData(0);
+        for (let i = 0; i < ch.length; i++) ch[i] = (Math.random() * 2 - 1);
+        const src = c.createBufferSource();
+        src.buffer = buf;
+        const gain = c.createGain();
+        const f = c.createBiquadFilter();
+        f.type = opts.filter || "highpass";
+        f.frequency.value = opts.cutoff || 2000;
+        f.Q.value = 1.5;
+        const peak = opts.volume ?? 0.1;
+        const attack = 0.002;
+        const release = opts.duration - attack;
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(peak, t + attack);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + attack + release);
+        src.connect(f);
+        f.connect(gain);
+        gain.connect(c.destination);
+        src.start(t);
+        src.stop(t + opts.duration + 0.05);
+      }
+
+      // ─── Style 1 : Crystal Glass ────────────────────────────────────
+      const crystal = {
+        hover() {
+          tone({ freq: 1760, freqEnd: 1320, duration: 0.07, type: "sine", volume: 0.06 });
+          tone({ freq: 3520, duration: 0.05, type: "sine", volume: 0.025 }, 0.005);
+        },
+        click() {
+          tone({ freq: 1320, freqEnd: 880, duration: 0.09, type: "sine", volume: 0.16 });
+          tone({ freq: 2640, duration: 0.07, type: "sine", volume: 0.08 }, 0.005);
+          tone({ freq: 5280, duration: 0.05, type: "sine", volume: 0.04 }, 0.01);
+        },
+        success() {
+          // Crystal triad C5 E5 G5 with shimmer
+          tone({ freq: 523, duration: 0.18, type: "sine", volume: 0.16, release: 0.2 });
+          tone({ freq: 659, duration: 0.18, type: "sine", volume: 0.14, release: 0.2 }, 0.06);
+          tone({ freq: 784, duration: 0.22, type: "sine", volume: 0.14, release: 0.24 }, 0.12);
+          tone({ freq: 2637, duration: 0.18, type: "sine", volume: 0.05, release: 0.18 }, 0.12);
+        },
+        error() {
+          tone({ freq: 880, freqEnd: 440, duration: 0.18, type: "triangle", volume: 0.14 });
+          tone({ freq: 1760, freqEnd: 880, duration: 0.12, type: "sine", volume: 0.05 });
+        },
+        notification() {
+          tone({ freq: 1568, duration: 0.09, type: "sine", volume: 0.13 });
+          tone({ freq: 2093, duration: 0.13, type: "sine", volume: 0.13, release: 0.13 }, 0.07);
+          tone({ freq: 4186, duration: 0.1, type: "sine", volume: 0.05 }, 0.07);
+        },
+        achievementGold() {
+          // Glassy ascending major triad with tower of shimmer
+          tone({ freq: 659, duration: 0.1, type: "sine", volume: 0.18 });
+          tone({ freq: 831, duration: 0.1, type: "sine", volume: 0.18 }, 0.09);
+          tone({ freq: 988, duration: 0.1, type: "sine", volume: 0.18 }, 0.18);
+          tone({ freq: 1319, duration: 0.28, type: "sine", volume: 0.18, release: 0.3 }, 0.27);
+          tone({ freq: 2637, duration: 0.22, type: "sine", volume: 0.07, release: 0.24 }, 0.27);
+          tone({ freq: 5274, duration: 0.18, type: "sine", volume: 0.04, release: 0.2 }, 0.27);
+        },
+      };
+
+      // ─── Style 2 : Retro 8-bit ──────────────────────────────────────
+      const retro = {
+        hover() {
+          tone({ freq: 880, duration: 0.04, type: "square", volume: 0.05 });
+        },
+        click() {
+          tone({ freq: 1000, freqEnd: 600, duration: 0.06, type: "square", volume: 0.18 });
+        },
+        success() {
+          // Mario-coin-like 4-note arpeggio
+          tone({ freq: 523, duration: 0.06, type: "square", volume: 0.18 });
+          tone({ freq: 659, duration: 0.06, type: "square", volume: 0.18 }, 0.07);
+          tone({ freq: 784, duration: 0.06, type: "square", volume: 0.18 }, 0.14);
+          tone({ freq: 1047, duration: 0.16, type: "square", volume: 0.2 }, 0.21);
+        },
+        error() {
+          tone({ freq: 220, freqEnd: 110, duration: 0.15, type: "square", volume: 0.18 });
+          tone({ freq: 165, duration: 0.18, type: "square", volume: 0.14 }, 0.1);
+        },
+        notification() {
+          tone({ freq: 880, duration: 0.06, type: "pulse", volume: 0.16 });
+          tone({ freq: 1320, duration: 0.1, type: "square", volume: 0.16 }, 0.08);
+        },
+        achievementGold() {
+          // Chiptune fanfare
+          tone({ freq: 392, duration: 0.08, type: "square", volume: 0.18 });
+          tone({ freq: 523, duration: 0.08, type: "square", volume: 0.18 }, 0.08);
+          tone({ freq: 659, duration: 0.08, type: "square", volume: 0.18 }, 0.16);
+          tone({ freq: 784, duration: 0.08, type: "square", volume: 0.18 }, 0.24);
+          tone({ freq: 1047, duration: 0.24, type: "square", volume: 0.2, release: 0.26 }, 0.32);
+          // Bass thump
+          tone({ freq: 130, duration: 0.4, type: "square", volume: 0.08, release: 0.38 });
+        },
+      };
+
+      // ─── Style 3 : Cyberpunk Sci-fi ─────────────────────────────────
+      const cyber = {
+        hover() {
+          fm({ freq: 1200, freqEnd: 900, duration: 0.05, ratio: 3, index: 1.5, volume: 0.05 });
+        },
+        click() {
+          fm({ freq: 800, freqEnd: 400, duration: 0.08, ratio: 2.5, index: 3, volume: 0.18 });
+          noise({ duration: 0.03, cutoff: 6000, volume: 0.04 });
+        },
+        success() {
+          fm({ freq: 440, freqEnd: 1320, duration: 0.22, ratio: 2, index: 4, volume: 0.16, release: 0.2 });
+          fm({ freq: 660, duration: 0.18, ratio: 3, index: 2, volume: 0.1, release: 0.16 }, 0.1);
+          noise({ duration: 0.06, cutoff: 4000, volume: 0.06 }, 0.0);
+        },
+        error() {
+          fm({ freq: 600, freqEnd: 200, duration: 0.18, ratio: 1.5, index: 5, volume: 0.18 });
+          noise({ duration: 0.08, cutoff: 1500, volume: 0.08, filter: "lowpass" });
+        },
+        notification() {
+          fm({ freq: 1200, duration: 0.1, ratio: 4, index: 2, volume: 0.14 });
+          fm({ freq: 1800, duration: 0.14, ratio: 3, index: 1.5, volume: 0.12, release: 0.14 }, 0.06);
+        },
+        achievementGold() {
+          fm({ freq: 220, freqEnd: 880, duration: 0.4, ratio: 2, index: 4, volume: 0.16, release: 0.4 });
+          fm({ freq: 440, freqEnd: 1320, duration: 0.32, ratio: 3, index: 3, volume: 0.14, release: 0.32 }, 0.1);
+          fm({ freq: 880, duration: 0.28, ratio: 2.5, index: 2, volume: 0.12, release: 0.28 }, 0.2);
+          noise({ duration: 0.4, cutoff: 5000, volume: 0.04 }, 0.05);
+        },
+      };
+
+      // ─── Style 4 : Soft Lofi ────────────────────────────────────────
+      const lofi = {
+        hover() {
+          tone({
+            freq: 440, duration: 0.08, type: "sine", volume: 0.05,
+            attack: 0.02, release: 0.06,
+            filter: { type: "lowpass", freq: 3000 },
+          });
+        },
+        click() {
+          tone({
+            freq: 350, freqEnd: 250, duration: 0.14, type: "sine", volume: 0.16,
+            attack: 0.015, release: 0.12,
+            filter: { type: "lowpass", freq: 2500 },
+          });
+        },
+        success() {
+          // Soft fifth interval, long release
+          tone({
+            freq: 392, duration: 0.4, type: "sine", volume: 0.16,
+            attack: 0.04, release: 0.36,
+            filter: { type: "lowpass", freq: 3500 },
+          });
+          tone({
+            freq: 587, duration: 0.5, type: "sine", volume: 0.14,
+            attack: 0.05, release: 0.45,
+            filter: { type: "lowpass", freq: 3500 },
+          }, 0.12);
+        },
+        error() {
+          tone({
+            freq: 330, freqEnd: 220, duration: 0.32, type: "sine", volume: 0.14,
+            attack: 0.03, release: 0.28,
+            filter: { type: "lowpass", freq: 2000 },
+          });
+        },
+        notification() {
+          tone({
+            freq: 660, duration: 0.16, type: "sine", volume: 0.12,
+            attack: 0.025, release: 0.13,
+            filter: { type: "lowpass", freq: 4000 },
+          });
+          tone({
+            freq: 880, duration: 0.22, type: "sine", volume: 0.1,
+            attack: 0.03, release: 0.18,
+            filter: { type: "lowpass", freq: 4000 },
+          }, 0.1);
+        },
+        achievementGold() {
+          // Warm progression IV V I
+          tone({
+            freq: 349, duration: 0.4, type: "sine", volume: 0.16,
+            attack: 0.04, release: 0.36, filter: { type: "lowpass", freq: 3500 },
+          });
+          tone({
+            freq: 392, duration: 0.4, type: "sine", volume: 0.16,
+            attack: 0.04, release: 0.36, filter: { type: "lowpass", freq: 3500 },
+          }, 0.18);
+          tone({
+            freq: 523, duration: 0.6, type: "sine", volume: 0.18,
+            attack: 0.05, release: 0.55, filter: { type: "lowpass", freq: 4000 },
+          }, 0.36);
+          tone({
+            freq: 1047, duration: 0.5, type: "sine", volume: 0.06,
+            attack: 0.05, release: 0.45, filter: { type: "lowpass", freq: 5000 },
+          }, 0.36);
+        },
+      };
+
+      // ─── Style 5 : Magical RPG ──────────────────────────────────────
+      // Pluck = sine with very fast attack + exponential decay (harp-like).
+      function pluck(opts) {
+        tone({
+          freq: opts.freq,
+          duration: opts.duration ?? 0.5,
+          type: "triangle",
+          volume: opts.volume ?? 0.18,
+          attack: 0.002,
+          release: opts.release ?? 0.45,
+          delay: opts.delay,
+        });
+        // Add 5th + octave shimmer
+        tone({
+          freq: opts.freq * 2,
+          duration: (opts.duration ?? 0.5) * 0.6,
+          type: "sine",
+          volume: (opts.volume ?? 0.18) * 0.4,
+          attack: 0.002,
+          release: (opts.release ?? 0.45) * 0.5,
+          delay: opts.delay,
+        });
+      }
+      const rpg = {
+        hover() {
+          pluck({ freq: 880, duration: 0.18, volume: 0.06, release: 0.16 });
+        },
+        click() {
+          pluck({ freq: 587, duration: 0.3, volume: 0.18, release: 0.28 });
+          pluck({ freq: 880, duration: 0.28, volume: 0.12, release: 0.26, delay: 0.04 });
+        },
+        success() {
+          // Major arpeggio C E G C
+          pluck({ freq: 523, duration: 0.4, volume: 0.16, release: 0.38 });
+          pluck({ freq: 659, duration: 0.4, volume: 0.16, release: 0.38, delay: 0.07 });
+          pluck({ freq: 784, duration: 0.4, volume: 0.16, release: 0.38, delay: 0.14 });
+          pluck({ freq: 1047, duration: 0.5, volume: 0.18, release: 0.48, delay: 0.22 });
+        },
+        error() {
+          // Minor descending pluck
+          pluck({ freq: 440, duration: 0.3, volume: 0.16, release: 0.28 });
+          pluck({ freq: 370, duration: 0.4, volume: 0.14, release: 0.38, delay: 0.1 });
+        },
+        notification() {
+          pluck({ freq: 988, duration: 0.3, volume: 0.14, release: 0.28 });
+          pluck({ freq: 1318, duration: 0.4, volume: 0.12, release: 0.38, delay: 0.08 });
+        },
+        achievementGold() {
+          // Full ascending pentatonic harp
+          pluck({ freq: 523, duration: 0.5, volume: 0.18, release: 0.48 });
+          pluck({ freq: 659, duration: 0.5, volume: 0.18, release: 0.48, delay: 0.08 });
+          pluck({ freq: 784, duration: 0.5, volume: 0.18, release: 0.48, delay: 0.16 });
+          pluck({ freq: 988, duration: 0.5, volume: 0.18, release: 0.48, delay: 0.24 });
+          pluck({ freq: 1319, duration: 0.7, volume: 0.2, release: 0.65, delay: 0.32 });
+          // Sparkle
+          tone({ freq: 2637, duration: 0.5, type: "sine", volume: 0.06, release: 0.45, delay: 0.32 });
+          tone({ freq: 5274, duration: 0.4, type: "sine", volume: 0.03, release: 0.36, delay: 0.32 });
+        },
+      };
+
+      const STYLES = { crystal, retro, cyber, lofi, rpg };
+      const SOUND_NAMES = ["hover", "click", "success", "error", "notification", "achievementGold"];
+
+      function play(style, name) {
+        STYLES[style][name]();
+      }
+
+      function playAll(style) {
+        let delay = 0;
+        for (const name of SOUND_NAMES) {
+          setTimeout(() => STYLES[style][name](), delay);
+          delay += 850;
+        }
+      }
+
+      function pickStyle(name) {
+        const el = document.getElementById("picked");
+        const nameEl = document.getElementById("pickedName");
+        nameEl.textContent = name;
+        el.classList.add("show");
+      }
+    </script>
+  </body>
+</html>
