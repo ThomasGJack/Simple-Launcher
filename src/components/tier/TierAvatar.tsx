@@ -180,10 +180,11 @@ function SupporterFrame({ size }: { size: Dims }) {
 }
 
 /** Tier 2 — VIP : rotating cyan→violet conic ring with wide pulsing
- *  halo + two orbiting particles. Three animation layers (rotation
- *  5s + halo pulse 2.4s + particle orbit 4s) — bold and unmistakable
- *  at any size. */
+ *  halo. Two animation layers (rotation 5s + halo pulse 2.4s) — bold
+ *  and unmistakable at any size, no orbiting particles to keep the
+ *  effect calm in dense lists. */
 function VipFrame({ size }: { size: Dims }) {
+  void size;
   return (
     <>
       {/* Outer wide glow aura — saturated and pulsing */}
@@ -222,49 +223,16 @@ function VipFrame({ size }: { size: Dims }) {
             "inset 0 0 14px rgba(167,139,250,0.7), 0 0 22px rgba(34,211,238,0.7)",
         }}
       />
-      {/* 2 orbiting cyan/violet particles — only on md+ sizes (would
-          be invisible at xs/sm). */}
-      {size.frame >= 50 &&
-        [0, 1].map((i) => (
-          <motion.span
-            key={i}
-            aria-hidden
-            className="absolute left-1/2 top-1/2 size-1.5 rounded-full"
-            style={{
-              marginLeft: -3,
-              marginTop: -3,
-              background: i === 0 ? "#22D3EE" : "#A78BFA",
-              boxShadow:
-                i === 0
-                  ? "0 0 8px rgba(34,211,238,1), 0 0 14px rgba(34,211,238,0.7)"
-                  : "0 0 8px rgba(167,139,250,1), 0 0 14px rgba(167,139,250,0.7)",
-            }}
-            animate={{ rotate: 360 }}
-            transition={{
-              duration: 4,
-              repeat: Infinity,
-              ease: "linear",
-              delay: i * 2,
-            }}
-          >
-            <span
-              className="block size-1.5 rounded-full"
-              style={{
-                background: i === 0 ? "#22D3EE" : "#A78BFA",
-                transform: `translate(${size.frame / 2 + 3}px, 0)`,
-              }}
-            />
-          </motion.span>
-        ))}
     </>
   );
 }
 
 /** Tier 3 — Légende : the maximum effort frame. Three rotating layers
- *  + six orbiting sparkles + huge gold/orange aura. Used sparingly
- *  across the app — at most a dozen rendered at once even on the
- *  densest community page, so the perf cost stays manageable. */
+ *  + huge gold/orange aura. Used sparingly across the app — at most
+ *  a dozen rendered at once even on the densest community page, so
+ *  the perf cost stays manageable. */
 function LegendFrame({ size }: { size: Dims }) {
+  void size;
   return (
     <>
       {/* Massive pulsing gold aura — unmistakable from any distance */}
@@ -319,44 +287,6 @@ function LegendFrame({ size }: { size: Dims }) {
             "inset 0 0 18px rgba(255,215,0,0.7), 0 0 26px rgba(255,107,53,0.8)",
         }}
       />
-      {/* 6 orbiting sparkles — rendered on sm+ sizes (xs is too tight) */}
-      {size.frame >= 40 &&
-        [0, 1, 2, 3, 4, 5].map((i) => (
-          <motion.span
-            key={i}
-            aria-hidden
-            className="absolute left-1/2 top-1/2 size-2 rounded-full bg-amber-100"
-            style={{
-              marginLeft: -4,
-              marginTop: -4,
-              boxShadow:
-                "0 0 8px rgba(255,215,0,1), 0 0 16px rgba(255,107,53,0.95)",
-            }}
-            animate={{
-              rotate: 360,
-              opacity: [0, 1, 1, 0],
-            }}
-            transition={{
-              rotate: {
-                duration: 4.5,
-                repeat: Infinity,
-                ease: "linear",
-                delay: i * 0.75,
-              },
-              opacity: {
-                duration: 4.5,
-                repeat: Infinity,
-                times: [0, 0.15, 0.85, 1],
-                delay: i * 0.75,
-              },
-            }}
-          >
-            <span
-              className="block size-2 rounded-full bg-amber-100"
-              style={{ transform: `translate(${size.frame / 2 + 4}px, 0)` }}
-            />
-          </motion.span>
-        ))}
     </>
   );
 }
