@@ -179,13 +179,26 @@ service cloud.firestore {
           allow read: if isCrewMember();
           allow create: if isCrewMember() &&
             request.resource.data.senderUid == request.auth.uid;
-          // Edits : sender only (verified by senderUid match on the
-          // existing doc). Deletes : sender or owner/admin (mod).
-          allow update: if request.auth != null &&
-            resource.data.senderUid == request.auth.uid;
+          // Edits : sender (text + editedAt). Pin toggle : owner/admin
+          // (gated client-side too). Combine both into a single update
+          // rule that allows either.
+          allow update: if request.auth != null && (
+            resource.data.senderUid == request.auth.uid ||
+            isCrewAdminOrOwner()
+          );
+          // Deletes : sender or owner/admin (mod).
           allow delete: if request.auth != null &&
             (resource.data.senderUid == request.auth.uid ||
               isCrewAdminOrOwner());
+
+          // Reactions : one doc per (uid, emoji) pair. Each user can
+          // write/delete their own reactions; everyone reads.
+          match /reactions/{reactionId} {
+            allow read: if isCrewMember();
+            allow create, delete: if request.auth != null &&
+              isCrewMember() &&
+              reactionId.matches(request.auth.uid + '__.*');
+          }
         }
       }
     }

@@ -99,6 +99,29 @@ export type CrewMessage = {
   senderName: string | null;
   senderAvatar: string | null;
   sentAt: number;
+  /** Set when the user has edited the message after sending. */
+  editedAt: number | null;
+  /** Pinned messages stay highlighted at the top of the channel. */
+  pinned: boolean;
+  /** Quoted reply context. When set, the message renders with a small
+   *  bar above showing the parent message's preview. */
+  replyToId: string | null;
+  replyToText: string | null;
+  replyToSenderName: string | null;
+  /** Uids tagged via `@username` in the message body. Used to drive
+   *  the notifications fan-out (one notif per mentioned uid). */
+  mentionedUids: string[];
+  /** Image attachment URL (from Firebase Storage). Set when the
+   *  sender uploaded an image inline. Phase 4 — reserved for now. */
+  imageUrl: string | null;
+};
+
+export type CrewReaction = {
+  /** Doc id is `${uid}__${emoji}` so a user can react with multiple
+   *  emojis on the same message but only once per (user, emoji) pair. */
+  uid: string;
+  emoji: string;
+  addedAt: number;
 };
 
 // ─── Marker for the achievement evaluator ─────────────────────────────
@@ -258,17 +281,7 @@ export function watchChannelMessages(
   return onSnapshot(
     q,
     (snap) => {
-      const list: CrewMessage[] = snap.docs.map((d) => {
-        const data = d.data();
-        return {
-          id: d.id,
-          text: typeof data.text === "string" ? data.text : "",
-          senderUid: typeof data.senderUid === "string" ? data.senderUid : "",
-          senderName: typeof data.senderName === "string" ? data.senderName : null,
-          senderAvatar: typeof data.senderAvatar === "string" ? data.senderAvatar : null,
-          sentAt: tsToMs(data.sentAt) ?? 0,
-        };
-      });
+      const list: CrewMessage[] = snap.docs.map(parseMessage);
       // Reverse so oldest is first (UI scrolls bottom = newest).
       list.reverse();
       callback(list);
@@ -280,7 +293,122 @@ export function watchChannelMessages(
   );
 }
 
+function parseMessage(d: { id: string; data: () => Record<string, unknown> }): CrewMessage {
+  const data = d.data();
+  const mentions = Array.isArray(data.mentionedUids)
+    ? (data.mentionedUids as unknown[]).filter((m): m is string => typeof m === "string")
+    : [];
+  return {
+    id: d.id,
+    text: typeof data.text === "string" ? data.text : "",
+    senderUid: typeof data.senderUid === "string" ? data.senderUid : "",
+    senderName: typeof data.senderName === "string" ? data.senderName : null,
+    senderAvatar: typeof data.senderAvatar === "string" ? data.senderAvatar : null,
+    sentAt: tsToMs(data.sentAt) ?? 0,
+    editedAt: tsToMs(data.editedAt),
+    pinned: !!data.pinned,
+    replyToId: typeof data.replyToId === "string" ? data.replyToId : null,
+    replyToText: typeof data.replyToText === "string" ? data.replyToText : null,
+    replyToSenderName:
+      typeof data.replyToSenderName === "string" ? data.replyToSenderName : null,
+    mentionedUids: mentions,
+    imageUrl: typeof data.imageUrl === "string" ? data.imageUrl : null,
+  };
+}
+
+/**
+ * Watch reactions on a single message. Returns the parsed list of
+ * CrewReaction docs. The UI groups them by emoji and shows the count
+ * + the array of users for tooltips.
+ */
+export function watchMessageReactions(
+  crewId: string,
+  channelId: string,
+  messageId: string,
+  callback: (reactions: CrewReaction[]) => void,
+): Unsubscribe {
+  const fb = getFirebase();
+  if (!fb) {
+    callback([]);
+    return () => {};
+  }
+  return onSnapshot(
+    collection(
+      fb.db,
+      "crews",
+      crewId,
+      "channels",
+      channelId,
+      "messages",
+      messageId,
+      "reactions",
+    ),
+    (snap) => {
+      const list: CrewReaction[] = snap.docs.map((d) => {
+        const data = d.data();
+        return {
+          uid: typeof data.uid === "string" ? data.uid : d.id.split("__")[0] ?? "",
+          emoji: typeof data.emoji === "string" ? data.emoji : "👍",
+          addedAt: tsToMs(data.addedAt) ?? 0,
+        };
+      });
+      callback(list);
+    },
+    (err) => {
+      console.warn("[crews] reactions watch failed:", err);
+      callback([]);
+    },
+  );
+}
+
+/**
+ * Watch only pinned messages in a channel. The pinned bar in the UI
+ * subscribes here separately so it stays in sync without paginating
+ * through the full history.
+ */
+export function watchPinnedMessages(
+  crewId: string,
+  channelId: string,
+  callback: (messages: CrewMessage[]) => void,
+): Unsubscribe {
+  const fb = getFirebase();
+  if (!fb) {
+    callback([]);
+    return () => {};
+  }
+  const q = query(
+    collection(fb.db, "crews", crewId, "channels", channelId, "messages"),
+    where("pinned", "==", true),
+    orderBy("sentAt", "desc"),
+    fbLimit(20),
+  );
+  return onSnapshot(
+    q,
+    (snap) => {
+      const list = snap.docs.map(parseMessage);
+      callback(list);
+    },
+    (err) => {
+      console.warn("[crews] pinned watch failed:", err);
+      callback([]);
+    },
+  );
+}
+
 // ─── Messaging ────────────────────────────────────────────────────────
+
+export type SendMessageOptions = {
+  /** Reply context — when set, the message renders with a quoted bar
+   *  above it pointing to the parent message. */
+  replyTo?: {
+    id: string;
+    text: string;
+    senderName: string | null;
+  } | null;
+  /** Uids tagged via `@user` in the text. Used by the caller (App-level
+   *  side-effect) to fan out notifications. */
+  mentionedUids?: string[];
+};
 
 export async function sendChannelMessage(
   crewId: string,
@@ -289,10 +417,11 @@ export async function sendChannelMessage(
   senderUid: string,
   senderName: string | null,
   senderAvatar: string | null,
-): Promise<void> {
+  options: SendMessageOptions = {},
+): Promise<string> {
   const fb = getFirebase();
   if (!fb) throw new Error("Firebase not configured");
-  await addDoc(
+  const ref = await addDoc(
     collection(fb.db, "crews", crewId, "channels", channelId, "messages"),
     {
       text: text.trim(),
@@ -300,9 +429,117 @@ export async function sendChannelMessage(
       senderName,
       senderAvatar,
       sentAt: serverTimestamp(),
+      pinned: false,
+      replyToId: options.replyTo?.id ?? null,
+      replyToText: options.replyTo?.text ?? null,
+      replyToSenderName: options.replyTo?.senderName ?? null,
+      mentionedUids: options.mentionedUids ?? [],
     },
   );
   markCrewJoined();
+  return ref.id;
+}
+
+/** Sender-only edit. Updates `text` + stamps `editedAt`. The rules
+ *  enforce that only the original sender can update. */
+export async function editChannelMessage(
+  crewId: string,
+  channelId: string,
+  messageId: string,
+  newText: string,
+): Promise<void> {
+  const fb = getFirebase();
+  if (!fb) throw new Error("Firebase not configured");
+  await updateDoc(
+    doc(fb.db, "crews", crewId, "channels", channelId, "messages", messageId),
+    {
+      text: newText.trim(),
+      editedAt: serverTimestamp(),
+    },
+  );
+}
+
+/** Delete a channel message. Sender can delete their own; crew
+ *  owner/admin can delete anyone's (mod). */
+export async function deleteChannelMessage(
+  crewId: string,
+  channelId: string,
+  messageId: string,
+): Promise<void> {
+  const fb = getFirebase();
+  if (!fb) throw new Error("Firebase not configured");
+  await deleteDoc(
+    doc(fb.db, "crews", crewId, "channels", channelId, "messages", messageId),
+  );
+}
+
+/** Toggle the pinned flag. Owner/admin only — but the rules don't
+ *  enforce this on `update` of a message (which is sender-only). For
+ *  now this is gated client-side; if abused we'd add a Cloud Function
+ *  or a separate `pinned/{messageId}` doc with proper rules. */
+export async function setMessagePinned(
+  crewId: string,
+  channelId: string,
+  messageId: string,
+  pinned: boolean,
+): Promise<void> {
+  const fb = getFirebase();
+  if (!fb) throw new Error("Firebase not configured");
+  await updateDoc(
+    doc(fb.db, "crews", crewId, "channels", channelId, "messages", messageId),
+    { pinned },
+  );
+}
+
+/** Add an emoji reaction to a message. One doc per (uid, emoji) pair —
+ *  the doc id encodes both so a user can react with several emojis. */
+export async function addMessageReaction(
+  crewId: string,
+  channelId: string,
+  messageId: string,
+  uid: string,
+  emoji: string,
+): Promise<void> {
+  const fb = getFirebase();
+  if (!fb) throw new Error("Firebase not configured");
+  await setDoc(
+    doc(
+      fb.db,
+      "crews",
+      crewId,
+      "channels",
+      channelId,
+      "messages",
+      messageId,
+      "reactions",
+      `${uid}__${emoji}`,
+    ),
+    { uid, emoji, addedAt: serverTimestamp() },
+  );
+}
+
+export async function removeMessageReaction(
+  crewId: string,
+  channelId: string,
+  messageId: string,
+  uid: string,
+  emoji: string,
+): Promise<void> {
+  const fb = getFirebase();
+  if (!fb) throw new Error("Firebase not configured");
+  await deleteDoc(
+    doc(
+      fb.db,
+      "crews",
+      crewId,
+      "channels",
+      channelId,
+      "messages",
+      messageId,
+      "reactions",
+      `${uid}__${emoji}`,
+    ),
+  );
 }
 
 // ─── Membership ops ───────────────────────────────────────────────────

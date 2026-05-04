@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useMemo, useState } from "react";
 import {
   Castle,
   Compass,
@@ -9,22 +8,21 @@ import {
   Lock,
   LogOut,
   Plus,
-  Send,
 } from "lucide-react";
 import { useAuthStore } from "@/store/auth";
 import { useUIStore } from "@/store/ui";
 import { useUsers } from "@/store/firebaseStores";
 import {
   leaveCrew,
-  sendChannelMessage,
   watchCrews,
   watchCrewChannels,
-  watchChannelMessages,
+  watchCrewMembers,
   watchMyCrewIds,
   type Crew,
   type CrewChannel,
-  type CrewMessage,
+  type CrewMember,
 } from "@/firebase/crews";
+import { ChannelView } from "@/components/crews/ChannelView";
 import { hasAnyTier } from "@/lib/supporterTier";
 import { isAdmin } from "@/lib/admin";
 import { sounds } from "@/lib/sounds";
@@ -64,6 +62,7 @@ export function CrewsPage() {
   const [allCrews, setAllCrews] = useState<Crew[]>([]);
   const [myCrewIds, setMyCrewIds] = useState<Set<string>>(new Set());
   const [channels, setChannels] = useState<CrewChannel[]>([]);
+  const [members, setMembers] = useState<CrewMember[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [browseOpen, setBrowseOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
@@ -105,6 +104,19 @@ export function CrewsPage() {
     }
     return watchCrewChannels(selectedCrewId, setChannels);
   }, [selectedCrewId]);
+
+  useEffect(() => {
+    if (!selectedCrewId) {
+      setMembers([]);
+      return;
+    }
+    return watchCrewMembers(selectedCrewId, setMembers);
+  }, [selectedCrewId]);
+
+  const myMember = useMemo(
+    () => (me ? members.find((m) => m.uid === me.uid) ?? null : null),
+    [members, me],
+  );
 
   // Auto-pick the first channel when none selected for the current crew.
   useEffect(() => {
@@ -361,13 +373,14 @@ export function CrewsPage() {
 
       {/* ─── Messages pane ─────────────────────────────────── */}
       <main className="flex flex-1 flex-col overflow-hidden">
-        {selectedChannel && selectedCrewId ? (
+        {selectedChannel && selectedCrew ? (
           <ChannelView
-            crewId={selectedCrewId}
+            crew={selectedCrew}
             channel={selectedChannel}
             myUid={me?.uid ?? ""}
             myName={me?.displayName ?? null}
             myAvatar={me?.photoURL ?? null}
+            myMember={myMember}
           />
         ) : (
           <div className="grid flex-1 place-items-center text-fg-dim">
@@ -397,164 +410,3 @@ export function CrewsPage() {
   );
 }
 
-function ChannelView({
-  crewId,
-  channel,
-  myUid,
-  myName,
-  myAvatar,
-}: {
-  crewId: string;
-  channel: CrewChannel;
-  myUid: string;
-  myName: string | null;
-  myAvatar: string | null;
-}) {
-  const [messages, setMessages] = useState<CrewMessage[]>([]);
-  const [text, setText] = useState("");
-  const [sending, setSending] = useState(false);
-  const scrollerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => watchChannelMessages(crewId, channel.id, setMessages), [crewId, channel.id]);
-
-  // Auto-scroll to bottom when messages arrive (only if user was near bottom).
-  useEffect(() => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
-    if (nearBottom) {
-      el.scrollTop = el.scrollHeight;
-    }
-  }, [messages]);
-
-  const handleSend = async () => {
-    const trimmed = text.trim();
-    if (!trimmed || !myUid || sending) return;
-    setSending(true);
-    setText("");
-    try {
-      await sendChannelMessage(crewId, channel.id, trimmed, myUid, myName, myAvatar);
-      sounds.click();
-    } catch (err) {
-      console.warn("[crews] send failed:", err);
-      setText(trimmed); // restore on failure
-    } finally {
-      setSending(false);
-    }
-  };
-
-  return (
-    <>
-      <header className="flex items-center gap-2 border-b border-white/[0.06] bg-bg-soft/30 px-5 py-3">
-        <Hash className="size-4 text-fg-dim" />
-        <div className="min-w-0">
-          <div className="truncate font-semibold">{channel.name}</div>
-          {channel.description && (
-            <div className="truncate text-xs text-fg-muted">{channel.description}</div>
-          )}
-        </div>
-      </header>
-
-      <div ref={scrollerRef} className="flex-1 overflow-y-auto px-5 py-4">
-        <AnimatePresence initial={false}>
-          {messages.length === 0 ? (
-            <div className="grid h-full place-items-center text-fg-dim">
-              <div className="text-center">
-                <Hash className="mx-auto mb-2 size-8 text-fg-dim" strokeWidth={1.5} />
-                <div className="text-sm">Premier message dans #{channel.name} ?</div>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {messages.map((m, i) => {
-                const prev = i > 0 ? messages[i - 1] : null;
-                const grouped =
-                  prev && prev.senderUid === m.senderUid && m.sentAt - prev.sentAt < 5 * 60_000;
-                return (
-                  <motion.div
-                    key={m.id}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.15 }}
-                    className="flex gap-3"
-                  >
-                    {grouped ? (
-                      <div className="w-9 shrink-0" />
-                    ) : m.senderAvatar ? (
-                      <img
-                        src={m.senderAvatar}
-                        alt=""
-                        className="size-9 shrink-0 rounded-full object-cover ring-1 ring-white/10"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <div className="grid size-9 shrink-0 place-items-center rounded-full bg-bg-elevated text-xs uppercase text-fg-muted ring-1 ring-white/10">
-                        {(m.senderName ?? "?").slice(0, 1)}
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      {!grouped && (
-                        <div className="flex items-baseline gap-2">
-                          <span className="font-medium text-fg-primary">
-                            {m.senderName ?? "Anonyme"}
-                          </span>
-                          <span className="text-[10px] text-fg-dim">
-                            {formatStamp(m.sentAt)}
-                          </span>
-                        </div>
-                      )}
-                      <div className="break-words text-sm leading-relaxed text-fg-muted">
-                        {m.text}
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          )}
-        </AnimatePresence>
-      </div>
-
-      <div className="border-t border-white/[0.06] bg-bg-soft/30 p-4">
-        <div className="flex items-end gap-2 rounded-2xl bg-bg-base/40 p-2 ring-1 ring-white/[0.06] focus-within:ring-accent/40">
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                void handleSend();
-              }
-            }}
-            placeholder={`Écrire dans #${channel.name}…`}
-            rows={1}
-            className="no-drag flex-1 resize-none bg-transparent px-2 py-1.5 text-sm text-fg-primary placeholder:text-fg-dim focus:outline-none"
-            style={{ maxHeight: 200 }}
-          />
-          <button
-            type="button"
-            onClick={handleSend}
-            disabled={!text.trim() || sending}
-            className="no-drag grid size-9 shrink-0 place-items-center rounded-xl bg-accent text-bg-base shadow-[0_0_14px_var(--color-accent-soft)] disabled:opacity-50"
-          >
-            <Send className="size-4" />
-          </button>
-        </div>
-      </div>
-    </>
-  );
-}
-
-function formatStamp(ts: number): string {
-  if (!ts) return "";
-  const d = new Date(ts);
-  const today = new Date();
-  const sameDay =
-    d.getFullYear() === today.getFullYear() &&
-    d.getMonth() === today.getMonth() &&
-    d.getDate() === today.getDate();
-  const time = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-  if (sameDay) return `Aujourd'hui ${time}`;
-  return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" }) + " " + time;
-}
