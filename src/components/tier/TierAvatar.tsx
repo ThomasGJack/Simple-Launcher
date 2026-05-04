@@ -111,7 +111,12 @@ export function TierAvatar({
     <div
       className={cn("relative", className)}
       style={{ width: dims.frame, height: dims.frame }}
-      title={`Supporter — ${TIER_LABEL[tier]}`}
+      // Native `title` removed — most parents (Sidebar AvatarButton,
+      // CommunityPage UserRow, MembersList row, etc.) already render
+      // their own custom tooltip with the displayName, and the OS-level
+      // tooltip stacked on top creating a visual collision. The tier
+      // is communicated visually by the frame + corner badge anyway.
+      aria-label={`Supporter — ${TIER_LABEL[tier]}`}
     >
       {tier === "supporter" && <SupporterFrame size={dims} animated={useAnimation} />}
       {tier === "vip" && <VipFrame size={dims} animated={useAnimation} />}
