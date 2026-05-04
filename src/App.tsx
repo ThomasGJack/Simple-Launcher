@@ -21,9 +21,25 @@ import {
   useAchievementsPrimed,
 } from "@/store/firebaseStores";
 import { recordUnlock } from "@/firebase/achievements";
+import {
+  bumpTotalUsersOnce,
+  incrementAchievementCount,
+} from "@/firebase/achievementStats";
 import { recordNotification } from "@/firebase/notifications";
-import { ACHIEVEMENTS, isUnlocked, type AchievementContext } from "@/lib/achievements";
-import { pushAchievementToast, AchievementUnlockToastHost } from "@/components/achievements/AchievementUnlockToast";
+import {
+  ACHIEVEMENTS,
+  computeProgress,
+  isUnlocked,
+  progressPercent,
+  type Achievement,
+  type AchievementContext,
+} from "@/lib/achievements";
+import { achievementFlags } from "@/lib/achievementFlags";
+import {
+  pushAchievementToast,
+  pushMilestoneToast,
+  AchievementUnlockToastHost,
+} from "@/components/achievements/AchievementUnlockToast";
 import { InvitationPopupHost } from "@/components/invitations/InvitationPopup";
 import { LiveActivityToastHost } from "@/components/presence/LiveActivityToastHost";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
@@ -43,6 +59,11 @@ import type { ModuleExitEvent, ModuleLaunchEvent } from "@/lib/modules";
 // (`YYYY-MM-DD_HH-MM_v<version>_<sid>.log`) reflects the real version
 // instead of the "dev" fallback.
 installGlobalLoggerHandlers();
+// Snapshot the launch hour right at module load so the time-of-day
+// achievements (night-owl, early-bird) read a stable value for the
+// duration of the session — Date.getHours() at evaluate-time would
+// silently change if the user kept the app open across midnight.
+achievementFlags.setBootHour(new Date().getHours());
 void (async () => {
   try {
     const v = await getVersion();
@@ -91,6 +112,9 @@ function App() {
         // Persist a slim snapshot so the next offline boot still
         // renders without waiting on Firebase to come back.
         saveCachedUser(firebaseUserAsCached(u));
+        // Bump the global "totalUsers" counter once per uid per boot —
+        // feeds the rarity % shown next to each achievement.
+        bumpTotalUsersOnce(u.uid).catch(() => {});
       } else {
         // Logout / no user → clear the cache so we don't show stale
         // identity on the next launch.
@@ -117,6 +141,9 @@ function App() {
           "Auth listener slow + offline — falling back to cached user",
           { source: "App.boot", metadata: { uid: cached.uid } },
         );
+        // Stamp the local "used offline" achievement flag so lone-wolf
+        // unlocks on the next eval pass.
+        achievementFlags.markOfflineUsed();
         setOfflineUser(cachedUserAsFirebaseUser(cached));
       } else {
         // No cache to fall back on — let the user land on the login
@@ -296,6 +323,7 @@ function App() {
       return Date.now() - u.lastSeen < 60_000;
     }).length;
     const totalLaunches = playtime.reduce((s, p) => s + p.totalLaunches, 0);
+    const distinctModulesLaunched = playtime.filter((p) => p.totalLaunches > 0).length;
     const ctx: AchievementContext = {
       modules: allModules,
       installedCount: 0, // not tracked server-side; using playtime-based proxy
@@ -310,6 +338,10 @@ function App() {
         (c) => c.lastMessage?.senderUid === user.uid,
       ).length,
       totalLaunches,
+      distinctModulesLaunched,
+      bootHour: achievementFlags.getBootHour(),
+      sharedProfileOnce: achievementFlags.hasSharedProfile(),
+      usedOfflineModeOnce: achievementFlags.hasUsedOffline(),
     };
     // Detect newly-unlocked achievements. Two layers of dedup:
     //   1. `unlockedSet` reflects the Firestore-persisted state — once a
@@ -329,6 +361,9 @@ function App() {
             { source: "App.achievements", metadata: { achievementId: ach.id } },
           );
         });
+        // Bump the global rarity counter for this badge. Best-effort
+        // and idempotent at the Firestore level (atomic increment).
+        incrementAchievementCount(ach.id).catch(() => {});
         // Mirror the unlock into the notifications subcollection so it
         // shows up in the bell panel for later reference (the toast is
         // ephemeral). Best-effort — failure here doesn't break the
@@ -347,6 +382,13 @@ function App() {
           source: "App.achievements",
           metadata: { achievementId: ach.id, tier: ach.tier },
         });
+      } else {
+        // Not yet unlocked — emit a "you're getting close" milestone
+        // toast when crossing 75 % / 90 % progress, exactly once per
+        // (achievement, tier) combo. Stored in localStorage rather than
+        // Firestore because it's purely UX nudging, not a persistent
+        // record.
+        maybeMilestoneToast(ach, ctx);
       }
     }
   }, [user, allModules, allUsers, playtime, conversations, unlockedSet, unlockedSetPrimed]);
@@ -406,6 +448,32 @@ function App() {
       <ErrorBoundary scope="live-activity-toast"><LiveActivityToastHost /></ErrorBoundary>
     </>
   );
+}
+
+/**
+ * Fires a milestone toast ("you're 75 % / 90 % of the way there") for an
+ * achievement that has a numeric progress track. Each (id, tier) combo
+ * is rate-limited via localStorage so the user never sees the same nudge
+ * twice. Boolean / time-based achievements have no progress and skip
+ * silently.
+ */
+function maybeMilestoneToast(ach: Achievement, ctx: AchievementContext): void {
+  const progress = computeProgress(ach.id, ctx);
+  if (!progress) return;
+  const pct = progressPercent(progress);
+  if (pct < 75) return;
+  // Pick the highest tier we've crossed for this evaluation. The order
+  // matters — 90 % wins over 75 %.
+  const tier = pct >= 90 ? 90 : 75;
+  const key = `ach.milestone.${ach.id}.${tier}`;
+  try {
+    if (localStorage.getItem(key) === "1") return;
+    localStorage.setItem(key, "1");
+  } catch {
+    // Storage disabled — fall back to in-memory dedup. The toast queue
+    // itself dedupes by id so worst case is one extra nudge per session.
+  }
+  pushMilestoneToast(ach.id, pct);
 }
 
 export default App;

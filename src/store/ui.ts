@@ -6,6 +6,7 @@ export type Route =
   | { name: "module"; moduleId: string }
   | { name: "settings" }
   | { name: "profile" }
+  | { name: "achievements" }
   | { name: "admin" }
   | { name: "admin-builder"; moduleId: string }
   | { name: "community" }

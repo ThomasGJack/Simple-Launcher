@@ -21,6 +21,9 @@ const SettingsPage = lazy(() =>
 const ProfilePage = lazy(() =>
   import("@/pages/ProfilePage").then((m) => ({ default: m.ProfilePage })),
 );
+const AchievementsPage = lazy(() =>
+  import("@/pages/AchievementsPage").then((m) => ({ default: m.AchievementsPage })),
+);
 const AdminPage = lazy(() =>
   import("@/pages/AdminPage").then((m) => ({ default: m.AdminPage })),
 );
@@ -99,6 +102,8 @@ function renderRoute(name: string) {
       return <SettingsPage />;
     case "profile":
       return <ProfilePage />;
+    case "achievements":
+      return <AchievementsPage />;
     case "admin":
       return <AdminPage />;
     case "admin-builder":

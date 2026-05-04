@@ -156,11 +156,25 @@ export function ProfilePage() {
             label="Session moyenne"
             value={avgSessionMs > 0 ? formatPlaytime(avgSessionMs) : "—"}
           />
-          <StatBox
-            icon={Trophy}
-            label="Achievements"
-            value={`${unlockedCount} / ${unlockableTotal}`}
-          />
+          <button
+            type="button"
+            onClick={() => {
+              sounds.click();
+              navigate({ name: "achievements" });
+            }}
+            className="no-drag group relative overflow-hidden rounded-xl bg-amber-400/[0.06] p-4 text-left ring-1 ring-amber-400/20 transition hover:bg-amber-400/[0.1] hover:ring-amber-400/40 hover:shadow-[0_0_24px_rgba(252,211,77,0.3)]"
+          >
+            <div className="mb-1 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-amber-300">
+              <Trophy className="size-3" /> Achievements
+            </div>
+            <div className="font-display text-3xl tabular-nums text-fg-primary">
+              {unlockedCount}
+              <span className="text-base text-fg-muted">/{unlockableTotal}</span>
+            </div>
+            <div className="mt-1 text-[11px] text-amber-200/80 opacity-0 transition-opacity group-hover:opacity-100">
+              Voir tous mes succès →
+            </div>
+          </button>
         </div>
 
         {/* Next-milestone progress bar — caps at 100h (mostly unreachable

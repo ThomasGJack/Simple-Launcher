@@ -10,6 +10,7 @@ import { ModuleParticles } from "@/components/ui/Particles";
 import { FriendsOnlineStrip } from "@/components/home/FriendsOnlineStrip";
 import { NewsCard } from "@/components/home/NewsCard";
 import { ActionsChip } from "@/components/home/ActionsChip";
+import { NextAchievementChip } from "@/components/home/NextAchievementChip";
 
 /**
  * Home page — bento-grid social hub. Surfaces in priority:
@@ -153,6 +154,11 @@ export function HomePage() {
             className="col-span-12 lg:col-span-5"
           >
             <FriendsOnlineStrip />
+            {/* Rotating "almost there" chip — auto-hides if the user has
+                no in-progress achievements. Click → AchievementsPage. */}
+            <div className="mt-4">
+              <NextAchievementChip />
+            </div>
             <NewsCard />
           </motion.div>
         </div>

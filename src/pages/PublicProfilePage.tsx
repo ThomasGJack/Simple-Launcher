@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -34,7 +34,12 @@ import {
   type ProfileThemeId,
 } from "@/lib/profileThemes";
 import { signOut } from "@/firebase/auth";
-import { ACHIEVEMENTS, TIER_STYLES } from "@/lib/achievements";
+import { ACHIEVEMENTS, TIER_STYLES, TIER_WEIGHT } from "@/lib/achievements";
+import {
+  computeRarity,
+  watchAchievementStats,
+  type AchievementStats,
+} from "@/firebase/achievementStats";
 import { conversationIdFor } from "@/types/messaging";
 import { ensureConversation } from "@/firebase/messaging";
 import { sounds } from "@/lib/sounds";
@@ -112,7 +117,37 @@ export function PublicProfilePage() {
   }, [playtime, modules, profile?.pinnedModuleIds]);
 
   const unlockedById = useMemo(() => new Set(unlocked.map((u) => u.id)), [unlocked]);
+  const unlockedAtById = useMemo(
+    () => new Map(unlocked.map((u) => [u.id, u.unlockedAt] as const)),
+    [unlocked],
+  );
   const visibleAchievements = ACHIEVEMENTS.filter((a) => !a.secret || unlockedById.has(a.id));
+
+  // Trophy showcase — pick the user's 6 most prestigious unlocks
+  // (platinum first, then by tier weight desc, then by most recent
+  // unlock date among ties). Drives the highlight strip above the
+  // detailed badge grid further down on the page.
+  const trophyShowcase = useMemo(() => {
+    const unlockedWithMeta = ACHIEVEMENTS.filter((a) => unlockedById.has(a.id));
+    return unlockedWithMeta
+      .sort((a, b) => {
+        const tierDiff = TIER_WEIGHT[b.tier] - TIER_WEIGHT[a.tier];
+        if (tierDiff !== 0) return tierDiff;
+        return (
+          (unlockedAtById.get(b.id) ?? 0) - (unlockedAtById.get(a.id) ?? 0)
+        );
+      })
+      .slice(0, 6);
+  }, [unlockedById, unlockedAtById]);
+
+  // Live rarity data — read once per public profile view. Used to show
+  // "5 % des joueurs l'ont" under each badge in the showcase.
+  const [rarityStats, setRarityStats] = useState<AchievementStats>({
+    counts: {},
+    totalUsers: 0,
+  });
+  useEffect(() => watchAchievementStats(setRarityStats), []);
+  const rarityPercents = useMemo(() => computeRarity(rarityStats), [rarityStats]);
 
   const isMe = me?.uid === targetUid;
   const [editing, setEditing] = useState(false);
@@ -416,9 +451,67 @@ export function PublicProfilePage() {
           </div>
           )}
 
+          {/* Trophy showcase — the 6 most prestigious unlocked badges
+              displayed front-and-center, with rarity %. Hidden if the
+              user hasn't unlocked anything yet. */}
+          {trophyShowcase.length > 0 && (
+            <div className="rounded-2xl bg-gradient-to-br from-amber-500/[0.08] via-amber-400/[0.04] to-transparent p-5 ring-1 ring-amber-400/20">
+              <h2 className="mb-3 inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-amber-300">
+                <Trophy className="size-3" /> Vitrine — top {trophyShowcase.length}
+              </h2>
+              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+                {trophyShowcase.map((ach) => {
+                  const tier = TIER_STYLES[ach.tier];
+                  const Icon = ach.icon;
+                  const rarity =
+                    rarityStats.totalUsers > 0
+                      ? rarityPercents[ach.id] ?? 0
+                      : null;
+                  return (
+                    <div
+                      key={ach.id}
+                      className={cn(
+                        "flex flex-col items-center gap-2 rounded-xl bg-bg-base/40 p-3.5 ring-1 transition-all",
+                        tier.ring,
+                        tier.glow,
+                      )}
+                      title={ach.description}
+                    >
+                      <div
+                        className={cn(
+                          "grid size-12 place-items-center rounded-xl ring-1",
+                          tier.bg,
+                          tier.text,
+                          tier.ring,
+                        )}
+                      >
+                        <Icon className="size-6" strokeWidth={2} />
+                      </div>
+                      <div className="text-center">
+                        <div className="text-[11px] font-medium leading-tight text-fg-primary">
+                          {ach.title}
+                        </div>
+                        <div className="mt-0.5 text-[9px] uppercase tracking-wider text-fg-dim">
+                          {tier.label}
+                        </div>
+                        {rarity != null && (
+                          <div className="mt-1 text-[9px] text-cyan-300/80">
+                            {rarity < 1
+                              ? "< 1 %"
+                              : `${rarity.toFixed(rarity < 10 ? 1 : 0)} % des joueurs`}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="rounded-2xl glass p-5">
             <h2 className="mb-3 inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-fg-muted">
-              <Trophy className="size-3" /> Badges
+              <Trophy className="size-3" /> Tous les badges
             </h2>
             <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
               {visibleAchievements.map((ach) => {

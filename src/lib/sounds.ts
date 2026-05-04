@@ -123,6 +123,45 @@ export const sounds = {
     // Faint shimmer overtone for sparkle
     play({ freq: 2637, duration: 0.12, type: "sine", volume: 0.06, release: 0.1 }, 0.21);
   },
+  // ─── Achievement unlock jingles, one per tier ──────────────────────
+  // Bronze : two-tone clink, like a coin landing. Modest and short.
+  achievementBronze() {
+    play({ freq: 523, duration: 0.08, type: "triangle", volume: 0.16 }); // C5
+    play({ freq: 659, duration: 0.12, type: "triangle", volume: 0.14 }, 0.07); // E5
+  },
+  // Silver : 3-note rising arpeggio, slightly brighter timbre.
+  achievementSilver() {
+    play({ freq: 587, duration: 0.08, type: "sine", volume: 0.18 }); // D5
+    play({ freq: 740, duration: 0.08, type: "sine", volume: 0.18 }, 0.08); // F#5
+    play({ freq: 880, duration: 0.18, type: "sine", volume: 0.18, release: 0.2 }, 0.16); // A5
+  },
+  // Gold : ascending major triad with a sparkle overtone.
+  achievementGold() {
+    play({ freq: 659, duration: 0.09, type: "sine", volume: 0.2 }); // E5
+    play({ freq: 831, duration: 0.09, type: "sine", volume: 0.2 }, 0.08); // G#5
+    play({ freq: 988, duration: 0.09, type: "sine", volume: 0.2 }, 0.16); // B5
+    play({ freq: 1319, duration: 0.22, type: "sine", volume: 0.18, release: 0.24 }, 0.24); // E6
+    play({ freq: 2637, duration: 0.16, type: "sine", volume: 0.06, release: 0.14 }, 0.24); // shimmer
+  },
+  // Platinum : full ascending pentatonic with deep sub-bass and a
+  // shimmering high overtone — feels like a "you did it!" finale.
+  achievementPlatinum() {
+    play({ freq: 130, duration: 0.45, type: "triangle", volume: 0.12, release: 0.42 }); // C3 sub
+    play({ freq: 523, duration: 0.1, type: "sine", volume: 0.2 }); // C5
+    play({ freq: 659, duration: 0.1, type: "sine", volume: 0.2 }, 0.09); // E5
+    play({ freq: 784, duration: 0.1, type: "sine", volume: 0.2 }, 0.18); // G5
+    play({ freq: 1047, duration: 0.1, type: "sine", volume: 0.2 }, 0.27); // C6
+    play({ freq: 1319, duration: 0.32, type: "sine", volume: 0.22, release: 0.36 }, 0.36); // E6
+    play({ freq: 2093, duration: 0.18, type: "sine", volume: 0.08, release: 0.18 }, 0.36); // C7 shimmer
+    play({ freq: 3136, duration: 0.16, type: "sine", volume: 0.05, release: 0.16 }, 0.36); // G7 shimmer
+  },
+  // Quieter chime used for the 75 % / 90 % "almost there" milestone
+  // toast — same shape as `success` but with a faint ascending tail to
+  // suggest progress rather than completion.
+  achievementMilestone() {
+    play({ freq: 740, duration: 0.07, type: "sine", volume: 0.12 });
+    play({ freq: 988, duration: 0.1, type: "sine", volume: 0.1 }, 0.06);
+  },
 };
 
 // Auto-init enabled flag from storage on import

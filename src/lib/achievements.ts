@@ -19,6 +19,12 @@ export type Achievement = {
   tier: "bronze" | "silver" | "gold" | "platinum";
   /** Hidden until unlocked — surprise factor. */
   secret?: boolean;
+  /**
+   * Cryptic clue rendered when the achievement is locked AND `secret`.
+   * Lets players guess what triggers it without giving the full
+   * description away. No hint = no help (true mystery).
+   */
+  hint?: string;
 };
 
 export type AchievementContext = {
@@ -35,6 +41,15 @@ export type AchievementContext = {
   totalMessagesSent: number;
   /** All-time number of game launches summed across modules. */
   totalLaunches: number;
+  /** Distinct module IDs the user has launched at least once. */
+  distinctModulesLaunched: number;
+  /** Hour-of-day (0-23) when the launcher last booted, used by
+   *  time-of-day secrets like "night-owl" and "early-bird". */
+  bootHour: number;
+  /** True if the user opened the share-profile modal at least once. */
+  sharedProfileOnce: boolean;
+  /** True if the user accessed the launcher in offline mode at least once. */
+  usedOfflineModeOnce: boolean;
 };
 
 /**
@@ -126,6 +141,52 @@ export const ACHIEVEMENTS: Achievement[] = [
     icon: Flame,
     tier: "gold",
   },
+  // ─── Hidden achievements (with cryptic hints) ──────────────────────
+  {
+    id: "night-owl",
+    title: "Hibou de nuit",
+    description: "Lance le launcher entre minuit et 5h du matin",
+    icon: Sparkles,
+    tier: "silver",
+    secret: true,
+    hint: "L'horloge tourne encore quand le monde dort…",
+  },
+  {
+    id: "early-bird",
+    title: "Lève-tôt",
+    description: "Lance le launcher entre 5h et 7h du matin",
+    icon: Sparkles,
+    tier: "silver",
+    secret: true,
+    hint: "Le café fume avant que le soleil ne se lève.",
+  },
+  {
+    id: "explorer",
+    title: "Touche-à-tout",
+    description: "Lance 5 modules différents au moins une fois",
+    icon: Star,
+    tier: "silver",
+    secret: true,
+    hint: "Pourquoi se contenter d'un seul jeu ?",
+  },
+  {
+    id: "evangelist",
+    title: "Évangéliste",
+    description: "Partage ton profil au moins une fois (lien ou QR)",
+    icon: Sparkles,
+    tier: "bronze",
+    secret: true,
+    hint: "Le bouche-à-oreille est la meilleure pub.",
+  },
+  {
+    id: "lone-wolf",
+    title: "Loup solitaire",
+    description: "Utilise le launcher en mode hors ligne",
+    icon: Sparkles,
+    tier: "bronze",
+    secret: true,
+    hint: "Pas besoin du réseau pour s'amuser.",
+  },
   {
     id: "platinum",
     title: "Légende du launcher",
@@ -133,8 +194,71 @@ export const ACHIEVEMENTS: Achievement[] = [
     icon: Trophy,
     tier: "platinum",
     secret: true,
+    hint: "Réveille la légende qui sommeille en toi.",
   },
 ];
+
+/** Numeric progress descriptor. `current` clamps to `[0, threshold]`. */
+export type AchievementProgress = {
+  current: number;
+  threshold: number;
+};
+
+/**
+ * Compute the numeric progress towards an achievement. Returns null for
+ * achievements that have no meaningful progress bar (boolean-style
+ * unlocks like "first-launch"). The UI uses this to render an inline
+ * "23 / 100" bar on locked entries and to drive the milestone toasts at
+ * 75 % / 90 % thresholds.
+ */
+export function computeProgress(
+  id: string,
+  ctx: AchievementContext,
+): AchievementProgress | null {
+  const ms = totalPlaytimeMs(ctx);
+  switch (id) {
+    case "playtime-1h":
+      return { current: ms, threshold: 60 * 60 * 1000 };
+    case "playtime-10h":
+      return { current: ms, threshold: 10 * 60 * 60 * 1000 };
+    case "playtime-100h":
+      return { current: ms, threshold: 100 * 60 * 60 * 1000 };
+    case "library-3-games":
+      return { current: ctx.installedCount, threshold: 3 };
+    case "library-5-games":
+      return { current: ctx.installedCount, threshold: 5 };
+    case "social-3-friends":
+      return { current: ctx.distinctChatPartners, threshold: 3 };
+    case "social-popular":
+      return { current: ctx.totalMessagesSent, threshold: 100 };
+    case "session-spree":
+      return { current: ctx.totalLaunches, threshold: 50 };
+    case "explorer":
+      return { current: ctx.distinctModulesLaunched, threshold: 5 };
+    default:
+      // Boolean achievements (first-launch, first-message, time-of-day,
+      // platinum, …) don't have a numeric track.
+      return null;
+  }
+}
+
+/** Human-readable formatter for `current` / `threshold`. Picks units
+ *  appropriate to the achievement (hours for ms thresholds, integers
+ *  otherwise). */
+export function formatProgress(id: string, progress: AchievementProgress): string {
+  if (id.startsWith("playtime-")) {
+    const hours = progress.current / 3_600_000;
+    const target = progress.threshold / 3_600_000;
+    return `${hours.toFixed(hours < 10 ? 1 : 0)} / ${target} h`;
+  }
+  return `${Math.min(progress.current, progress.threshold)} / ${progress.threshold}`;
+}
+
+/** Percent in `[0, 100]`. Returns 0 for invalid thresholds (defensive). */
+export function progressPercent(progress: AchievementProgress): number {
+  if (progress.threshold <= 0) return 0;
+  return Math.max(0, Math.min(100, (progress.current / progress.threshold) * 100));
+}
 
 /**
  * Evaluates the unlock condition for an achievement against the current
@@ -142,6 +266,11 @@ export const ACHIEVEMENTS: Achievement[] = [
  * (avoiding closure capture in the catalog above).
  */
 export function isUnlocked(id: string, ctx: AchievementContext): boolean {
+  // Numeric achievements: delegate to the progress helper for a single
+  // source of truth on thresholds.
+  const progress = computeProgress(id, ctx);
+  if (progress) return progress.current >= progress.threshold;
+
   switch (id) {
     case "first-launch":
       return true; // implicit — user is in the app right now
@@ -151,22 +280,14 @@ export function isUnlocked(id: string, ctx: AchievementContext): boolean {
       return ctx.totalLaunches > 0;
     case "first-message":
       return ctx.totalMessagesSent > 0 || ctx.conversations.some((c) => !!c.lastMessage);
-    case "playtime-1h":
-      return totalPlaytimeMs(ctx) >= 60 * 60 * 1000;
-    case "playtime-10h":
-      return totalPlaytimeMs(ctx) >= 10 * 60 * 60 * 1000;
-    case "playtime-100h":
-      return totalPlaytimeMs(ctx) >= 100 * 60 * 60 * 1000;
-    case "library-3-games":
-      return ctx.installedCount >= 3;
-    case "library-5-games":
-      return ctx.installedCount >= 5;
-    case "social-3-friends":
-      return ctx.distinctChatPartners >= 3;
-    case "social-popular":
-      return ctx.totalMessagesSent >= 100;
-    case "session-spree":
-      return ctx.totalLaunches >= 50;
+    case "night-owl":
+      return ctx.bootHour >= 0 && ctx.bootHour < 5;
+    case "early-bird":
+      return ctx.bootHour >= 5 && ctx.bootHour < 7;
+    case "evangelist":
+      return ctx.sharedProfileOnce;
+    case "lone-wolf":
+      return ctx.usedOfflineModeOnce;
     case "platinum": {
       // All non-secret + non-platinum unlocked
       const others = ACHIEVEMENTS.filter((a) => !a.secret && a.id !== "platinum");
@@ -212,3 +333,12 @@ export const TIER_STYLES = {
     label: "Platine",
   },
 } as const;
+
+/** Numeric weight of each tier — used to sort the showcase / top picks
+ *  so platinum > gold > silver > bronze regardless of unlock date. */
+export const TIER_WEIGHT: Record<Achievement["tier"], number> = {
+  bronze: 1,
+  silver: 2,
+  gold: 3,
+  platinum: 4,
+};

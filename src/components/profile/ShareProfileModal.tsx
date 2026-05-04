@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
+import { achievementFlags } from "@/lib/achievementFlags";
 
 /**
  * Profile sharing modal — shows the public URL of the user's launcher
@@ -39,6 +40,9 @@ export function ShareProfileModal({
 
   useEffect(() => {
     if (!open) return;
+    // Stamp the local achievement flag the very first time the modal is
+    // opened — this is what unlocks the secret "evangelist" badge.
+    achievementFlags.markProfileShared();
     let cancelled = false;
     (async () => {
       setQrDataUrl(null);
