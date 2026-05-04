@@ -27,6 +27,14 @@ import { pushAchievementToast, AchievementUnlockToastHost } from "@/components/a
 import { InvitationPopupHost } from "@/components/invitations/InvitationPopup";
 import { LiveActivityToastHost } from "@/components/presence/LiveActivityToastHost";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
+import { OfflineBanner } from "@/components/layout/OfflineBanner";
+import {
+  cachedUserAsFirebaseUser,
+  firebaseUserAsCached,
+  loadCachedUser,
+  saveCachedUser,
+} from "@/lib/offlineCache";
+import { useOnlineStore } from "@/lib/online";
 import type { ModuleExitEvent, ModuleLaunchEvent } from "@/lib/modules";
 
 // Install window.error / window.unhandledrejection capture eagerly at
@@ -47,22 +55,47 @@ void (async () => {
 
 function App() {
   const setUser = useAuthStore((s) => s.setUser);
+  const setOfflineUser = useAuthStore((s) => s.setOfflineUser);
   const setLoading = useAuthStore((s) => s.setLoading);
   const loading = useAuthStore((s) => s.loading);
   const user = useAuthStore((s) => s.user);
+  const mode = useAuthStore((s) => s.mode);
   const route = useUIStore((s) => s.route);
   const navigate = useUIStore((s) => s.navigate);
 
+  // ─── Auth bootstrap with offline fallback ──────────────────────────
+  //
+  // Firebase's `onAuthStateChanged` fires immediately with the locally
+  // persisted user when the app boots, even when offline — but ONLY if
+  // the persistence layer manages to hydrate. On a cold offline boot
+  // with a corrupt or missing IndexedDB / localStorage, the callback
+  // can hang for the full network timeout (~30 s) before resolving to
+  // null. That's the "white page" the user sees.
+  //
+  // To fix: race the real listener against a 4-second wall clock that
+  // falls back to whatever we cached in `offline.user.v1` from the
+  // previous successful login. If the listener ever fires later (e.g.
+  // network comes back mid-session), it overwrites the cached snapshot
+  // and switches the store back to "online" mode.
   useEffect(() => {
     const fb = getFirebase();
     if (!fb) {
       setLoading(false);
       return;
     }
+    let resolvedByListener = false;
     const unsubscribe = onAuthStateChanged(fb.auth, (u) => {
+      resolvedByListener = true;
       setUser(u);
-      // Bind logger identity so subsequent logs ship with uid + display name
-      // attached. Buffered anonymous logs from before login get backfilled.
+      if (u) {
+        // Persist a slim snapshot so the next offline boot still
+        // renders without waiting on Firebase to come back.
+        saveCachedUser(firebaseUserAsCached(u));
+      } else {
+        // Logout / no user → clear the cache so we don't show stale
+        // identity on the next launch.
+        saveCachedUser(null);
+      }
       logger.setUser(u?.uid ?? null, u?.displayName ?? null, u?.photoURL ?? null);
       if (u) {
         logger.action("Login", { source: "App", metadata: { uid: u.uid } });
@@ -70,8 +103,33 @@ function App() {
         logger.action("Logout", { source: "App" });
       }
     });
-    return () => unsubscribe();
-  }, [setUser, setLoading]);
+
+    // 4 s fallback — short enough that a slow boot still feels snappy,
+    // long enough that a normal warm IndexedDB hydrate (~50–500 ms)
+    // beats it. Only kicks in when the listener hasn't fired yet AND
+    // we have something cached AND we're actually offline.
+    const timer = setTimeout(() => {
+      if (resolvedByListener) return;
+      const cached = loadCachedUser();
+      const online = useOnlineStore.getState().online;
+      if (cached && !online) {
+        logger.warn(
+          "Auth listener slow + offline — falling back to cached user",
+          { source: "App.boot", metadata: { uid: cached.uid } },
+        );
+        setOfflineUser(cachedUserAsFirebaseUser(cached));
+      } else {
+        // No cache to fall back on — let the user land on the login
+        // page rather than spin forever.
+        setLoading(false);
+      }
+    }, 4_000);
+
+    return () => {
+      clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [setUser, setOfflineUser, setLoading]);
 
   // Log every page navigation as an action — gives the admin a breadcrumb
   // trail of what the user did before any bug was reported.
@@ -127,6 +185,13 @@ function App() {
       navigate({ name: "home" });
     }
   }, [loading, user, route, navigate]);
+
+  // ─── Mount the offline-mode banner host once auth is settled. The
+  // banner reads `useOnline()` itself; this block just makes sure it's
+  // rendered above the AppShell and remains visible even when auth is
+  // still loading. Hidden when the route is "login" so we don't double
+  // up the offline messaging there.
+  const showOfflineBanner = mode !== "anon" && route.name !== "login";
 
   useEffect(() => {
     if (!user) return;
@@ -331,6 +396,7 @@ function App() {
 
   return (
     <>
+      {showOfflineBanner && <OfflineBanner />}
       <AppShell />
       {/* Each top-level host is wrapped in its own ErrorBoundary so a
           crash in one (e.g. a malformed Firestore snapshot) doesn't kill

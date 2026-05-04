@@ -1,8 +1,14 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, CloudOff, Library } from "lucide-react";
 import { loginWithDiscord } from "@/firebase/auth";
 import { useUIStore } from "@/store/ui";
+import { useOnline } from "@/lib/online";
+import {
+  cachedUserAsFirebaseUser,
+  loadCachedUser,
+} from "@/lib/offlineCache";
+import { useAuthStore } from "@/store/auth";
 
 const DiscordIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -12,8 +18,11 @@ const DiscordIcon = ({ className }: { className?: string }) => (
 
 export function LoginPage() {
   const navigate = useUIStore((s) => s.navigate);
+  const setOfflineUser = useAuthStore((s) => s.setOfflineUser);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const online = useOnline();
+  const cachedUser = loadCachedUser();
 
   const handleDiscordLogin = async () => {
     setLoading(true);
@@ -28,6 +37,12 @@ export function LoginPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleOfflineEnter = () => {
+    if (!cachedUser) return;
+    setOfflineUser(cachedUserAsFirebaseUser(cachedUser));
+    navigate({ name: "home" });
   };
 
   return (
@@ -52,15 +67,54 @@ export function LoginPage() {
         </div>
 
         <motion.button
-          whileHover={{ scale: loading ? 1 : 1.02 }}
-          whileTap={{ scale: loading ? 1 : 0.98 }}
+          whileHover={{ scale: loading || !online ? 1 : 1.02 }}
+          whileTap={{ scale: loading || !online ? 1 : 0.98 }}
           onClick={handleDiscordLogin}
-          disabled={loading}
+          disabled={loading || !online}
           className="no-drag flex w-full items-center justify-center gap-3 rounded-2xl bg-[#5865F2] px-6 py-4 font-medium text-white shadow-[0_0_24px_rgba(88,101,242,0.4)] transition-shadow hover:shadow-[0_0_36px_rgba(88,101,242,0.6)] disabled:opacity-60"
         >
           <DiscordIcon className="size-5" />
-          <span>{loading ? "En attente de Discord…" : "Se connecter avec Discord"}</span>
+          <span>
+            {loading
+              ? "En attente de Discord…"
+              : !online
+                ? "Pas de connexion internet"
+                : "Se connecter avec Discord"}
+          </span>
         </motion.button>
+
+        {/* Offline rescue: if the user has logged in before (we have a
+            cached identity in localStorage) and we're currently offline,
+            offer a one-tap path back into the app in read-only mode so
+            they can still launch already-installed games. The button is
+            hidden when online — Discord login is then the natural flow. */}
+        {!online && cachedUser && (
+          <motion.button
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            onClick={handleOfflineEnter}
+            className="no-drag mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-white/[0.04] px-6 py-3 text-sm text-fg-primary ring-1 ring-white/[0.08] hover:bg-white/[0.08]"
+          >
+            <Library className="size-4" />
+            <span>Continuer hors ligne ({cachedUser.displayName ?? "compte local"})</span>
+          </motion.button>
+        )}
+
+        {!online && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="mt-4 flex items-start gap-3 rounded-xl bg-amber-500/10 p-4 text-sm ring-1 ring-amber-500/30"
+          >
+            <CloudOff className="mt-0.5 size-4 shrink-0 text-amber-300" strokeWidth={2.5} />
+            <p className="text-fg-primary">
+              Aucune connexion détectée. La connexion Discord nécessite internet ;
+              {cachedUser
+                ? " sinon clique sur 'Continuer hors ligne' pour accéder aux jeux déjà installés."
+                : " réessaie quand le réseau sera de retour."}
+            </p>
+          </motion.div>
+        )}
 
         {error && (
           <motion.div

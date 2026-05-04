@@ -29,18 +29,28 @@ import { watchConversationsFor } from "@/firebase/messaging";
 import { watchPlaytime, type PlaytimeEntry } from "@/firebase/playtime";
 import { watchAchievements, type UnlockedAchievement } from "@/firebase/achievements";
 import { watchNotifications, type AppNotification } from "@/firebase/notifications";
+import { loadCachedModules, saveCachedModules } from "@/lib/offlineCache";
 import type { LauncherModule } from "@/types/module";
 import type { Conversation } from "@/types/messaging";
 
 // ─── Helper: ref-counted single-key store (no per-uid keying) ──────────
 
-function makeSharedStore<T>(initial: T, watch: (cb: (data: T) => void) => () => void) {
+function makeSharedStore<T>(
+  initial: T,
+  watch: (cb: (data: T) => void) => () => void,
+  options: { initiallyPrimed?: boolean } = {},
+) {
   // `primed` flips to true after the first snapshot fires. Lets consumers
   // distinguish "loading" from "loaded but empty" without needing their
   // own state. Reset to false when the watcher stops.
+  //
+  // `initiallyPrimed` lets a caller hot-seed `data` from a synchronous
+  // source (e.g. localStorage at boot) and skip the loading state — used
+  // by the modules store to render the offline-cached library before
+  // Firestore even gets a chance to respond.
   const useStore = create<{ data: T; primed: boolean }>(() => ({
     data: initial,
-    primed: false,
+    primed: !!options.initiallyPrimed,
   }));
   let unsubscribe: (() => void) | null = null;
   let refCount = 0;
@@ -146,7 +156,22 @@ export const useUsers = usersStore.useData;
 /** True once the first users snapshot has fired. */
 export const useUsersPrimed = usersStore.usePrimed;
 
-const modulesStore = makeSharedStore<LauncherModule[]>([], (cb) => watchModules(cb));
+// Modules: hot-seed the store with the last cached snapshot at module-
+// load time so the offline boot path renders the user's library
+// immediately, without waiting for the (potentially never-firing)
+// Firestore listener. The real listener overrides this once it fires.
+const cachedModulesAtBoot = loadCachedModules();
+const modulesStore = makeSharedStore<LauncherModule[]>(
+  cachedModulesAtBoot,
+  (cb) =>
+    watchModules((data) => {
+      // Persist every fresh snapshot so the next offline boot has the
+      // most recent server state to fall back on.
+      saveCachedModules(data);
+      cb(data);
+    }),
+  { initiallyPrimed: cachedModulesAtBoot.length > 0 },
+);
 /** Live list of every published module. */
 export const useModules = modulesStore.useData;
 /** True once the first modules snapshot has fired. */
