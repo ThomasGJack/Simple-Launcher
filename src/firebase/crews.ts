@@ -1,5 +1,7 @@
 import {
   addDoc,
+  arrayRemove,
+  arrayUnion,
   collection,
   collectionGroup,
   deleteDoc,
@@ -123,11 +125,22 @@ export type CrewMessage = {
   /** Image attachment URL (from Firebase Storage). Set when the
    *  sender uploaded an image inline. Phase 4 — reserved for now. */
   imageUrl: string | null;
+  /**
+   * Emoji reactions, stored inline on the message doc as a map
+   * `{ "👍": ["uid1", "uid2"], "🔥": ["uid3"] }`. Inline (rather than
+   * a /reactions subcollection) so a channel only needs ONE listener
+   * (`watchChannelMessages`) to render reactions for every message —
+   * see perf Phase 2.3. Atomic via `arrayUnion` / `arrayRemove`.
+   */
+  reactions: Record<string, string[]>;
 };
 
+/**
+ * Legacy shape for reactions that lived in a subcollection. Kept for
+ * backward compatibility with `watchMessageReactions` (now deprecated)
+ * — see CrewMessage.reactions for the new inline storage.
+ */
 export type CrewReaction = {
-  /** Doc id is `${uid}__${emoji}` so a user can react with multiple
-   *  emojis on the same message but only once per (user, emoji) pair. */
   uid: string;
   emoji: string;
   addedAt: number;
@@ -319,6 +332,17 @@ function parseMessage(d: { id: string; data: () => Record<string, unknown> }): C
   const mentions = Array.isArray(data.mentionedUids)
     ? (data.mentionedUids as unknown[]).filter((m): m is string => typeof m === "string")
     : [];
+  // Reactions are a Map<emoji, uid[]>. Defensive parsing for older
+  // docs that don't have the field yet.
+  const reactions: Record<string, string[]> = {};
+  if (data.reactions && typeof data.reactions === "object") {
+    for (const [emoji, uids] of Object.entries(data.reactions as Record<string, unknown>)) {
+      if (Array.isArray(uids)) {
+        const list = (uids as unknown[]).filter((u): u is string => typeof u === "string");
+        if (list.length > 0) reactions[emoji] = list;
+      }
+    }
+  }
   return {
     id: d.id,
     text: typeof data.text === "string" ? data.text : "",
@@ -334,6 +358,7 @@ function parseMessage(d: { id: string; data: () => Record<string, unknown> }): C
       typeof data.replyToSenderName === "string" ? data.replyToSenderName : null,
     mentionedUids: mentions,
     imageUrl: typeof data.imageUrl === "string" ? data.imageUrl : null,
+    reactions,
   };
 }
 
@@ -599,8 +624,14 @@ export async function setMessagePinned(
   );
 }
 
-/** Add an emoji reaction to a message. One doc per (uid, emoji) pair —
- *  the doc id encodes both so a user can react with several emojis. */
+/**
+ * Add an emoji reaction to a message. Stored inline on the message
+ * doc as `reactions: { "👍": [uid, ...] }` via arrayUnion (idempotent
+ * — re-reacting with the same emoji is a no-op). This replaces the
+ * previous /reactions subcollection that required a per-message
+ * onSnapshot listener (50 listeners per channel). Now reactions are
+ * delivered alongside the message via watchChannelMessages.
+ */
 export async function addMessageReaction(
   crewId: string,
   channelId: string,
@@ -610,22 +641,18 @@ export async function addMessageReaction(
 ): Promise<void> {
   const fb = getFirebase();
   if (!fb) throw new Error("Firebase not configured");
-  await setDoc(
-    doc(
-      fb.db,
-      "crews",
-      crewId,
-      "channels",
-      channelId,
-      "messages",
-      messageId,
-      "reactions",
-      `${uid}__${emoji}`,
-    ),
-    { uid, emoji, addedAt: serverTimestamp() },
+  await updateDoc(
+    doc(fb.db, "crews", crewId, "channels", channelId, "messages", messageId),
+    { [`reactions.${emoji}`]: arrayUnion(uid) },
   );
 }
 
+/**
+ * Remove an emoji reaction. arrayRemove is idempotent — calling it
+ * when the user hasn't reacted is a no-op. Empty arrays remain in
+ * the doc until the next message edit ; the parser filters them out
+ * client-side so they don't appear in the UI.
+ */
 export async function removeMessageReaction(
   crewId: string,
   channelId: string,
@@ -635,18 +662,9 @@ export async function removeMessageReaction(
 ): Promise<void> {
   const fb = getFirebase();
   if (!fb) throw new Error("Firebase not configured");
-  await deleteDoc(
-    doc(
-      fb.db,
-      "crews",
-      crewId,
-      "channels",
-      channelId,
-      "messages",
-      messageId,
-      "reactions",
-      `${uid}__${emoji}`,
-    ),
+  await updateDoc(
+    doc(fb.db, "crews", crewId, "channels", channelId, "messages", messageId),
+    { [`reactions.${emoji}`]: arrayRemove(uid) },
   );
 }
 

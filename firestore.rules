@@ -190,11 +190,25 @@ service cloud.firestore {
           allow create: if isCrewMember() &&
             request.resource.data.senderUid == request.auth.uid;
           // Edits : sender (text + editedAt). Pin toggle : owner/admin
-          // (gated client-side too). Combine both into a single update
-          // rule that allows either.
+          // (gated client-side too). Reactions : every crew member
+          // can append/remove their own uid in the inline reactions
+          // map (perf Phase 2.3 — moved from /reactions subcollection
+          // to message.reactions Map<emoji, uid[]>).
+          //
+          // Rule logic :
+          //   - sender can update anything (typo fix → text/editedAt)
+          //   - admin/owner can update anything (pin toggle, mod)
+          //   - any member can update if and only if the diff touches
+          //     only the `reactions` field (no impersonation possible
+          //     because the field is appended via arrayUnion and rules
+          //     evaluate the resulting state)
           allow update: if request.auth != null && (
             resource.data.senderUid == request.auth.uid ||
-            isCrewAdminOrOwner()
+            isCrewAdminOrOwner() ||
+            (
+              isCrewMember() &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions'])
+            )
           );
           // Deletes : sender or owner/admin (mod).
           allow delete: if request.auth != null &&

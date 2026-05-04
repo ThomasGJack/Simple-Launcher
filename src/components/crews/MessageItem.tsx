@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Check,
@@ -18,9 +18,7 @@ import {
   editChannelMessage,
   removeMessageReaction,
   setMessagePinned,
-  watchMessageReactions,
   type CrewMessage,
-  type CrewReaction,
 } from "@/firebase/crews";
 import {
   renderMessageMarkdown,
@@ -68,7 +66,6 @@ export const MessageItem = memo(function MessageItem({
   grouped: boolean;
   onReply: () => void;
 }) {
-  const [reactions, setReactions] = useState<CrewReaction[]>([]);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(message.text);
@@ -79,26 +76,23 @@ export const MessageItem = memo(function MessageItem({
   const canDelete = isMine || amOwnerOrAdmin;
   const canPin = amOwnerOrAdmin;
 
-  useEffect(
-    () =>
-      watchMessageReactions(crewId, channelId, message.id, setReactions),
-    [crewId, channelId, message.id],
-  );
-
-  // Group the reactions doc list into { emoji: [uid, uid, ...] } and
-  // pre-flag whether the current user already reacted with each emoji.
+  // Reactions are now delivered inline on the message doc (see perf
+  // Phase 2.3) — no per-message listener. The map is already
+  // `Record<emoji, uid[]>`, we just need to flag whether the current
+  // viewer reacted and sort by count for display.
   const groupedReactions = useMemo(() => {
     const map = new Map<string, { uids: string[]; iReacted: boolean }>();
-    for (const r of reactions) {
-      const entry = map.get(r.emoji) ?? { uids: [], iReacted: false };
-      entry.uids.push(r.uid);
-      if (r.uid === myUid) entry.iReacted = true;
-      map.set(r.emoji, entry);
+    for (const [emoji, uids] of Object.entries(message.reactions)) {
+      if (!uids.length) continue;
+      map.set(emoji, {
+        uids,
+        iReacted: uids.includes(myUid),
+      });
     }
     return Array.from(map.entries()).sort(
       (a, b) => b[1].uids.length - a[1].uids.length,
     );
-  }, [reactions, myUid]);
+  }, [message.reactions, myUid]);
 
   // Resolve uid → displayName from the live users store. Falls back to
   // the truncated uid if the user is no longer in the store (left,
@@ -425,6 +419,7 @@ export const MessageItem = memo(function MessageItem({
     prev.message.senderName === next.message.senderName &&
     prev.message.senderAvatar === next.message.senderAvatar &&
     prev.message.sentAt === next.message.sentAt &&
+    reactionsEqual(prev.message.reactions, next.message.reactions) &&
     prev.crewId === next.crewId &&
     prev.channelId === next.channelId &&
     prev.myUid === next.myUid &&
@@ -432,6 +427,30 @@ export const MessageItem = memo(function MessageItem({
     prev.grouped === next.grouped
   );
 });
+
+/**
+ * Shallow compare two reaction maps. Returns true when both contain
+ * the same emojis in the same order with identical uid arrays.
+ * Used by MessageItem's memo comparator — without it, every snapshot
+ * would emit a fresh map and bust the memo.
+ */
+function reactionsEqual(
+  a: Record<string, string[]>,
+  b: Record<string, string[]>,
+): boolean {
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  for (const k of aKeys) {
+    const av = a[k];
+    const bv = b[k];
+    if (!bv || av.length !== bv.length) return false;
+    for (let i = 0; i < av.length; i++) {
+      if (av[i] !== bv[i]) return false;
+    }
+  }
+  return true;
+}
 
 /** Renders the message body with markdown + mention pills. */
 function MessageBody({
