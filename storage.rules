@@ -39,6 +39,23 @@ service firebase.storage {
       allow delete: if request.auth != null && request.auth.uid == uid;
     }
 
+    // Custom crew icon images. Public read (so any authed launcher can
+    // show the icon in the sidebar / discovery list), write restricted
+    // to the crew owner via a Firestore lookup. 2 MiB cap because
+    // these get rendered at 12×12 px most of the time — no need for
+    // a 5 MB asset.
+    match /crews/{crewId}/{file} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null &&
+        firestore.exists(/databases/(default)/documents/crews/$(crewId)) &&
+        firestore.get(/databases/(default)/documents/crews/$(crewId)).data.ownerUid == request.auth.uid &&
+        request.resource.size < 2 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null &&
+        firestore.exists(/databases/(default)/documents/crews/$(crewId)) &&
+        firestore.get(/databases/(default)/documents/crews/$(crewId)).data.ownerUid == request.auth.uid;
+    }
+
     // Profile customization assets (banner image, future custom avatar
     // overlay, …). Public read so any launcher user can display the banner
     // on a public profile page; write restricted to the owner.

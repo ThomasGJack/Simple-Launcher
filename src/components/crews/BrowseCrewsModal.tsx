@@ -135,14 +135,25 @@ export function BrowseCrewsModal({
                     >
                       <div className="flex items-start gap-3">
                         <div
-                          className="grid size-12 shrink-0 place-items-center rounded-xl text-2xl ring-1"
+                          className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl text-2xl ring-1"
                           style={{
-                            background: `color-mix(in srgb, ${c.color} 18%, transparent)`,
+                            background: c.iconUrl
+                              ? "transparent"
+                              : `color-mix(in srgb, ${c.color} 18%, transparent)`,
                             color: c.color,
                             ["--tw-ring-color" as string]: c.color,
                           } as React.CSSProperties}
                         >
-                          {c.emblem}
+                          {c.iconUrl ? (
+                            <img
+                              src={c.iconUrl}
+                              alt=""
+                              className="size-full object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            c.emblem
+                          )}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div

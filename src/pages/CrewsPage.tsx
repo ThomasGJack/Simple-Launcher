@@ -228,16 +228,28 @@ export function CrewsPage() {
                 )}
                 style={
                   {
-                    background: active
-                      ? `color-mix(in srgb, ${c.color} 22%, var(--color-bg-elevated))`
-                      : "var(--color-bg-elevated)",
+                    background:
+                      c.iconUrl
+                        ? "transparent"
+                        : active
+                          ? `color-mix(in srgb, ${c.color} 22%, var(--color-bg-elevated))`
+                          : "var(--color-bg-elevated)",
                     color: c.color,
                     boxShadow: active ? `0 0 18px ${c.color}66` : undefined,
                     ["--tw-ring-color" as string]: active ? c.color : undefined,
                   } as React.CSSProperties
                 }
               >
-                {c.emblem || c.name.slice(0, 1)}
+                {c.iconUrl ? (
+                  <img
+                    src={c.iconUrl}
+                    alt=""
+                    className="size-full rounded-2xl object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  c.emblem || c.name.slice(0, 1)
+                )}
                 {c.isMaster && (
                   <span
                     title="Crew maître — tout le launcher"
@@ -305,7 +317,16 @@ export function CrewsPage() {
               : undefined,
           }}
         >
-          <span className="text-2xl">{selectedCrew?.emblem ?? "🏰"}</span>
+          {selectedCrew?.iconUrl ? (
+            <img
+              src={selectedCrew.iconUrl}
+              alt=""
+              className="size-8 shrink-0 rounded-lg object-cover ring-1 ring-white/10"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <span className="text-2xl">{selectedCrew?.emblem ?? "🏰"}</span>
+          )}
           <div className="min-w-0 flex-1">
             <div
               className="truncate font-display text-lg"

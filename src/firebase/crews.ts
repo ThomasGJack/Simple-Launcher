@@ -62,6 +62,10 @@ export type Crew = {
   color: string;
   position: number;
   createdAt: number;
+  /** Optional custom icon image URL. When set, the UI shows the
+   *  uploaded PNG/JPG instead of the emoji `emblem`. Lives at
+   *  `crews/{crewId}/icon.{ext}` in Firebase Storage. */
+  iconUrl: string | null;
   /** Uid of the user who owns this crew. Empty for legacy admin-only
    *  crews — those are filled in by the master-crew migration. */
   ownerUid: string;
@@ -417,6 +421,45 @@ export type SendMessageOptions = {
    *  composer uploaded a file before sending. */
   imageUrl?: string | null;
 };
+
+/**
+ * Upload a custom crew icon (PNG/JPG/WebP) and persist its public URL
+ * on the crew doc. The owner uid is checked client-side; the actual
+ * gate is the Storage rule + the Firestore rule on the crew update
+ * (owner-only). Returns the resulting download URL so the caller can
+ * preview it immediately.
+ *
+ * Path: `crews/{crewId}/icon.{ext}` — overwritten on each upload so
+ * we don't accumulate orphan files when the user changes the icon.
+ */
+export async function uploadCrewIcon(
+  crewId: string,
+  file: File,
+): Promise<string> {
+  const fb = getFirebase();
+  if (!fb) throw new Error("Firebase not configured");
+  if (!file.type.startsWith("image/")) {
+    throw new Error("Seules les images sont acceptées (PNG, JPG, WebP).");
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    throw new Error("Image trop lourde (2 MiB max pour une icône).");
+  }
+  const ext = inferImageExt(file);
+  // Fixed filename so the next upload overwrites cleanly. No need for
+  // timestamps — we only ever want one icon per crew.
+  const path = `crews/${crewId}/icon${ext}`;
+  const ref = storageRef(fb.storage, path);
+  await uploadBytesResumable(ref, file, {
+    contentType: file.type,
+    customMetadata: { crewId, kind: "crew-icon" },
+  });
+  const url = await getDownloadURL(ref);
+  // Persist on the crew doc so consumers don't need to re-resolve the
+  // path; also ensures changes propagate live via the existing
+  // watchCrews / watchMyCrewIds subscriptions.
+  await updateDoc(doc(fb.db, "crews", crewId), { iconUrl: url });
+  return url;
+}
 
 /**
  * Upload an image attachment for a crew message. Lives at
@@ -851,7 +894,18 @@ export async function ensureMasterMemberships(
 // ─── Admin ops (legacy + master-crew management) ──────────────────────
 
 export async function createCrew(
-  crew: Omit<Crew, "id" | "createdAt" | "ownerUid" | "isMaster" | "isPublic" | "joinCode" | "description" | "memberCount"> & {
+  crew: Omit<
+    Crew,
+    | "id"
+    | "createdAt"
+    | "ownerUid"
+    | "isMaster"
+    | "isPublic"
+    | "joinCode"
+    | "description"
+    | "memberCount"
+    | "iconUrl"
+  > & {
     isMaster?: boolean;
     isPublic?: boolean;
     description?: string;
@@ -948,6 +1002,7 @@ function parseCrew(d: { id: string; data: () => Record<string, unknown> }): Crew
     color: typeof data.color === "string" ? data.color : "#00d4ff",
     position: typeof data.position === "number" ? data.position : 0,
     createdAt: tsToMs(data.createdAt) ?? 0,
+    iconUrl: typeof data.iconUrl === "string" ? data.iconUrl : null,
     ownerUid: typeof data.ownerUid === "string" ? data.ownerUid : "",
     isMaster: !!data.isMaster,
     isPublic: !!data.isPublic,

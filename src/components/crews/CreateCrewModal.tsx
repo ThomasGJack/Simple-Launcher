@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertTriangle,
@@ -6,9 +6,12 @@ import {
   Crown,
   Globe,
   Lock,
+  Loader2,
+  Smile,
+  Upload,
   X,
 } from "lucide-react";
-import { createUserCrew } from "@/firebase/crews";
+import { createUserCrew, uploadCrewIcon } from "@/firebase/crews";
 import { useAuthStore } from "@/store/auth";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
@@ -37,6 +40,21 @@ export function CreateCrewModal({
   const [isPublic, setIsPublic] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Image picked locally — uploaded only after the crew is created
+   *  (we need the crewId in the storage path). The preview blob URL
+   *  is shown immediately for instant visual feedback. */
+  const [iconFile, setIconFile] = useState<File | null>(null);
+  const [iconPreview, setIconPreview] = useState<string | null>(null);
+  const [iconUploading, setIconUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handlePickIcon = () => fileInputRef.current?.click();
+  const handleClearIcon = () => {
+    if (iconPreview) URL.revokeObjectURL(iconPreview);
+    setIconFile(null);
+    setIconPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
   const handleSubmit = async () => {
     if (!me) return;
@@ -59,6 +77,24 @@ export function CreateCrewModal({
         me.displayName ?? null,
         me.photoURL ?? null,
       );
+      // If the user picked a custom icon, upload it now that we have
+      // the crewId for the Storage path. Failures are surfaced but
+      // don't roll back the crew (the user can re-upload from the
+      // edit panel later).
+      if (iconFile) {
+        setIconUploading(true);
+        try {
+          await uploadCrewIcon(id, iconFile);
+        } catch (uploadErr) {
+          console.warn("[crews] icon upload failed:", uploadErr);
+          setError(
+            "Crew créé mais l'upload de l'icône a échoué : " +
+              (uploadErr instanceof Error ? uploadErr.message : String(uploadErr)),
+          );
+        } finally {
+          setIconUploading(false);
+        }
+      }
       sounds.success();
       onCreated(id);
       onClose();
@@ -131,23 +167,106 @@ export function CreateCrewModal({
                 />
               </Field>
 
-              <Field label="Emblème">
-                <div className="grid grid-cols-8 gap-1.5">
-                  {EMBLEMS.map((e) => (
-                    <button
-                      key={e}
-                      type="button"
-                      onClick={() => setEmblem(e)}
-                      className={cn(
-                        "flex aspect-square items-center justify-center rounded-lg text-2xl transition",
-                        emblem === e
-                          ? "bg-accent/20 ring-2 ring-accent"
-                          : "bg-bg-base/30 ring-1 ring-white/[0.06] hover:bg-white/[0.04]",
-                      )}
+              <Field label="Icône du crew">
+                {/* Image upload card — takes precedence when a file is
+                    picked; the emoji grid below is the fallback / un-
+                    selected state. */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3 rounded-xl bg-bg-base/30 p-3 ring-1 ring-white/[0.06]">
+                    <div
+                      className="grid size-14 place-items-center overflow-hidden rounded-xl ring-1"
+                      style={{
+                        background: iconPreview
+                          ? "transparent"
+                          : `color-mix(in srgb, ${color} 18%, transparent)`,
+                        color,
+                        ["--tw-ring-color" as string]: color,
+                      } as React.CSSProperties}
                     >
-                      {e}
-                    </button>
-                  ))}
+                      {iconPreview ? (
+                        <img
+                          src={iconPreview}
+                          alt=""
+                          className="size-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-3xl">{emblem}</span>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs text-fg-primary">
+                        {iconFile
+                          ? iconFile.name
+                          : "Aucune image — l'emoji est utilisé"}
+                      </div>
+                      <div className="text-[10px] text-fg-muted">
+                        PNG / JPG / WebP · 2 MiB max
+                      </div>
+                    </div>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (!f) return;
+                        if (f.size > 2 * 1024 * 1024) {
+                          setError("Image trop lourde (2 MiB max).");
+                          return;
+                        }
+                        setError(null);
+                        if (iconPreview) URL.revokeObjectURL(iconPreview);
+                        setIconFile(f);
+                        setIconPreview(URL.createObjectURL(f));
+                      }}
+                      className="hidden"
+                    />
+                    {iconFile ? (
+                      <button
+                        type="button"
+                        onClick={handleClearIcon}
+                        className="grid size-8 place-items-center rounded-lg bg-white/[0.04] text-fg-muted ring-1 ring-white/[0.06] hover:bg-danger/10 hover:text-danger"
+                        title="Retirer l'image"
+                      >
+                        <X className="size-4" />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handlePickIcon}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-bg-base shadow-[0_0_14px_var(--color-accent-soft)] hover:shadow-[0_0_20px_var(--color-accent-glow)]"
+                      >
+                        <Upload className="size-3.5" />
+                        Importer
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Emoji grid (fallback when no image picked) */}
+                  {!iconFile && (
+                    <>
+                      <div className="flex items-center gap-1.5 px-1 text-[10px] uppercase tracking-wider text-fg-dim">
+                        <Smile className="size-3" /> Ou choisis un emoji
+                      </div>
+                      <div className="grid grid-cols-8 gap-1.5">
+                        {EMBLEMS.map((e) => (
+                          <button
+                            key={e}
+                            type="button"
+                            onClick={() => setEmblem(e)}
+                            className={cn(
+                              "flex aspect-square items-center justify-center rounded-lg text-2xl transition",
+                              emblem === e
+                                ? "bg-accent/20 ring-2 ring-accent"
+                                : "bg-bg-base/30 ring-1 ring-white/[0.06] hover:bg-white/[0.04]",
+                            )}
+                          >
+                            {e}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
               </Field>
 
@@ -216,7 +335,13 @@ export function CreateCrewModal({
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-5 py-3 font-medium text-bg-base shadow-[0_0_24px_var(--color-accent-soft)] hover:shadow-[0_0_36px_var(--color-accent-glow)] disabled:opacity-50"
               >
                 {submitting ? (
-                  "Création…"
+                  iconUploading ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" /> Upload icône…
+                    </>
+                  ) : (
+                    "Création…"
+                  )
                 ) : (
                   <>
                     <CheckCircle2 className="size-4" /> Créer le crew
