@@ -19,7 +19,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
  *  pouvoir changer sans rebuild — la valeur env l'emporte si fournie.)
  */
 const KOFI_USERNAME =
-  (import.meta.env.VITE_KOFI_USERNAME as string | undefined) ?? "simplelaunche";
+  (import.meta.env.VITE_KOFI_USERNAME as string | undefined) ?? "simplegames";
 
 export const KOFI_PAGE_URL = `https://ko-fi.com/${KOFI_USERNAME}`;
 export const KOFI_TIERS_URL = `${KOFI_PAGE_URL}/tiers`;
