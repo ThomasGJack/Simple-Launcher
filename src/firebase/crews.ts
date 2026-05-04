@@ -17,6 +17,11 @@ import {
   where,
   type Unsubscribe,
 } from "firebase/firestore";
+import {
+  getDownloadURL,
+  ref as storageRef,
+  uploadBytesResumable,
+} from "firebase/storage";
 import { getFirebase } from "./config";
 
 const KEY_CREW_JOINED = "ach.flag.crewJoined.v1";
@@ -408,7 +413,54 @@ export type SendMessageOptions = {
   /** Uids tagged via `@user` in the text. Used by the caller (App-level
    *  side-effect) to fan out notifications. */
   mentionedUids?: string[];
+  /** Public Storage URL of an image attached inline. Set when the
+   *  composer uploaded a file before sending. */
+  imageUrl?: string | null;
 };
+
+/**
+ * Upload an image attachment for a crew message. Lives at
+ * `users/{uid}/crewUploads/{timestamp}-{rand}.{ext}` so the storage
+ * rules can match per-uid. Returns the public download URL the caller
+ * passes to `sendChannelMessage` via `options.imageUrl`.
+ *
+ * Capped at 5 MiB client-side (the storage rule also enforces it). The
+ * caller should validate the file is an image before calling — the
+ * rule `request.resource.contentType.matches('image/.*')` rejects
+ * anything else but the user gets a slower error path that way.
+ */
+export async function uploadCrewImage(uid: string, file: File): Promise<string> {
+  const fb = getFirebase();
+  if (!fb) throw new Error("Firebase not configured");
+  if (!file.type.startsWith("image/")) {
+    throw new Error("Seules les images sont acceptées (PNG, JPG, GIF, WebP).");
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error("Image trop lourde (5 MiB max).");
+  }
+  const ext = inferImageExt(file);
+  const path = `users/${uid}/crewUploads/${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}${ext}`;
+  const ref = storageRef(fb.storage, path);
+  await uploadBytesResumable(ref, file, {
+    contentType: file.type,
+    customMetadata: { uid, kind: "crew-image" },
+  });
+  return getDownloadURL(ref);
+}
+
+function inferImageExt(file: File): string {
+  const name = file.name.toLowerCase();
+  for (const ext of [".png", ".jpg", ".jpeg", ".webp", ".gif"]) {
+    if (name.endsWith(ext)) return ext;
+  }
+  if (file.type.includes("png")) return ".png";
+  if (file.type.includes("webp")) return ".webp";
+  if (file.type.includes("jpeg")) return ".jpg";
+  if (file.type.includes("gif")) return ".gif";
+  return ".png";
+}
 
 export async function sendChannelMessage(
   crewId: string,
@@ -434,6 +486,7 @@ export async function sendChannelMessage(
       replyToText: options.replyTo?.text ?? null,
       replyToSenderName: options.replyTo?.senderName ?? null,
       mentionedUids: options.mentionedUids ?? [],
+      imageUrl: options.imageUrl ?? null,
     },
   );
   markCrewJoined();

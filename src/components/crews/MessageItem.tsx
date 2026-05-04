@@ -250,7 +250,26 @@ export function MessageItem({
             </div>
           </div>
         ) : (
-          <MessageBody text={message.text} nameForUid={nameForUid} />
+          <>
+            {message.text && (
+              <MessageBody text={message.text} nameForUid={nameForUid} />
+            )}
+            {message.imageUrl && (
+              <a
+                href={message.imageUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 block max-w-md overflow-hidden rounded-xl ring-1 ring-white/[0.06] hover:ring-accent/40"
+              >
+                <img
+                  src={message.imageUrl}
+                  alt=""
+                  className="max-h-80 w-auto object-contain"
+                  referrerPolicy="no-referrer"
+                />
+              </a>
+            )}
+          </>
         )}
 
         {message.editedAt && !editing && (

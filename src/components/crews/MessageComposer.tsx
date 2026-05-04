@@ -1,11 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CornerDownLeft, Send, X } from "lucide-react";
+import {
+  CornerDownLeft,
+  Image as ImageIcon,
+  Loader2,
+  Send,
+  X,
+} from "lucide-react";
 import {
   extractMentionedUids,
   injectMentionTokens,
 } from "@/lib/crewMessageFormat";
 import { useUsers } from "@/store/firebaseStores";
+import { useAuthStore } from "@/store/auth";
+import { uploadCrewImage } from "@/firebase/crews";
 import { cn } from "@/lib/cn";
 import type { CrewMessage } from "@/firebase/crews";
 
@@ -13,6 +21,7 @@ export type ComposerSubmit = (input: {
   text: string;
   mentionedUids: string[];
   replyTo: { id: string; text: string; senderName: string | null } | null;
+  imageUrl: string | null;
 }) => Promise<void>;
 
 /**
@@ -34,11 +43,19 @@ export function MessageComposer({
   onSubmit: ComposerSubmit;
 }) {
   const allUsers = useUsers();
+  const me = useAuthStore((s) => s.user);
   const taRef = useRef<HTMLTextAreaElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [highlightIdx, setHighlightIdx] = useState(0);
+  const [imagePreview, setImagePreview] = useState<{
+    url: string;
+    file: File;
+  } | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   // Track resolved mentions chosen via the popup so we can rewrite
   // `@Name` → `<@uid>` reliably even if multiple users share the same
@@ -111,11 +128,43 @@ export function MessageComposer({
     });
   };
 
+  const handlePickImage = () => fileInputRef.current?.click();
+
+  const handleImageChange = async (file: File | null) => {
+    if (!file || !me) return;
+    setUploadError(null);
+    // Show local preview immediately while we upload in background.
+    const localUrl = URL.createObjectURL(file);
+    setImagePreview({ url: localUrl, file });
+  };
+
+  const handleClearImage = () => {
+    if (imagePreview) URL.revokeObjectURL(imagePreview.url);
+    setImagePreview(null);
+    setUploadError(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const handleSend = async () => {
     const trimmed = text.trim();
-    if (!trimmed || sending) return;
+    if ((!trimmed && !imagePreview) || sending || !me) return;
     setSending(true);
     try {
+      // Upload the image (if any) right before sending so we don't
+      // burn quota on aborted drafts.
+      let imageUrl: string | null = null;
+      if (imagePreview) {
+        setUploadingImage(true);
+        try {
+          imageUrl = await uploadCrewImage(me.uid, imagePreview.file);
+        } catch (err) {
+          setUploadError(err instanceof Error ? err.message : String(err));
+          setUploadingImage(false);
+          setSending(false);
+          return;
+        }
+        setUploadingImage(false);
+      }
       const tokenized = injectMentionTokens(trimmed, resolvedMentions);
       const mentioned = extractMentionedUids(tokenized);
       await onSubmit({
@@ -128,10 +177,12 @@ export function MessageComposer({
               senderName: replyTo.senderName,
             }
           : null,
+        imageUrl,
       });
       setText("");
       setResolvedMentions([]);
       setMentionQuery(null);
+      handleClearImage();
       onCancelReply();
     } catch (err) {
       console.warn("[crews] composer send failed:", err);
@@ -226,7 +277,73 @@ export function MessageComposer({
           )}
         </AnimatePresence>
 
+        {/* Image preview chip */}
+        <AnimatePresence>
+          {imagePreview && (
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 6 }}
+              className="mb-2 flex items-center gap-2 rounded-xl bg-bg-base/40 p-2 ring-1 ring-white/[0.06]"
+            >
+              <img
+                src={imagePreview.url}
+                alt=""
+                className="size-12 rounded-lg object-cover ring-1 ring-white/10"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-xs text-fg-primary">
+                  {imagePreview.file.name}
+                </div>
+                <div className="text-[10px] text-fg-dim">
+                  {(imagePreview.file.size / 1024).toFixed(0)} KB
+                  {uploadingImage && (
+                    <>
+                      {" "}
+                      ·{" "}
+                      <span className="text-accent">
+                        <Loader2 className="inline size-3 animate-spin" /> upload…
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleClearImage}
+                className="grid size-6 place-items-center rounded-md text-fg-muted hover:bg-white/[0.06] hover:text-fg-primary"
+              >
+                <X className="size-3" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        {uploadError && (
+          <div className="mb-2 rounded-lg bg-danger/10 px-3 py-1.5 text-xs text-danger ring-1 ring-danger/30">
+            {uploadError}
+          </div>
+        )}
+
+        <input
+          type="file"
+          ref={fileInputRef}
+          accept="image/png,image/jpeg,image/gif,image/webp"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void handleImageChange(f);
+          }}
+          className="hidden"
+        />
+
         <div className="flex items-end gap-2 rounded-2xl bg-bg-base/40 p-2 ring-1 ring-white/[0.06] focus-within:ring-accent/40">
+          <button
+            type="button"
+            onClick={handlePickImage}
+            title="Joindre une image"
+            className="grid size-9 shrink-0 place-items-center rounded-xl text-fg-muted hover:bg-white/[0.06] hover:text-fg-primary"
+          >
+            <ImageIcon className="size-4" />
+          </button>
           <textarea
             ref={taRef}
             value={text}

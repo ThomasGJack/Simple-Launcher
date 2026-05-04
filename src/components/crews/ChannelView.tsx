@@ -91,6 +91,7 @@ export function ChannelView({
     text: string;
     mentionedUids: string[];
     replyTo: { id: string; text: string; senderName: string | null } | null;
+    imageUrl: string | null;
   }) => {
     if (!myUid) return;
     try {
@@ -104,6 +105,7 @@ export function ChannelView({
         {
           replyTo: input.replyTo,
           mentionedUids: input.mentionedUids,
+          imageUrl: input.imageUrl,
         },
       );
       sounds.click();

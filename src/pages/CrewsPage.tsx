@@ -23,6 +23,7 @@ import {
   type CrewMember,
 } from "@/firebase/crews";
 import { ChannelView } from "@/components/crews/ChannelView";
+import { MembersList } from "@/components/crews/MembersList";
 import { hasAnyTier } from "@/lib/supporterTier";
 import { isAdmin } from "@/lib/admin";
 import { sounds } from "@/lib/sounds";
@@ -388,6 +389,16 @@ export function CrewsPage() {
           </div>
         )}
       </main>
+
+      {/* ─── Member list (right) ───────────────────────────── */}
+      {selectedCrew && (
+        <MembersList
+          crew={selectedCrew}
+          members={members}
+          myUid={me?.uid ?? ""}
+          myRole={myMember?.role ?? null}
+        />
+      )}
 
       {/* Modals */}
       <BrowseCrewsModal

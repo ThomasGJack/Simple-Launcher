@@ -25,6 +25,20 @@ service firebase.storage {
       allow write: if request.auth != null && request.auth.uid == uid;
     }
 
+    // Per-user crew uploads (images attached to chat messages). Public
+    // read so other crew members can display the inline image; write
+    // restricted to the owner so a user can't ghost-upload via someone
+    // else's path. The 5 MiB cap is enforced client-side; the
+    // contentType check makes sure no executable / archive sneaks in.
+    match /users/{uid}/crewUploads/{file} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null &&
+        request.auth.uid == uid &&
+        request.resource.size < 5 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
     // Profile customization assets (banner image, future custom avatar
     // overlay, …). Public read so any launcher user can display the banner
     // on a public profile page; write restricted to the owner.
