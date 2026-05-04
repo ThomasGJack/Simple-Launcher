@@ -153,10 +153,21 @@ export const kofiWebhook = onRequest(
 
     // Verify the shared secret. Reject mismatches loudly — this is the
     // only thing protecting us from anyone POSTing fake transactions.
-    if (payload.verification_token !== KOFI_VERIFICATION_TOKEN.value()) {
+    // Trim both sides because secrets set via `echo "..." | firebase` end
+    // up with a trailing \n that wouldn't match Ko-fi's clean payload.
+    const expectedToken = KOFI_VERIFICATION_TOKEN.value().trim();
+    const receivedToken = (payload.verification_token ?? "").trim();
+    if (receivedToken !== expectedToken) {
+      // Log the first 8 chars of each side so we can diagnose without
+      // dumping the full secret. Useful when the user has different
+      // tokens stored on Ko-fi vs Firebase.
       logger.warn("kofi: token mismatch", {
         type: payload.type,
         from: payload.from_name,
+        receivedPrefix: receivedToken.slice(0, 8),
+        expectedPrefix: expectedToken.slice(0, 8),
+        receivedLen: receivedToken.length,
+        expectedLen: expectedToken.length,
       });
       res.status(403).send("Forbidden");
       return;
