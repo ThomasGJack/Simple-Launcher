@@ -697,10 +697,12 @@ export type CreateUserCrewInput = {
  * crew id. The owner is auto-added as a member with role "owner". A
  * random invite code is generated alongside the public/private flag.
  *
- * Caller must check the user's tier before calling this — Firestore
- * rules don't enforce the VIP gate (they trust the client because
- * tiers are admin-granted, not user-claimed). The CrewsPage UI does
- * the gating in the create button.
+ * Server-side gating : Firestore rules check the caller's tier on
+ * `users/{uid}.tier` (must be "supporter" / "vip" / "legend") before
+ * allowing the create. The CrewsPage UI also gates the button so
+ * non-supporters never see "Create" — but if a malicious client
+ * tampers with the JS and tries to call this directly, the rules
+ * reject the write.
  */
 export async function createUserCrew(
   input: CreateUserCrewInput,

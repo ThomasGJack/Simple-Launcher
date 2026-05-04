@@ -8,6 +8,22 @@ service cloud.firestore {
         request.auth.uid in ['discord_306118713537462273'];
     }
 
+    /**
+     * True when the requesting user has a paid supporter tier
+     * (Soutien / VIP / Légende) on their /users/{uid} doc. Server-
+     * side enforcement of the "create-a-crew requires a tier" rule
+     * — frontend already gates the UI button (see CrewsPage), but
+     * rules need to enforce too so a malicious client modifying
+     * the JS can't bypass and create crews without paying.
+     *
+     * Reads the user doc once via `get()` — costs 1 extra read per
+     * crew creation, fine for such a rare action.
+     */
+    function callerHasSupporterTier() {
+      let t = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.tier;
+      return t == 'supporter' || t == 'vip' || t == 'legend';
+    }
+
     // Users — public profile read so the shareable web profile page
     // (simplelaunche.web.app/u/{discordId}) can render without auth.
     // Sensitive sub-collections below stay locked down.
@@ -145,12 +161,22 @@ service cloud.firestore {
       // {code}` mapping doc gated by owner-only rules.
       allow read: if request.auth != null;
 
-      // Create (user-owned) : any authed user can create a crew. The
-      // VIP-tier gate lives client-side because tiers are admin-
-      // granted (rules can't validate them without an extra
-      // round-trip). The admin can also create master crews.
+      // Create (user-owned) : authed user with a paid supporter
+      // tier (Soutien / VIP / Légende) — gates the feature server-
+      // side, not just in the UI. Admin can always create (used
+      // for master crews + tooling). Master crews
+      // (`isMaster: true`) can ONLY be created by the admin —
+      // regular paid users still create user crews with
+      // isMaster: false.
       allow create: if request.auth != null &&
-        request.resource.data.ownerUid == request.auth.uid;
+        request.resource.data.ownerUid == request.auth.uid &&
+        (
+          isAdmin() ||
+          (
+            request.resource.data.isMaster == false &&
+            callerHasSupporterTier()
+          )
+        );
       // Update : owner/admin (or launcher admin). Master crews can
       // only be updated by the launcher admin.
       allow update: if isAdmin() ||
