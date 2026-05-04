@@ -40,6 +40,7 @@ export function TierAvatar({
   size = "md",
   className,
   fallbackTone,
+  animated,
 }: {
   tier: SupporterTier | null | undefined;
   src: string | null;
@@ -51,10 +52,21 @@ export function TierAvatar({
   /** When `src` is missing, draw an initial-letter placeholder with
    *  this tone instead of the default accent gradient. Optional. */
   fallbackTone?: "accent" | "fuchsia" | "emerald" | "amber" | "muted";
+  /** Force-disable the rotating / pulsing animations on the tier
+   *  frame. Default is `true` for sizes md/lg/xl, `false` for xs/sm
+   *  (avatars in dense lists like MembersList or MessageItem don't
+   *  need 4 motion.div per row — the static gradient ring still
+   *  conveys the tier). Pass `true` explicitly on small sizes if
+   *  you really want the animation (e.g. on a 1-off prominent xs
+   *  badge). */
+  animated?: boolean;
 }) {
   const dims = SIZE_PX[size];
   const initials = (displayName ?? "?").slice(0, 1).toUpperCase();
   const hasTier = tier === "supporter" || tier === "vip" || tier === "legend";
+  // Default : large sizes animate, small sizes stay static. Caller
+  // can force either way via the `animated` prop.
+  const useAnimation = animated ?? (size !== "xs" && size !== "sm");
 
   // The avatar pixel — same shape regardless of tier so the inner
   // contents stay consistent.
@@ -101,9 +113,9 @@ export function TierAvatar({
       style={{ width: dims.frame, height: dims.frame }}
       title={`Supporter — ${TIER_LABEL[tier]}`}
     >
-      {tier === "supporter" && <SupporterFrame size={dims} />}
-      {tier === "vip" && <VipFrame size={dims} />}
-      {tier === "legend" && <LegendFrame size={dims} />}
+      {tier === "supporter" && <SupporterFrame size={dims} animated={useAnimation} />}
+      {tier === "vip" && <VipFrame size={dims} animated={useAnimation} />}
+      {tier === "legend" && <LegendFrame size={dims} animated={useAnimation} />}
 
       {/* Avatar centred inside the frame with the right inset so the
           ring/glow surrounds it without bleeding through. */}
@@ -134,9 +146,38 @@ type Dims = (typeof SIZE_PX)[keyof typeof SIZE_PX];
 
 /** Tier 1 — Soutien : rotating bronze shimmer + wide warm pulsing aura.
  *  Two animated layers (rotation 8s + aura pulse 2.6s) so the bronze
- *  band reads instantly even at small sizes. */
-function SupporterFrame({ size }: { size: Dims }) {
+ *  band reads instantly even at small sizes. With `animated={false}`,
+ *  the frame collapses to a static gradient ring + glow (no motion.div),
+ *  saving CPU/GPU when many rows are rendered at once. */
+function SupporterFrame({ size, animated }: { size: Dims; animated: boolean }) {
   void size;
+  if (!animated) {
+    return (
+      <>
+        <div
+          aria-hidden
+          className="absolute -inset-1 rounded-full blur-md"
+          style={{
+            background:
+              "radial-gradient(circle, rgba(255,165,79,0.6) 0%, rgba(205,127,50,0.4) 45%, transparent 75%)",
+          }}
+        />
+        <div
+          aria-hidden
+          className="absolute inset-0 rounded-full"
+          style={{
+            background:
+              "conic-gradient(from 0deg, #cd7f32 0%, #ffb75e 25%, #ffe0b3 50%, #ffb75e 75%, #cd7f32 100%)",
+            WebkitMask:
+              "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
+            WebkitMaskComposite: "xor",
+            maskComposite: "exclude",
+            padding: 3,
+          }}
+        />
+      </>
+    );
+  }
   return (
     <>
       {/* Wide pulsing bronze aura — extends well beyond the avatar */}
@@ -182,9 +223,37 @@ function SupporterFrame({ size }: { size: Dims }) {
 /** Tier 2 — VIP : rotating cyan→violet conic ring with wide pulsing
  *  halo. Two animation layers (rotation 5s + halo pulse 2.4s) — bold
  *  and unmistakable at any size, no orbiting particles to keep the
- *  effect calm in dense lists. */
-function VipFrame({ size }: { size: Dims }) {
+ *  effect calm in dense lists. With `animated={false}`, drops to a
+ *  static gradient ring + fixed glow. */
+function VipFrame({ size, animated }: { size: Dims; animated: boolean }) {
   void size;
+  if (!animated) {
+    return (
+      <>
+        <div
+          aria-hidden
+          className="absolute -inset-1.5 rounded-full blur-lg"
+          style={{
+            background:
+              "radial-gradient(circle, rgba(167,139,250,0.65) 0%, rgba(34,211,238,0.45) 40%, transparent 75%)",
+          }}
+        />
+        <div
+          aria-hidden
+          className="absolute inset-0 rounded-full"
+          style={{
+            background:
+              "conic-gradient(from 0deg, #A78BFA, #22D3EE 25%, #67E8F9 50%, #818CF8 75%, #A78BFA)",
+            WebkitMask:
+              "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
+            WebkitMaskComposite: "xor",
+            maskComposite: "exclude",
+            padding: 3,
+          }}
+        />
+      </>
+    );
+  }
   return (
     <>
       {/* Outer wide glow aura — saturated and pulsing */}
@@ -231,8 +300,35 @@ function VipFrame({ size }: { size: Dims }) {
  *  + huge gold/orange aura. Used sparingly across the app — at most
  *  a dozen rendered at once even on the densest community page, so
  *  the perf cost stays manageable. */
-function LegendFrame({ size }: { size: Dims }) {
+function LegendFrame({ size, animated }: { size: Dims; animated: boolean }) {
   void size;
+  if (!animated) {
+    return (
+      <>
+        <div
+          aria-hidden
+          className="absolute -inset-2 rounded-full blur-xl"
+          style={{
+            background:
+              "radial-gradient(circle, rgba(255,215,0,0.65) 0%, rgba(255,107,53,0.4) 40%, transparent 75%)",
+          }}
+        />
+        <div
+          aria-hidden
+          className="absolute inset-0 rounded-full"
+          style={{
+            background:
+              "conic-gradient(from 0deg, #FF0080, #FFD700, #00FF95, #00B0FF, #B266FF, #FF0080)",
+            WebkitMask:
+              "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
+            WebkitMaskComposite: "xor",
+            maskComposite: "exclude",
+            padding: 3,
+          }}
+        />
+      </>
+    );
+  }
   return (
     <>
       {/* Massive pulsing gold aura — unmistakable from any distance */}

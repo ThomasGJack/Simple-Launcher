@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Crown,
@@ -21,6 +21,9 @@ import { useUsers } from "@/store/firebaseStores";
 import { sendGameInvitation } from "@/firebase/invitations";
 import { useAuthStore } from "@/store/auth";
 import { useUIStore } from "@/store/ui";
+import { useTickEvery } from "@/hooks/useTickEvery";
+import { statusFromLastSeen, type PresenceStatus } from "@/firebase/presence";
+import type { SupporterTier } from "@/lib/supporterTier";
 import { TierAvatar } from "@/components/tier/TierAvatar";
 import { TierName } from "@/components/tier/TierName";
 import { TierBannerOverlay } from "@/components/tier/TierBanner";
@@ -57,10 +60,21 @@ export function MembersList({
   const me = useAuthStore((s) => s.user);
   const navigate = useUIStore((s) => s.navigate);
   const [busyUid, setBusyUid] = useState<string | null>(null);
+  // Shared tick — drives status freshness without per-row interval.
+  const now = useTickEvery(15_000);
+
+  // Index `allUsers` by uid once, reused across every member lookup.
+  // Replaces the previous O(n²) `allUsers.find(u => u.uid === ...)`
+  // pattern that was called both in displayedMembers and sortedMembers.
+  const usersByUid = useMemo(() => {
+    const map = new Map<string, (typeof allUsers)[number]>();
+    for (const u of allUsers) map.set(u.uid, u);
+    return map;
+  }, [allUsers]);
 
   const myActivity = useMemo(
-    () => allUsers.find((u) => u.uid === me?.uid)?.currentActivity ?? null,
-    [allUsers, me?.uid],
+    () => (me?.uid ? usersByUid.get(me.uid)?.currentActivity ?? null : null),
+    [usersByUid, me?.uid],
   );
 
   const amOwnerOrAdmin =
@@ -70,12 +84,15 @@ export function MembersList({
   // pure list of `members` docs there would only show people who
   // explicitly joined since the migration. Fall back to the global
   // user list to give the launcher-wide community feel back.
-  const displayedMembers = useMemo<DisplayedMember[]>(() => {
+  // Single pass : build, enrich with live presence, then sort. Avoids
+  // the previous double-useMemo that re-iterated allUsers.
+  const sortedMembers = useMemo(() => {
+    const rank: Record<CrewRole, number> = { owner: 0, admin: 1, member: 2 };
+
+    let base: DisplayedMember[];
     if (crew.isMaster) {
-      // Master : merge everyone in the launcher with the (sparse)
-      // members docs to read role overrides where they exist.
       const byUid = new Map(members.map((m) => [m.uid, m] as const));
-      return allUsers.map((u) => {
+      base = allUsers.map((u) => {
         const m = byUid.get(u.uid);
         return {
           uid: u.uid,
@@ -83,42 +100,38 @@ export function MembersList({
           joinedAt: m?.joinedAt ?? 0,
           displayName: u.displayName ?? m?.displayName ?? "Anonyme",
           avatarUrl: u.avatarUrl ?? m?.avatarUrl ?? null,
+          tier: u.tier ?? null,
+          lastSeen: u.lastSeen ?? null,
+          status: statusFromLastSeen(u.lastSeen, now),
+          currentActivity: u.currentActivity ?? null,
+        };
+      });
+    } else {
+      base = members.map((m) => {
+        const live = usersByUid.get(m.uid);
+        return {
+          uid: m.uid,
+          role: m.role,
+          joinedAt: m.joinedAt,
+          displayName: live?.displayName ?? m.displayName ?? "Anonyme",
+          avatarUrl: live?.avatarUrl ?? m.avatarUrl ?? null,
+          tier: live?.tier ?? null,
+          lastSeen: live?.lastSeen ?? null,
+          status: statusFromLastSeen(live?.lastSeen ?? null, now),
+          currentActivity: live?.currentActivity ?? null,
         };
       });
     }
-    // User crew : strict list, but enrich with live presence data
-    // from the global users store so we get up-to-date avatars and
-    // game presence even if the member doc was last written long ago.
-    return members.map((m) => {
-      const live = allUsers.find((u) => u.uid === m.uid);
-      return {
-        uid: m.uid,
-        role: m.role,
-        joinedAt: m.joinedAt,
-        displayName: live?.displayName ?? m.displayName ?? "Anonyme",
-        avatarUrl: live?.avatarUrl ?? m.avatarUrl ?? null,
-      };
-    });
-  }, [crew.isMaster, members, allUsers]);
 
-  // Sort owner→admin→member, then online→offline, then alphabetical.
-  const sortedMembers = useMemo(() => {
-    const rank: Record<CrewRole, number> = { owner: 0, admin: 1, member: 2 };
-    const onlineWindow = 60_000;
-    const now = Date.now();
-    return [...displayedMembers].sort((a, b) => {
+    return base.sort((a, b) => {
       const roleDiff = rank[a.role] - rank[b.role];
       if (roleDiff !== 0) return roleDiff;
-      const aLive = allUsers.find((u) => u.uid === a.uid);
-      const bLive = allUsers.find((u) => u.uid === b.uid);
-      const aOnline =
-        aLive?.lastSeen && now - aLive.lastSeen < onlineWindow ? 1 : 0;
-      const bOnline =
-        bLive?.lastSeen && now - bLive.lastSeen < onlineWindow ? 1 : 0;
+      const aOnline = a.status === "online" ? 1 : 0;
+      const bOnline = b.status === "online" ? 1 : 0;
       if (aOnline !== bOnline) return bOnline - aOnline;
       return a.displayName.localeCompare(b.displayName);
     });
-  }, [displayedMembers, allUsers]);
+  }, [crew.isMaster, members, allUsers, usersByUid, now]);
 
   const handlePromote = async (target: DisplayedMember) => {
     if (busyUid) return;
@@ -303,9 +316,26 @@ type DisplayedMember = {
   joinedAt: number;
   displayName: string;
   avatarUrl: string | null;
+  tier: SupporterTier | null;
+  lastSeen: number | null;
+  status: PresenceStatus;
+  currentActivity:
+    | { moduleId: string; moduleName: string; startedAt: number }
+    | null;
 };
 
-function MemberRow({
+/**
+ * Memoized to skip re-renders unless the member's visible state
+ * actually changed. The parent rebuilds the list on every shared
+ * tick (15 s) and on every Firestore snapshot — without this memo,
+ * 60+ MemberRow + their TierAvatar / TierBanner / motion.div would
+ * re-render every tick.
+ *
+ * The parent passes pre-computed status / tier / activity (no more
+ * useUsers().find() per row), so the comparator can do a strict
+ * field-by-field compare without referential gotchas.
+ */
+const MemberRow = memo(function MemberRow({
   member,
   myUid,
   amOwnerOrAdmin,
@@ -330,22 +360,13 @@ function MemberRow({
   onInvite: () => void;
   onOpenProfile: () => void;
 }) {
-  const allUsers = useUsers();
-  const live = allUsers.find((u) => u.uid === member.uid);
-  const lastSeen = live?.lastSeen ?? null;
-  const status = !lastSeen
-    ? "offline"
-    : Date.now() - lastSeen < 60_000
-      ? "online"
-      : Date.now() - lastSeen < 5 * 60_000
-        ? "idle"
-        : "offline";
-  const activity = live?.currentActivity ?? null;
+  const status = member.status;
+  const activity = member.currentActivity;
   const isMine = member.uid === myUid;
 
   return (
     <div className="group relative">
-      <TierBannerOverlay tier={live?.tier ?? null} rounded="lg" />
+      <TierBannerOverlay tier={member.tier} rounded="lg" />
       <button
         type="button"
         onClick={onOpenProfile}
@@ -353,7 +374,7 @@ function MemberRow({
       >
         <div className="relative shrink-0">
           <TierAvatar
-            tier={live?.tier ?? null}
+            tier={member.tier}
             src={member.avatarUrl}
             displayName={member.displayName}
             size="sm"
@@ -373,7 +394,7 @@ function MemberRow({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 truncate text-sm">
             <TierName
-              tier={live?.tier ?? null}
+              tier={member.tier}
               name={member.displayName}
               className="truncate text-fg-primary"
             />
@@ -452,4 +473,25 @@ function MemberRow({
       </AnimatePresence>
     </div>
   );
-}
+}, (prev, next) => {
+  // Strict compare on every visible field. Callbacks (onPromote etc.)
+  // are inline arrow funcs from the parent — comparing them would
+  // defeat the memo, so we skip them. The closures stay valid because
+  // they capture stable references (`me`, `navigate`, busy state).
+  return (
+    prev.member.uid === next.member.uid &&
+    prev.member.role === next.member.role &&
+    prev.member.tier === next.member.tier &&
+    prev.member.status === next.member.status &&
+    prev.member.displayName === next.member.displayName &&
+    prev.member.avatarUrl === next.member.avatarUrl &&
+    prev.member.lastSeen === next.member.lastSeen &&
+    prev.member.currentActivity?.moduleId === next.member.currentActivity?.moduleId &&
+    prev.member.currentActivity?.moduleName === next.member.currentActivity?.moduleName &&
+    prev.amOwnerOrAdmin === next.amOwnerOrAdmin &&
+    prev.isOwnerOfCrew === next.isOwnerOfCrew &&
+    prev.busy === next.busy &&
+    prev.myUid === next.myUid &&
+    prev.myActivity?.moduleId === next.myActivity?.moduleId
+  );
+});

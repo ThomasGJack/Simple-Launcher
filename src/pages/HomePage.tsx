@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Clock, Play, Gamepad2 } from "lucide-react";
 import { useUIStore } from "@/store/ui";
@@ -6,14 +6,26 @@ import { useAuthStore } from "@/store/auth";
 import { useModules, usePlaytime } from "@/store/firebaseStores";
 import { formatPlaytime, type PlaytimeEntry } from "@/firebase/playtime";
 import type { LauncherModule } from "@/types/module";
-import { ModuleParticles } from "@/components/ui/Particles";
+import { useTickEvery } from "@/hooks/useTickEvery";
 import { FriendsOnlineStrip } from "@/components/home/FriendsOnlineStrip";
-import { NewsCard } from "@/components/home/NewsCard";
 import { ActionsChip } from "@/components/home/ActionsChip";
 import { NextAchievementChip } from "@/components/home/NextAchievementChip";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 import { achievementFlags } from "@/lib/achievementFlags";
 import { sounds } from "@/lib/sounds";
+
+// Lazy-loaded heavy decorative pieces. NewsCard pulls in the markdown
+// renderer (`marked`, ~30 KB), ModuleParticles pulls in tsparticles
+// (~15-20 KB). Neither is critical to the first paint, so we defer
+// them out of the eager `index` chunk.
+const NewsCard = lazy(() =>
+  import("@/components/home/NewsCard").then((m) => ({ default: m.NewsCard })),
+);
+const ModuleParticles = lazy(() =>
+  import("@/components/ui/Particles").then((m) => ({
+    default: m.ModuleParticles,
+  })),
+);
 
 /**
  * Home page — bento-grid social hub. Surfaces in priority:
@@ -32,12 +44,31 @@ export function HomePage() {
   const me = useAuthStore((s) => s.user);
   const modules = useModules();
   const playtime = usePlaytime(me?.uid);
-  const [, setNow] = useState(Date.now());
-
-  // Re-tick every 30s so relative time strings stay fresh
+  // Shared 30s tick so relative time strings stay fresh without
+  // forcing per-component setInterval (see hooks/useTickEvery.ts).
+  // The returned `now` is referenced inside `quickLaunch` memo deps —
+  // not strictly necessary but keeps the dep clean if we ever read
+  // `now` in subsequent renders.
+  void useTickEvery(30_000);
+  // Defer the decorative particles until after the first paint. They
+  // are purely cosmetic and pull in tsparticles (~15-20 KB), so we
+  // wait for the browser to be idle before mounting them. On low-end
+  // machines this prevents the first paint from being blocked by
+  // the WebGL/Canvas init.
+  const [particlesEnabled, setParticlesEnabled] = useState(false);
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 30_000);
-    return () => clearInterval(t);
+    type IdleWindow = Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+    };
+    const w = window as IdleWindow;
+    if (typeof w.requestIdleCallback === "function") {
+      const id = w.requestIdleCallback(() => setParticlesEnabled(true), {
+        timeout: 1000,
+      });
+      return () => cancelIdleCallback?.(id);
+    }
+    const t = setTimeout(() => setParticlesEnabled(true), 400);
+    return () => clearTimeout(t);
   }, []);
 
   // ─── Konami code listener ────────────────────────────────────────
@@ -127,15 +158,22 @@ export function HomePage() {
           the background "breathes" without becoming distracting. */}
       <GradientMesh accent={greeting.particleColor} heroGradient={greeting.heroGradient} />
 
-      {/* Subtle ambient particles tinted to time-of-day */}
+      {/* Subtle ambient particles tinted to time-of-day. Lazy-loaded
+          + deferred until the browser is idle so they don't block
+          the first paint. Suspense fallback is null — the particles
+          are purely decorative. */}
       <div aria-hidden className="pointer-events-none absolute inset-0">
-        <ModuleParticles
-          config={{
-            preset: greeting.particles,
-            color: greeting.particleColor,
-            density: 50,
-          }}
-        />
+        {particlesEnabled && (
+          <Suspense fallback={null}>
+            <ModuleParticles
+              config={{
+                preset: greeting.particles,
+                color: greeting.particleColor,
+                density: 50,
+              }}
+            />
+          </Suspense>
+        )}
       </div>
 
       {/* Floating colored orbs (slow, blurry, soft) — adds life without
@@ -216,7 +254,13 @@ export function HomePage() {
                 <NextAchievementChip />
               </ErrorBoundary>
             </div>
-            <NewsCard />
+            {/* NewsCard ships the markdown renderer (`marked`) — lazy
+                loaded so it doesn't bloat the eager bundle. Skeleton
+                fallback maintains the column height while the chunk
+                downloads. */}
+            <Suspense fallback={<NewsCardSkeleton />}>
+              <NewsCard />
+            </Suspense>
           </motion.div>
         </div>
       </div>
@@ -369,11 +413,10 @@ function GreetingHero({
   greetingEmoji: string;
   avatar: string | null;
 }) {
-  const [time, setTime] = useState(formatHourMinute(new Date()));
-  useEffect(() => {
-    const t = setInterval(() => setTime(formatHourMinute(new Date())), 30_000);
-    return () => clearInterval(t);
-  }, []);
+  // Subscribe to the shared 30 s tick so the displayed time refreshes
+  // without spinning a dedicated interval per GreetingHero instance.
+  const tick = useTickEvery(30_000);
+  const time = useMemo(() => formatHourMinute(new Date(tick)), [tick]);
   return (
     <div className="mb-5 flex items-center gap-4 rounded-3xl glass-strong p-6">
       {avatar ? (
@@ -556,4 +599,20 @@ function formatRelative(ts: number): string {
 
 function formatHourMinute(d: Date): string {
   return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+}
+
+/**
+ * Lightweight placeholder rendered while the lazy NewsCard chunk is
+ * still downloading. Keeps the column from collapsing visually so the
+ * surrounding bento layout doesn't reflow when the real card mounts.
+ */
+function NewsCardSkeleton() {
+  return (
+    <div className="rounded-3xl glass-strong p-6 ring-1 ring-white/[0.04]">
+      <div className="mb-4 h-3 w-24 animate-pulse rounded bg-white/[0.08]" />
+      <div className="mb-3 h-5 w-3/4 animate-pulse rounded bg-white/[0.10]" />
+      <div className="mb-2 h-3 w-full animate-pulse rounded bg-white/[0.06]" />
+      <div className="h-3 w-5/6 animate-pulse rounded bg-white/[0.06]" />
+    </div>
+  );
 }

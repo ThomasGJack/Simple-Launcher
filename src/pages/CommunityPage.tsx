@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Users, Copy, Check, Gamepad2, ExternalLink, MessageCircle } from "lucide-react";
 import { useAuthStore } from "@/store/auth";
@@ -7,6 +7,7 @@ import { statusFromLastSeen, type UserPresence, type PresenceStatus } from "@/fi
 import { useUsers } from "@/store/firebaseStores";
 import { ensureConversation } from "@/firebase/messaging";
 import { conversationIdFor } from "@/types/messaging";
+import { useTickEvery } from "@/hooks/useTickEvery";
 import { TierAvatar } from "@/components/tier/TierAvatar";
 import { TierName } from "@/components/tier/TierName";
 import { TierBannerOverlay } from "@/components/tier/TierBanner";
@@ -20,24 +21,21 @@ export function CommunityPage() {
   const me = useAuthStore((s) => s.user);
   const navigate = useUIStore((s) => s.navigate);
   const users = useUsers();
-  const [, setNow] = useState(Date.now());
-
-  // Re-evaluate status periodically (lastSeen comparison is time-sensitive)
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 15_000);
-    return () => clearInterval(t);
-  }, []);
+  // Shared 15 s tick — drives the online/idle/offline status without
+  // forcing per-row re-renders (single timer for the whole launcher,
+  // see src/hooks/useTickEvery.ts).
+  const now = useTickEvery(15_000);
 
   const sorted = useMemo(() => {
     const order: Record<PresenceStatus, number> = { online: 0, idle: 1, offline: 2 };
     return [...users]
       .filter((u) => u.uid !== me?.uid)
-      .map((u) => ({ user: u, status: statusFromLastSeen(u.lastSeen) }))
+      .map((u) => ({ user: u, status: statusFromLastSeen(u.lastSeen, now) }))
       .sort((a, b) => {
         if (order[a.status] !== order[b.status]) return order[a.status] - order[b.status];
         return (b.user.lastSeen ?? 0) - (a.user.lastSeen ?? 0);
       });
-  }, [users, me]);
+  }, [users, me, now]);
 
   const onlineCount = sorted.filter((s) => s.status === "online").length;
 
@@ -138,7 +136,14 @@ async function startConversationWith(
   }
 }
 
-function UserRow({
+/**
+ * Memoized to skip re-renders when the user / status / callbacks
+ * haven't changed. The 50+ rows on this page used to re-mount their
+ * TierAvatar + TierBanner motion.div every 15 s tick, causing 150+
+ * animations to restart simultaneously. Now a tick only re-renders
+ * the parent and any row whose `status` actually flipped.
+ */
+const UserRow = memo(function UserRow({
   user,
   status,
   onClickActivity,
@@ -231,7 +236,30 @@ function UserRow({
       </button>
     </motion.div>
   );
-}
+}, (prev, next) => {
+  // Skip re-render unless something visible changed. Comparing the
+  // user object's fields one-by-one avoids relying on referential
+  // equality (presence.ts emits a new array every snapshot — see 1.2).
+  // We deliberately do NOT compare the onClick callbacks — they're
+  // inline arrow funcs from the parent that change on every render.
+  // Skipping that check is safe because:
+  //   1. The closed-over `user` reference is stable (1.2 memoization).
+  //   2. `useAuthStore` / `useUIStore` selectors return stable
+  //      references for `me` and `navigate`.
+  // So the "stale" callback after a memo bail-out behaves identically
+  // to a fresh one.
+  return (
+    prev.status === next.status &&
+    prev.user.uid === next.user.uid &&
+    prev.user.tier === next.user.tier &&
+    prev.user.displayName === next.user.displayName &&
+    prev.user.username === next.user.username &&
+    prev.user.avatarUrl === next.user.avatarUrl &&
+    prev.user.lastSeen === next.user.lastSeen &&
+    prev.user.currentActivity?.moduleId === next.user.currentActivity?.moduleId &&
+    prev.user.currentActivity?.moduleName === next.user.currentActivity?.moduleName
+  );
+});
 
 function InviteCard() {
   const [copied, setCopied] = useState(false);

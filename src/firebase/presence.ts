@@ -72,9 +72,17 @@ export type PresenceStatus = "online" | "idle" | "offline";
 const ONLINE_WINDOW_MS = 60_000;
 const IDLE_WINDOW_MS = 5 * 60_000;
 
-export function statusFromLastSeen(lastSeen: number | null): PresenceStatus {
+export function statusFromLastSeen(
+  lastSeen: number | null,
+  /** Optional reference time. Pass a shared `now` (e.g. from
+   *  `useTickEvery`) when computing the status for many users in a
+   *  single render — guarantees a stable result across the list and
+   *  lets React.memo'd children skip re-renders when the status
+   *  doesn't change. Defaults to `Date.now()` for callers that don't
+   *  care. */
+  now: number = Date.now(),
+): PresenceStatus {
   if (!lastSeen) return "offline";
-  const now = Date.now();
   if (now - lastSeen < ONLINE_WINDOW_MS) return "online";
   if (now - lastSeen < IDLE_WINDOW_MS) return "idle";
   return "offline";
@@ -99,10 +107,84 @@ export function watchAllUsers(callback: (users: UserPresence[]) => void): Unsubs
     callback([]);
     return () => {};
   }
+  // Reuse the same `UserPresence` reference across snapshots when the
+  // visible fields didn't change, so React.memo'd consumers (UserRow,
+  // MemberRow, MessageItem) skip work when an unrelated user heartbeats.
+  // Without this, every 30 s heartbeat from any single user would
+  // emit a fresh array of 30+ fresh objects, busting referential
+  // equality everywhere.
+  const cache = new Map<string, UserPresence>();
   return onSnapshot(collection(fb.db, "users"), (snap) => {
-    const users: UserPresence[] = snap.docs.map((d) => parseUserDoc(d.id, d.data()));
-    callback(users);
+    const next: UserPresence[] = [];
+    const seen = new Set<string>();
+    for (const d of snap.docs) {
+      seen.add(d.id);
+      const fresh = parseUserDoc(d.id, d.data());
+      const cached = cache.get(d.id);
+      if (cached && userPresenceEqual(cached, fresh)) {
+        next.push(cached);
+      } else {
+        cache.set(d.id, fresh);
+        next.push(fresh);
+      }
+    }
+    // Drop cache entries for users that no longer exist in the snapshot.
+    for (const uid of cache.keys()) {
+      if (!seen.has(uid)) cache.delete(uid);
+    }
+    callback(next);
   });
+}
+
+/**
+ * Deep equality check on the fields a consumer would observe. Returns
+ * true when two `UserPresence` objects are visibly identical, so the
+ * old reference can be reused. Order and field set must match
+ * `UserPresence` exactly — adding a new visible field requires
+ * extending this check or memoization will return stale values.
+ */
+function userPresenceEqual(a: UserPresence, b: UserPresence): boolean {
+  if (
+    a.uid !== b.uid ||
+    a.displayName !== b.displayName ||
+    a.username !== b.username ||
+    a.avatarUrl !== b.avatarUrl ||
+    a.discordId !== b.discordId ||
+    a.lastSeen !== b.lastSeen ||
+    a.bio !== b.bio ||
+    a.bannerUrl !== b.bannerUrl ||
+    a.accentColor !== b.accentColor ||
+    a.profileTheme !== b.profileTheme ||
+    a.tier !== b.tier
+  ) {
+    return false;
+  }
+  // currentActivity (object | null)
+  if ((a.currentActivity == null) !== (b.currentActivity == null)) return false;
+  if (
+    a.currentActivity &&
+    b.currentActivity &&
+    (a.currentActivity.moduleId !== b.currentActivity.moduleId ||
+      a.currentActivity.moduleName !== b.currentActivity.moduleName ||
+      a.currentActivity.startedAt !== b.currentActivity.startedAt)
+  ) {
+    return false;
+  }
+  // pinnedModuleIds (string[]) — order-sensitive on purpose, the user
+  // may reorder their pinned games.
+  if (a.pinnedModuleIds.length !== b.pinnedModuleIds.length) return false;
+  for (let i = 0; i < a.pinnedModuleIds.length; i++) {
+    if (a.pinnedModuleIds[i] !== b.pinnedModuleIds[i]) return false;
+  }
+  // privacy (object) — three booleans.
+  if (
+    a.privacy.showActivity !== b.privacy.showActivity ||
+    a.privacy.showPlaytime !== b.privacy.showPlaytime ||
+    a.privacy.allowDirectMessages !== b.privacy.allowDirectMessages
+  ) {
+    return false;
+  }
+  return true;
 }
 
 /**

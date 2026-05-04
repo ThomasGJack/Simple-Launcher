@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Check,
@@ -42,8 +42,14 @@ const QUICK_REACTIONS = ["👍", "❤️", "😂", "🔥", "🎉", "😮", "😢
  *  - Reactions row (live subscription)
  *  - Hover actions toolbar (react / reply / edit / pin / delete)
  *  - Inline edit mode for the sender
+ *
+ * Memoized — a channel can render 100+ messages and the parent
+ * (ChannelView) re-renders on every typing keystroke, every Firestore
+ * snapshot, every shared tick. Without memo, every re-render of the
+ * parent would re-execute every MessageItem body, re-subscribing
+ * reactions and re-running the markdown render.
  */
-export function MessageItem({
+export const MessageItem = memo(function MessageItem({
   message,
   crewId,
   channelId,
@@ -402,7 +408,30 @@ export function MessageItem({
       </AnimatePresence>
     </motion.div>
   );
-}
+}, (prev, next) => {
+  // Cheap field-by-field compare. Skipping the onReply callback
+  // (inline arrow from parent) is safe because onReply uses the
+  // current message id which is captured in the parent closure.
+  return (
+    prev.message.id === next.message.id &&
+    prev.message.text === next.message.text &&
+    prev.message.editedAt === next.message.editedAt &&
+    prev.message.pinned === next.message.pinned &&
+    prev.message.imageUrl === next.message.imageUrl &&
+    prev.message.replyToId === next.message.replyToId &&
+    prev.message.replyToText === next.message.replyToText &&
+    prev.message.replyToSenderName === next.message.replyToSenderName &&
+    prev.message.senderUid === next.message.senderUid &&
+    prev.message.senderName === next.message.senderName &&
+    prev.message.senderAvatar === next.message.senderAvatar &&
+    prev.message.sentAt === next.message.sentAt &&
+    prev.crewId === next.crewId &&
+    prev.channelId === next.channelId &&
+    prev.myUid === next.myUid &&
+    prev.amOwnerOrAdmin === next.amOwnerOrAdmin &&
+    prev.grouped === next.grouped
+  );
+});
 
 /** Renders the message body with markdown + mention pills. */
 function MessageBody({

@@ -3,6 +3,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  limit as fbLimit,
   onSnapshot,
   orderBy,
   query,
@@ -59,7 +60,14 @@ export function watchNews(callback: (entries: News[]) => void): Unsubscribe {
     callback([]);
     return () => {};
   }
-  const q = query(collection(fb.db, "news"), orderBy("updatedAt", "desc"));
+  // Cap the live stream to the 20 most recent updates. Older articles
+  // are still readable via direct fetch on the public news page if we
+  // ever build one — the launcher only surfaces the recent activity.
+  const q = query(
+    collection(fb.db, "news"),
+    orderBy("updatedAt", "desc"),
+    fbLimit(20),
+  );
   return onSnapshot(
     q,
     (snap) => {

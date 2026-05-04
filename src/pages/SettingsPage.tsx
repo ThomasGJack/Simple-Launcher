@@ -39,6 +39,7 @@ import {
   type McAccount,
 } from "@/lib/mcAuth";
 import { cn } from "@/lib/cn";
+import { useTickEvery } from "@/hooks/useTickEvery";
 import { DiagnosticModal } from "@/components/settings/DiagnosticModal";
 
 export function SettingsPage() {
@@ -673,12 +674,9 @@ function MinecraftAccountsCard() {
   const [defaultUuid, setDefaultUuid] = useState<string | null>(getDefaultMcUuid());
 
   // Tick every 30 s so the "expires in X" chip stays fresh without
-  // re-polling Tauri.
-  const [, setNow] = useState(Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 30_000);
-    return () => clearInterval(t);
-  }, []);
+  // re-polling Tauri. Uses the shared timer to avoid spinning yet
+  // another setInterval (see hooks/useTickEvery.ts).
+  void useTickEvery(30_000);
 
   const refreshList = async () => {
     try {
