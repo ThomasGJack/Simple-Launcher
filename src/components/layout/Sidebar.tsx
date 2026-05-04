@@ -555,7 +555,20 @@ function AvatarButton({
       {active && (
         <motion.div
           layoutId="sidebar-active"
-          className="absolute inset-0 rounded-xl ring-2 ring-accent shadow-[0_0_24px_var(--color-accent-glow)]"
+          className={cn(
+            "absolute inset-0 rounded-xl",
+            // When the user has a supporter tier, the animated frame
+            // (rainbow Légende, cyan/violet VIP, bronze Soutien) already
+            // surrounds the avatar with a clear "active" feel. Painting
+            // a square cyan rounded-xl ring on top creates a visual
+            // collision because the ring's square corners intersect
+            // the round frame. Keep the layoutId target mounted (so the
+            // smooth morph between sidebar buttons still works) but
+            // hide it visually when a tier is present.
+            tier
+              ? "opacity-0"
+              : "ring-2 ring-accent shadow-[0_0_24px_var(--color-accent-glow)]",
+          )}
           transition={{ type: "spring", stiffness: 380, damping: 30 }}
         />
       )}
