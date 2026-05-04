@@ -7,6 +7,8 @@ import { statusFromLastSeen, type UserPresence, type PresenceStatus } from "@/fi
 import { useUsers } from "@/store/firebaseStores";
 import { ensureConversation } from "@/firebase/messaging";
 import { conversationIdFor } from "@/types/messaging";
+import { TierAvatar } from "@/components/tier/TierAvatar";
+import { TierName } from "@/components/tier/TierName";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
 
@@ -165,16 +167,15 @@ function UserRow({
         className="no-drag relative shrink-0 transition-transform hover:scale-105"
         title={`Voir le profil de ${user.displayName ?? user.username ?? "ce pote"}`}
       >
-        {user.avatarUrl ? (
-          <img src={user.avatarUrl} alt="" className="size-12 rounded-xl object-cover ring-1 ring-white/10" />
-        ) : (
-          <div className="grid size-12 place-items-center rounded-xl bg-accent/10 text-accent ring-1 ring-accent/20 font-display">
-            {(user.displayName ?? "?").slice(0, 1).toUpperCase()}
-          </div>
-        )}
+        <TierAvatar
+          tier={user.tier}
+          src={user.avatarUrl}
+          displayName={user.displayName ?? user.username ?? "?"}
+          size="md"
+        />
         <span
           className={cn(
-            "absolute -bottom-0.5 -right-0.5 size-3.5 rounded-full ring-2 ring-bg-soft",
+            "absolute -left-0.5 -top-0.5 size-3.5 rounded-full ring-2 ring-bg-soft",
             meta.color,
           )}
           title={meta.label}
@@ -186,9 +187,11 @@ function UserRow({
         className="no-drag min-w-0 flex-1 text-left"
       >
         <div className="flex items-center gap-2">
-          <span className="truncate font-medium text-fg-primary transition-colors hover:text-accent">
-            {user.displayName ?? user.username ?? "Anonyme"}
-          </span>
+          <TierName
+            tier={user.tier}
+            name={user.displayName ?? user.username ?? "Anonyme"}
+            className="truncate font-medium text-fg-primary transition-colors hover:text-accent"
+          />
           {user.username && user.username !== user.displayName && (
             <span className="text-xs text-fg-dim">@{user.username}</span>
           )}

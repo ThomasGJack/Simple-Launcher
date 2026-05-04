@@ -40,6 +40,8 @@ import {
   watchAchievementStats,
   type AchievementStats,
 } from "@/firebase/achievementStats";
+import { TierAvatar } from "@/components/tier/TierAvatar";
+import { TierName } from "@/components/tier/TierName";
 import { conversationIdFor } from "@/types/messaging";
 import { ensureConversation } from "@/firebase/messaging";
 import { sounds } from "@/lib/sounds";
@@ -259,21 +261,12 @@ export function PublicProfilePage() {
         )}
         <div className="flex items-center gap-5 p-6 pt-3">
         <div className="relative">
-          {profile.avatarUrl ? (
-            <img
-              src={profile.avatarUrl}
-              alt=""
-              className="size-20 rounded-2xl object-cover ring-2"
-              style={{
-                boxShadow: "0 0 28px color-mix(in srgb, var(--profile-accent, var(--color-accent)) 50%, transparent)",
-                ["--tw-ring-color" as string]: "color-mix(in srgb, var(--profile-accent, var(--color-accent)) 40%, transparent)",
-              } as React.CSSProperties}
-            />
-          ) : (
-            <div className="grid size-20 place-items-center rounded-2xl bg-accent/15 font-display text-3xl text-accent ring-2 ring-accent/40">
-              {(profile.displayName ?? "?").slice(0, 1).toUpperCase()}
-            </div>
-          )}
+          <TierAvatar
+            tier={profile.tier}
+            src={profile.avatarUrl}
+            displayName={profile.displayName ?? profile.username ?? "?"}
+            size="xl"
+          />
           <span
             className={cn(
               "absolute -bottom-1 -right-1 size-5 rounded-full ring-4 ring-bg-soft",
@@ -284,7 +277,10 @@ export function PublicProfilePage() {
         </div>
         <div className="min-w-0 flex-1">
           <h1 className="font-display text-4xl text-fg-primary">
-            {profile.displayName ?? profile.username ?? "Anonyme"}
+            <TierName
+              tier={profile.tier}
+              name={profile.displayName ?? profile.username ?? "Anonyme"}
+            />
           </h1>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-fg-muted">
             {profile.username && profile.username !== profile.displayName && (

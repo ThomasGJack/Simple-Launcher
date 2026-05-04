@@ -27,6 +27,8 @@ import {
   splitMessageMentions,
 } from "@/lib/crewMessageFormat";
 import { useUsers } from "@/store/firebaseStores";
+import { TierAvatar } from "@/components/tier/TierAvatar";
+import { TierName } from "@/components/tier/TierName";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
 
@@ -167,26 +169,30 @@ export function MessageItem({
       {/* Avatar */}
       {grouped ? (
         <div className="w-9 shrink-0" />
-      ) : message.senderAvatar ? (
-        <img
-          src={message.senderAvatar}
-          alt=""
-          className="size-9 shrink-0 rounded-full object-cover ring-1 ring-white/10"
-          referrerPolicy="no-referrer"
-        />
       ) : (
-        <div className="grid size-9 shrink-0 place-items-center rounded-full bg-bg-elevated text-xs uppercase text-fg-muted ring-1 ring-white/10">
-          {(message.senderName ?? "?").slice(0, 1)}
-        </div>
+        <TierAvatar
+          tier={
+            allUsers.find((u) => u.uid === message.senderUid)?.tier ?? null
+          }
+          src={message.senderAvatar}
+          displayName={message.senderName}
+          size="sm"
+          className="shrink-0"
+          fallbackTone="muted"
+        />
       )}
 
       {/* Body */}
       <div className="min-w-0 flex-1">
         {!grouped && (
           <div className="flex items-baseline gap-2">
-            <span className="font-medium text-fg-primary">
-              {message.senderName ?? "Anonyme"}
-            </span>
+            <TierName
+              tier={
+                allUsers.find((u) => u.uid === message.senderUid)?.tier ?? null
+              }
+              name={message.senderName ?? "Anonyme"}
+              className="font-medium text-fg-primary"
+            />
             <span className="text-[10px] text-fg-dim">
               {formatStamp(message.sentAt)}
             </span>

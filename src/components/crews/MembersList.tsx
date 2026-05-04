@@ -21,6 +21,8 @@ import { useUsers } from "@/store/firebaseStores";
 import { sendGameInvitation } from "@/firebase/invitations";
 import { useAuthStore } from "@/store/auth";
 import { useUIStore } from "@/store/ui";
+import { TierAvatar } from "@/components/tier/TierAvatar";
+import { TierName } from "@/components/tier/TierName";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
 
@@ -348,21 +350,16 @@ function MemberRow({
         className="no-drag flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-white/[0.04]"
       >
         <div className="relative shrink-0">
-          {member.avatarUrl ? (
-            <img
-              src={member.avatarUrl}
-              alt=""
-              className="size-8 rounded-full object-cover ring-1 ring-white/10"
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <div className="grid size-8 place-items-center rounded-full bg-bg-elevated text-[10px] uppercase text-fg-muted ring-1 ring-white/10">
-              {member.displayName.slice(0, 1)}
-            </div>
-          )}
+          <TierAvatar
+            tier={live?.tier ?? null}
+            src={member.avatarUrl}
+            displayName={member.displayName}
+            size="sm"
+            fallbackTone="muted"
+          />
           <span
             className={cn(
-              "absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full ring-2 ring-bg-soft",
+              "absolute -left-0.5 -top-0.5 size-2.5 rounded-full ring-2 ring-bg-soft",
               status === "online"
                 ? "bg-emerald-400"
                 : status === "idle"
@@ -373,7 +370,11 @@ function MemberRow({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 truncate text-sm">
-            <span className="truncate text-fg-primary">{member.displayName}</span>
+            <TierName
+              tier={live?.tier ?? null}
+              name={member.displayName}
+              className="truncate text-fg-primary"
+            />
             {member.role === "owner" || isOwnerOfCrew ? (
               <Crown className="size-3 shrink-0 text-amber-300" />
             ) : member.role === "admin" ? (

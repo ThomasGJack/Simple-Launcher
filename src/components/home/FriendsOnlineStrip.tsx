@@ -5,6 +5,7 @@ import { statusFromLastSeen } from "@/firebase/presence";
 import { useUsers } from "@/store/firebaseStores";
 import { useAuthStore } from "@/store/auth";
 import { useUIStore } from "@/store/ui";
+import { TierAvatar } from "@/components/tier/TierAvatar";
 
 /**
  * Compact strip showing how many friends are online + a few avatars + the
@@ -49,24 +50,17 @@ export function FriendsOnlineStrip() {
         <span className="relative inline-flex size-2 rounded-full bg-emerald-400" />
       </span>
       <div className="flex shrink-0 -space-x-2">
-        {sample.map((u) =>
-          u.avatarUrl ? (
-            <img
-              key={u.uid}
-              src={u.avatarUrl}
-              alt=""
-              className="size-7 rounded-full object-cover ring-2 ring-bg-base"
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <div
-              key={u.uid}
-              className="grid size-7 place-items-center rounded-full bg-bg-elevated text-[10px] uppercase ring-2 ring-bg-base"
-            >
-              {(u.displayName ?? "?").slice(0, 1)}
-            </div>
-          ),
-        )}
+        {sample.map((u) => (
+          <TierAvatar
+            key={u.uid}
+            tier={u.tier}
+            src={u.avatarUrl}
+            displayName={u.displayName}
+            size="xs"
+            className="ring-2 ring-bg-base"
+            fallbackTone="muted"
+          />
+        ))}
       </div>
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm text-fg-primary">

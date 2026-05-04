@@ -6,11 +6,12 @@ import { useAuthStore } from "@/store/auth";
 import { useFavoritesStore } from "@/store/favorites";
 import { isAdmin } from "@/lib/admin";
 import { sounds } from "@/lib/sounds";
-import { useModules, useConversations, useNotifications } from "@/store/firebaseStores";
+import { useModules, useConversations, useNotifications, useUsers } from "@/store/firebaseStores";
 import { watchUserShortcuts } from "@/firebase/shortcuts";
 import { unreadCount, otherParticipant, type Conversation } from "@/types/messaging";
 import { notify } from "@/lib/notifications";
 import { NotificationsCenter } from "@/components/notifications/NotificationsCenter";
+import { TierAvatar } from "@/components/tier/TierAvatar";
 import type { LauncherModule } from "@/types/module";
 import { cn } from "@/lib/cn";
 
@@ -216,6 +217,7 @@ export function Sidebar() {
 
         {user ? (
           <AvatarButton
+            uid={user.uid}
             photoURL={user.photoURL}
             displayName={user.displayName ?? "Profil"}
             active={
@@ -511,16 +513,24 @@ function FavoriteButton({
 }
 
 function AvatarButton({
+  uid,
   photoURL,
   displayName,
   active,
   onClick,
 }: {
+  uid: string;
   photoURL: string | null;
   displayName: string;
   active?: boolean;
   onClick: () => void;
 }) {
+  // Read the current user's tier from the live users store so the
+  // sidebar avatar reflects supporter status with the same animated
+  // frame seen elsewhere in the app.
+  const allUsers = useUsers();
+  const tier = allUsers.find((u) => u.uid === uid)?.tier ?? null;
+
   return (
     <button
       onClick={() => {
@@ -537,25 +547,13 @@ function AvatarButton({
           transition={{ type: "spring", stiffness: 380, damping: 30 }}
         />
       )}
-      {photoURL ? (
-        <img
-          src={photoURL}
-          alt={displayName}
-          className={cn(
-            "relative z-10 size-9 rounded-lg object-cover transition-all",
-            active ? "ring-1 ring-bg-base" : "ring-1 ring-white/10 group-hover:ring-accent/50",
-          )}
-        />
-      ) : (
-        <div
-          className={cn(
-            "relative z-10 grid size-9 place-items-center rounded-lg bg-accent/15 font-display text-sm text-accent",
-            active ? "ring-1 ring-bg-base" : "ring-1 ring-white/10 group-hover:ring-accent/50",
-          )}
-        >
-          {displayName.slice(0, 1).toUpperCase()}
-        </div>
-      )}
+      <TierAvatar
+        tier={tier}
+        src={photoURL}
+        displayName={displayName}
+        size="md"
+        className="relative z-10"
+      />
       <span className="pointer-events-none absolute left-full ml-3 whitespace-nowrap rounded-md bg-bg-elevated px-2.5 py-1 text-xs text-fg-primary opacity-0 shadow-lg ring-1 ring-white/[0.06] transition-opacity group-hover:opacity-100 z-50">
         {displayName}
       </span>
