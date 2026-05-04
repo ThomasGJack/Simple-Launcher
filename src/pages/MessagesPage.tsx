@@ -9,13 +9,15 @@ import {
   watchConversationById,
   watchMessages,
 } from "@/firebase/messaging";
-import { useConversations } from "@/store/firebaseStores";
+import { useConversations, useUsers } from "@/store/firebaseStores";
 import {
   otherParticipant,
   unreadCount,
   type Conversation,
   type Message,
 } from "@/types/messaging";
+import { TierAvatar } from "@/components/tier/TierAvatar";
+import { TierBannerOverlay } from "@/components/tier/TierBanner";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
 
@@ -142,6 +144,10 @@ function ConversationRow({
   const unread = unreadCount(conv, myUid);
   const last = conv.lastMessage;
   const isMine = last?.senderUid === myUid;
+  // Pull peer's tier from the live presence cache so the row reflects
+  // their current grade (Soutien / VIP / Légende) without needing it
+  // duplicated in the conversation doc.
+  const peerTier = useUsers().find((u) => u.uid === peerUid)?.tier ?? null;
 
   return (
     <button
@@ -154,18 +160,16 @@ function ConversationRow({
           : "hover:bg-white/[0.03]",
       )}
     >
-      {peerAvatar ? (
-        <img
+      <TierBannerOverlay tier={peerTier} rounded="xl" />
+      <div className="relative shrink-0">
+        <TierAvatar
+          tier={peerTier}
           src={peerAvatar}
-          alt=""
-          className="size-10 shrink-0 rounded-xl object-cover ring-1 ring-white/10"
+          displayName={peerName}
+          size="md"
         />
-      ) : (
-        <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent/15 font-display text-sm text-accent ring-1 ring-accent/20">
-          {peerName.slice(0, 1).toUpperCase()}
-        </div>
-      )}
-      <div className="min-w-0 flex-1">
+      </div>
+      <div className="relative min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
           <span className={cn(
             "truncate text-sm",
@@ -209,6 +213,7 @@ function ChatPanel({ conv, myUid }: { conv: Conversation; myUid: string }) {
   const peerUid = otherParticipant(conv, myUid);
   const peerName = conv.participantNames[peerUid] ?? "Inconnu";
   const peerAvatar = conv.participantAvatars[peerUid] ?? null;
+  const peerTier = useUsers().find((u) => u.uid === peerUid)?.tier ?? null;
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
@@ -284,21 +289,19 @@ function ChatPanel({ conv, myUid }: { conv: Conversation; myUid: string }) {
         </button>
         <button
           onClick={() => navigate({ name: "user-profile", uid: peerUid })}
-          className="no-drag flex min-w-0 flex-1 items-center gap-3 rounded-lg p-1 text-left transition-colors hover:bg-white/[0.03]"
+          className="no-drag relative flex min-w-0 flex-1 items-center gap-3 rounded-lg p-1 text-left transition-colors hover:bg-white/[0.03]"
           title={`Voir le profil de ${peerName}`}
         >
-          {peerAvatar ? (
-            <img
+          <TierBannerOverlay tier={peerTier} rounded="lg" />
+          <div className="relative shrink-0">
+            <TierAvatar
+              tier={peerTier}
               src={peerAvatar}
-              alt=""
-              className="size-9 shrink-0 rounded-lg object-cover ring-1 ring-white/10"
+              displayName={peerName}
+              size="md"
             />
-          ) : (
-            <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent/15 font-display text-accent ring-1 ring-accent/20">
-              {peerName.slice(0, 1).toUpperCase()}
-            </div>
-          )}
-          <div className="min-w-0 flex-1">
+          </div>
+          <div className="relative min-w-0 flex-1">
             <div className="truncate font-medium text-fg-primary">{peerName}</div>
             <div className="text-[10px] uppercase tracking-wider text-fg-dim">Conversation privée · Voir le profil</div>
           </div>
