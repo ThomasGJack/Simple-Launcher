@@ -1,7 +1,10 @@
 import {
   collection,
   doc,
+  limit as fbLimit,
   onSnapshot,
+  orderBy,
+  query,
   serverTimestamp,
   setDoc,
   type Unsubscribe,
@@ -114,7 +117,19 @@ export function watchAllUsers(callback: (users: UserPresence[]) => void): Unsubs
   // emit a fresh array of 30+ fresh objects, busting referential
   // equality everywhere.
   const cache = new Map<string, UserPresence>();
-  return onSnapshot(collection(fb.db, "users"), (snap) => {
+  // Cap the live stream at 200 most-recently-seen users. The launcher
+  // is small enough today (< 50 active users) that this is well above
+  // the realistic ceiling, but having an explicit cap means the
+  // bandwidth and re-render cost stays bounded as the user base grows.
+  // If we ever exceed 200, older accounts are still readable via
+  // direct fetch on ProfilePage — they just don't appear in the
+  // Communauté list automatically.
+  const q = query(
+    collection(fb.db, "users"),
+    orderBy("lastSeen", "desc"),
+    fbLimit(200),
+  );
+  return onSnapshot(q, (snap) => {
     const next: UserPresence[] = [];
     const seen = new Set<string>();
     for (const d of snap.docs) {

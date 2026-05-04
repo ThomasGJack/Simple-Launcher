@@ -1,6 +1,11 @@
 import { initializeApp, type FirebaseApp } from "firebase/app";
 import { browserLocalPersistence, getAuth, setPersistence, type Auth } from "firebase/auth";
-import { getFirestore, type Firestore } from "firebase/firestore";
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentSingleTabManager,
+  type Firestore,
+} from "firebase/firestore";
 import { getStorage, type FirebaseStorage } from "firebase/storage";
 import { getFunctions, type Functions } from "firebase/functions";
 
@@ -30,7 +35,24 @@ export function getFirebase() {
     setPersistence(auth, browserLocalPersistence).catch((err) =>
       console.warn("[firebase] persistence failed:", err),
     );
-    db = getFirestore(app);
+    // Enable Firestore offline persistence with IndexedDB-backed cache.
+    // Tauri runs as a single-window, single-tab app — `persistentSingleTabManager`
+    // is the cheapest tab manager (no cross-tab coordination overhead).
+    //
+    // Effects :
+    //  - Cold/warm boot reads come from cache instantly (no round-trip
+    //    before the first paint).
+    //  - When offline (mode hors ligne), all reads succeed against the
+    //    cache. Writes queue and sync when the network comes back.
+    //  - Cache is automatically pruned (Firebase manages its own LRU).
+    //
+    // `initializeFirestore` must be called before the first `getFirestore`
+    // — we do it here at first init so it's the only entry point.
+    db = initializeFirestore(app, {
+      localCache: persistentLocalCache({
+        tabManager: persistentSingleTabManager(undefined),
+      }),
+    });
     storage = getStorage(app);
     functions = getFunctions(app, "europe-west1");
   }

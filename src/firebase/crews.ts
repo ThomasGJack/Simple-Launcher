@@ -156,8 +156,14 @@ export function watchCrews(callback: (crews: Crew[]) => void): Unsubscribe {
     callback([]);
     return () => {};
   }
+  // Cap to 50 crews. The launcher exposes "browse all crews" via
+  // BrowseCrewsModal which can paginate beyond this if we ever need.
+  // For the sidebar / route, only what the user is in matters
+  // (watchMyCrewIds handles that), so 50 is a generous upper bound
+  // for the discovery list.
+  const q = query(collection(fb.db, "crews"), fbLimit(50));
   return onSnapshot(
-    collection(fb.db, "crews"),
+    q,
     (snap) => {
       const list: Crew[] = snap.docs.map(parseCrew);
       list.sort((a, b) => a.position - b.position || a.createdAt - b.createdAt);
@@ -210,8 +216,14 @@ export function watchCrewMembers(
     callback([]);
     return () => {};
   }
+  // Cap at 100 members per crew. Master crew is the only one that
+  // could realistically grow past this — and there it's bounded by
+  // the 200-user `watchAllUsers` cap (the sidebar already shows the
+  // global presence list). The 100 hard limit prevents pathological
+  // crews from broadcasting hundreds of writes per role change to
+  // every viewer.
   return onSnapshot(
-    collection(fb.db, "crews", crewId, "members"),
+    query(collection(fb.db, "crews", crewId, "members"), fbLimit(100)),
     (snap) => {
       const list: CrewMember[] = snap.docs.map((d) => {
         const data = d.data();
