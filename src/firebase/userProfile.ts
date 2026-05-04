@@ -1,8 +1,9 @@
-import { doc, serverTimestamp, setDoc } from "firebase/firestore";
+import { doc, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { getFirebase } from "./config";
 import type { UserPrivacy } from "./presence";
 import type { ProfileThemeId } from "@/lib/profileThemes";
+import type { SupporterTier } from "@/lib/supporterTier";
 
 /**
  * Persists user-editable profile fields to `/users/{uid}`. The presence
@@ -62,6 +63,24 @@ export async function uploadProfileBanner(
     );
   });
   return getDownloadURL(ref);
+}
+
+/**
+ * Admin-only : set a user's supporter tier ("supporter" / "vip" /
+ * "legend") or clear it (`null`). Used by the admin panel to manually
+ * grant tiers until subscription payments are wired up. Firestore
+ * rules let any authed user write their own profile, so technically a
+ * user could elevate themselves — the admin panel is just the
+ * intended UI. Once Stripe is in place we'll lock this down via a
+ * Cloud Function + an `isAdmin()` rule on the `tier` field.
+ */
+export async function setUserTier(
+  uid: string,
+  tier: SupporterTier | null,
+): Promise<void> {
+  const fb = getFirebase();
+  if (!fb) throw new Error("Firebase non configuré");
+  await updateDoc(doc(fb.db, "users", uid), { tier });
 }
 
 function inferImageExt(file: File): string {

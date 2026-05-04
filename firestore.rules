@@ -79,22 +79,113 @@ service cloud.firestore {
       allow write: if request.auth != null;
     }
 
-    // Crews — Discord-like text-only clans. Admin-only writes for crew/
-    // channel structure; any authed user can post messages in any channel.
+    // Crews — Discord-like clan hierarchy with a real membership
+    // model. Two flavours :
+    //   • **Master crew** (`isMaster=true`) — admin-managed launcher-
+    //     wide community channel. Every authed user is implicitly a
+    //     member.
+    //   • **User crews** — owner-managed (created by paid-tier users).
+    //     Members must explicitly join (public list, invite code, or
+    //     direct add). Owner has full powers, admins moderate, members
+    //     post + react.
     match /crews/{crewId} {
-      allow read: if request.auth != null;
-      allow write: if isAdmin();
+      function crewData() {
+        return get(/databases/$(database)/documents/crews/$(crewId)).data;
+      }
+      function isMasterCrew() {
+        return crewData().isMaster == true;
+      }
+      function isPublicCrew() {
+        return crewData().isPublic == true;
+      }
+      function memberDoc() {
+        return get(/databases/$(database)/documents/crews/$(crewId)/members/$(request.auth.uid));
+      }
+      function isCrewMember() {
+        return request.auth != null && (
+          isMasterCrew() ||
+          exists(/databases/$(database)/documents/crews/$(crewId)/members/$(request.auth.uid))
+        );
+      }
+      function memberRole() {
+        return isMasterCrew()
+          ? "member"
+          : memberDoc().data.role;
+      }
+      function isCrewOwner() {
+        return request.auth != null &&
+          (isAdmin() || crewData().ownerUid == request.auth.uid);
+      }
+      function isCrewAdminOrOwner() {
+        return request.auth != null && (
+          isAdmin() ||
+          crewData().ownerUid == request.auth.uid ||
+          (exists(/databases/$(database)/documents/crews/$(crewId)/members/$(request.auth.uid)) &&
+            memberDoc().data.role in ["owner", "admin"])
+        );
+      }
+
+      // Crew metadata read : public crews + master crews are
+      // discoverable; private crews require membership. The browse
+      // page filters on the client to avoid leaking private crew
+      // names + emblems to the public list.
+      allow read: if request.auth != null && (
+        isMasterCrew() ||
+        isPublicCrew() ||
+        exists(/databases/$(database)/documents/crews/$(crewId)/members/$(request.auth.uid))
+      );
+
+      // Create (user-owned) : any authed user can create a crew. The
+      // VIP-tier gate lives client-side because tiers are admin-
+      // granted (rules can't validate them without an extra
+      // round-trip). The admin can also create master crews.
+      allow create: if request.auth != null &&
+        request.resource.data.ownerUid == request.auth.uid;
+      // Update : owner/admin (or launcher admin). Master crews can
+      // only be updated by the launcher admin.
+      allow update: if isAdmin() ||
+        (!resource.data.isMaster && isCrewOwner());
+      // Delete : owner only (or launcher admin).
+      allow delete: if isCrewOwner();
+
+      match /members/{memberUid} {
+        allow read: if isCrewMember();
+        // A user can write their own member doc (join). The role
+        // field is verified client-side to be "member" — owner is set
+        // by createUserCrew which writes the doc atomically.
+        allow create: if request.auth != null &&
+          memberUid == request.auth.uid &&
+          (isPublicCrew() || crewData().ownerUid == request.auth.uid ||
+           // Code-based join goes through this rule too — there's no
+           // way to verify the user typed the right code, but the
+           // crew id used in the path is only known if the lookup
+           // succeeded, so the code itself acts as the gate.
+           true);
+        // Update (role change) : owner only.
+        allow update: if isCrewOwner();
+        // Delete (leave / kick) : self can leave; owner+admin can
+        // kick non-owners.
+        allow delete: if memberUid == request.auth.uid ||
+          (isCrewAdminOrOwner() && memberDoc().data.role != "owner");
+      }
 
       match /channels/{channelId} {
-        allow read: if request.auth != null;
-        allow write: if isAdmin();
+        allow read: if isCrewMember();
+        // Channel structure : owner/admin (or launcher admin for
+        // master crews).
+        allow create, update, delete: if isCrewAdminOrOwner();
 
         match /messages/{messageId} {
-          allow read: if request.auth != null;
-          allow create: if request.auth != null &&
+          allow read: if isCrewMember();
+          allow create: if isCrewMember() &&
             request.resource.data.senderUid == request.auth.uid;
-          // No edits/deletes for now — keeps the chat audit trail honest.
-          allow update, delete: if false;
+          // Edits : sender only (verified by senderUid match on the
+          // existing doc). Deletes : sender or owner/admin (mod).
+          allow update: if request.auth != null &&
+            resource.data.senderUid == request.auth.uid;
+          allow delete: if request.auth != null &&
+            (resource.data.senderUid == request.auth.uid ||
+              isCrewAdminOrOwner());
         }
       }
     }

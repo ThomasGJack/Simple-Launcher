@@ -13,6 +13,7 @@ import {
   type Crew,
   type CrewChannel,
 } from "@/firebase/crews";
+import { useAuthStore } from "@/store/auth";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
 
@@ -259,14 +260,19 @@ function CrewEditor({
   existingCount: number;
   onClose: () => void;
 }) {
+  const me = useAuthStore((s) => s.user);
   const [name, setName] = useState(initial?.name ?? "");
   const [emblem, setEmblem] = useState(initial?.emblem ?? "🏰");
   const [color, setColor] = useState(initial?.color ?? "#00d4ff");
   const [position, setPosition] = useState(initial?.position ?? existingCount);
+  const [isMaster, setIsMaster] = useState(initial?.isMaster ?? false);
+  const [isPublic, setIsPublic] = useState(initial?.isPublic ?? false);
+  const [description, setDescription] = useState(initial?.description ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSave = async () => {
+    if (!me) return;
     if (!name.trim()) {
       setError("Le nom est requis");
       return;
@@ -274,11 +280,19 @@ function CrewEditor({
     setSaving(true);
     setError(null);
     try {
-      const data = { name: name.trim(), emblem: emblem || "🏰", color, position };
+      const data = {
+        name: name.trim(),
+        emblem: emblem || "🏰",
+        color,
+        position,
+        isMaster,
+        isPublic,
+        description: description.trim(),
+      };
       if (initial) {
         await updateCrew(initial.id, data);
       } else {
-        await createCrew(data);
+        await createCrew(data, me.uid);
       }
       sounds.success();
       onClose();
@@ -350,6 +364,47 @@ function CrewEditor({
             className="w-full rounded-xl bg-bg-base/40 px-3 py-2 text-sm ring-1 ring-white/[0.06] focus:outline-none focus:ring-accent/50"
           />
         </Field>
+        <div className="col-span-2">
+          <Field label="Description (publique)">
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              maxLength={140}
+              rows={2}
+              placeholder="Ex: Le crew maître où toute la communauté discute"
+              className="w-full resize-none rounded-xl bg-bg-base/40 px-3 py-2 text-sm ring-1 ring-white/[0.06] focus:outline-none focus:ring-accent/50"
+            />
+          </Field>
+        </div>
+        <label className="col-span-1 flex cursor-pointer items-center gap-3 rounded-xl bg-bg-base/40 px-3 py-2.5 ring-1 ring-white/[0.06]">
+          <input
+            type="checkbox"
+            checked={isMaster}
+            onChange={(e) => setIsMaster(e.target.checked)}
+            className="size-4 accent-amber-400"
+          />
+          <div className="flex-1">
+            <div className="text-sm font-medium text-fg-primary">★ Crew maître</div>
+            <div className="text-[10px] text-fg-muted">
+              Tous les users sont membres auto. Réservé à "Simple Games".
+            </div>
+          </div>
+        </label>
+        <label className="col-span-1 flex cursor-pointer items-center gap-3 rounded-xl bg-bg-base/40 px-3 py-2.5 ring-1 ring-white/[0.06]">
+          <input
+            type="checkbox"
+            checked={isPublic}
+            onChange={(e) => setIsPublic(e.target.checked)}
+            disabled={isMaster}
+            className="size-4 accent-emerald-400"
+          />
+          <div className="flex-1">
+            <div className="text-sm font-medium text-fg-primary">🌐 Public</div>
+            <div className="text-[10px] text-fg-muted">
+              Listé dans la page Découvrir, ouvert à tous.
+            </div>
+          </div>
+        </label>
       </div>
       {error && (
         <div className="mt-3 rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger ring-1 ring-danger/30">

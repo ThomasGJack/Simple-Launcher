@@ -1,51 +1,102 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Castle, Hash, Send } from "lucide-react";
+import {
+  Castle,
+  Compass,
+  Crown,
+  Hash,
+  KeyRound,
+  Lock,
+  LogOut,
+  Plus,
+  Send,
+} from "lucide-react";
 import { useAuthStore } from "@/store/auth";
 import { useUIStore } from "@/store/ui";
+import { useUsers } from "@/store/firebaseStores";
 import {
+  leaveCrew,
+  sendChannelMessage,
   watchCrews,
   watchCrewChannels,
   watchChannelMessages,
-  sendChannelMessage,
+  watchMyCrewIds,
   type Crew,
   type CrewChannel,
   type CrewMessage,
 } from "@/firebase/crews";
+import { hasAnyTier } from "@/lib/supporterTier";
+import { isAdmin } from "@/lib/admin";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
+import { CreateCrewModal } from "@/components/crews/CreateCrewModal";
+import { JoinByCodeModal } from "@/components/crews/JoinByCodeModal";
+import { BrowseCrewsModal } from "@/components/crews/BrowseCrewsModal";
 
 /**
  * Discord-like clan/crew page. Three-column layout:
- *   • left rail: list of crews (icons / names)
+ *   • left rail: list of crews the user is a member of (master crews
+ *     show automatically since `ensureMasterMemberships` runs at boot)
  *   • middle rail: channels of the selected crew
  *   • main: messages of the selected channel + composer
  *
- * Crews and channels are configured by the admin in the Admin panel.
- * Messages are sent by any authed user.
+ * Below the crew rail, three buttons:
+ *   – Découvrir : opens the public-crew directory
+ *   – Code     : opens the join-by-code dialog
+ *   – Créer    : opens the create-crew form (gated on supporter tier)
  */
 export function CrewsPage() {
   const me = useAuthStore((s) => s.user);
   const route = useUIStore((s) => s.route);
   const navigate = useUIStore((s) => s.navigate);
+  const allUsers = useUsers();
 
-  const [crews, setCrews] = useState<Crew[]>([]);
+  // The current user's profile from the presence collection — used to
+  // gate the "Créer un crew" button on a paid supporter tier (granted
+  // manually by the admin until subscriptions are wired up).
+  const myProfile = useMemo(
+    () => allUsers.find((u) => u.uid === me?.uid) ?? null,
+    [allUsers, me?.uid],
+  );
+  const canCreateCrew =
+    isAdmin(me) || hasAnyTier(myProfile?.tier ?? null);
+
+  const [allCrews, setAllCrews] = useState<Crew[]>([]);
+  const [myCrewIds, setMyCrewIds] = useState<Set<string>>(new Set());
   const [channels, setChannels] = useState<CrewChannel[]>([]);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [browseOpen, setBrowseOpen] = useState(false);
+  const [codeOpen, setCodeOpen] = useState(false);
 
-  useEffect(() => watchCrews(setCrews), []);
+  useEffect(() => watchCrews(setAllCrews), []);
+
+  useEffect(() => {
+    if (!me) {
+      setMyCrewIds(new Set());
+      return;
+    }
+    return watchMyCrewIds(me.uid, (ids) => setMyCrewIds(new Set(ids)));
+  }, [me]);
+
+  // Master crews are always visible (everyone is implicitly a member).
+  // User crews are only visible if the user is a member.
+  const visibleCrews = useMemo(
+    () =>
+      allCrews.filter(
+        (c) => c.isMaster || myCrewIds.has(c.id) || c.ownerUid === me?.uid,
+      ),
+    [allCrews, myCrewIds, me?.uid],
+  );
 
   const selectedCrewId = route.name === "crews" ? route.crewId : undefined;
   const selectedChannelId = route.name === "crews" ? route.channelId : undefined;
 
   // Auto-pick the first crew when the user lands without a selection.
-  // Hard-gate on `route.name === "crews"` — otherwise the effect can fire
-  // during the AnimatePresence exit transition and bounce the user right
-  // back here when they click "Home" or any other sidebar entry.
   useEffect(() => {
     if (route.name !== "crews") return;
-    if (selectedCrewId || crews.length === 0) return;
-    navigate({ name: "crews", crewId: crews[0].id });
-  }, [crews, selectedCrewId, navigate, route.name]);
+    if (selectedCrewId || visibleCrews.length === 0) return;
+    navigate({ name: "crews", crewId: visibleCrews[0].id });
+  }, [visibleCrews, selectedCrewId, navigate, route.name]);
 
   useEffect(() => {
     if (!selectedCrewId) {
@@ -56,7 +107,6 @@ export function CrewsPage() {
   }, [selectedCrewId]);
 
   // Auto-pick the first channel when none selected for the current crew.
-  // Same route gate as above to avoid bouncing back during navigation away.
   useEffect(() => {
     if (route.name !== "crews") return;
     if (!selectedCrewId) return;
@@ -65,25 +115,81 @@ export function CrewsPage() {
   }, [channels, selectedCrewId, selectedChannelId, navigate, route.name]);
 
   const selectedCrew = useMemo(
-    () => crews.find((c) => c.id === selectedCrewId) ?? null,
-    [crews, selectedCrewId],
+    () => visibleCrews.find((c) => c.id === selectedCrewId) ?? null,
+    [visibleCrews, selectedCrewId],
   );
   const selectedChannel = useMemo(
     () => channels.find((c) => c.id === selectedChannelId) ?? null,
     [channels, selectedChannelId],
   );
 
-  if (crews.length === 0) {
+  const handleLeaveCrew = async () => {
+    if (!me || !selectedCrew) return;
+    if (selectedCrew.isMaster) return;
+    if (
+      !confirm(
+        `Quitter le crew "${selectedCrew.name}" ? Tu pourras le rejoindre à nouveau plus tard si tu as le code ou s'il est public.`,
+      )
+    )
+      return;
+    try {
+      await leaveCrew(selectedCrew.id, me.uid);
+      sounds.click();
+      navigate({ name: "crews" });
+    } catch (err) {
+      console.warn("[crews] leave failed:", err);
+      sounds.error();
+    }
+  };
+
+  if (visibleCrews.length === 0) {
     return (
       <div className="grid h-full place-items-center p-12">
         <div className="max-w-md rounded-3xl glass p-10 text-center">
           <Castle className="mx-auto mb-3 size-10 text-fg-dim" strokeWidth={1.5} />
           <h2 className="font-display text-2xl">Aucun clan pour l'instant</h2>
           <p className="mt-2 text-sm text-fg-muted">
-            Demande à l'admin d'en créer un depuis le panel d'administration. Une fois en ligne,
-            les salons textuels apparaîtront ici.
+            Rejoins un crew public, utilise un code d'invitation, ou crée le tien.
           </p>
+          <div className="mt-5 flex flex-wrap justify-center gap-2">
+            <button
+              onClick={() => setBrowseOpen(true)}
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-500/15 px-4 py-2 text-sm font-medium text-emerald-300 ring-1 ring-emerald-500/30 hover:bg-emerald-500/25"
+            >
+              <Compass className="size-4" /> Découvrir
+            </button>
+            <button
+              onClick={() => setCodeOpen(true)}
+              className="inline-flex items-center gap-2 rounded-xl bg-cyan-500/15 px-4 py-2 text-sm font-medium text-cyan-300 ring-1 ring-cyan-500/30 hover:bg-cyan-500/25"
+            >
+              <KeyRound className="size-4" /> Code
+            </button>
+            {canCreateCrew && (
+              <button
+                onClick={() => setCreateOpen(true)}
+                className="inline-flex items-center gap-2 rounded-xl bg-amber-500/15 px-4 py-2 text-sm font-medium text-amber-300 ring-1 ring-amber-500/30 hover:bg-amber-500/25"
+              >
+                <Plus className="size-4" /> Créer
+              </button>
+            )}
+          </div>
         </div>
+        <BrowseCrewsModal
+          open={browseOpen}
+          onClose={() => setBrowseOpen(false)}
+          myCrewIds={myCrewIds}
+          onJoined={(id) => navigate({ name: "crews", crewId: id })}
+        />
+        <JoinByCodeModal
+          open={codeOpen}
+          onClose={() => setCodeOpen(false)}
+          onJoined={(id) => navigate({ name: "crews", crewId: id })}
+        />
+        <CreateCrewModal
+          open={createOpen}
+          onClose={() => setCreateOpen(false)}
+          onCreated={(id) => navigate({ name: "crews", crewId: id })}
+        />
       </div>
     );
   }
@@ -91,59 +197,139 @@ export function CrewsPage() {
   return (
     <div className="flex h-full overflow-hidden">
       {/* ─── Crews rail ────────────────────────────────────── */}
-      <aside className="flex w-20 shrink-0 flex-col items-center gap-2 border-r border-white/[0.06] bg-bg-soft/40 py-4">
-        {crews.map((c) => {
-          const active = c.id === selectedCrewId;
-          return (
+      <aside className="flex w-20 shrink-0 flex-col items-center justify-between gap-2 border-r border-white/[0.06] bg-bg-soft/40 py-4">
+        <div className="flex flex-col items-center gap-2">
+          {visibleCrews.map((c) => {
+            const active = c.id === selectedCrewId;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => navigate({ name: "crews", crewId: c.id })}
+                title={c.name}
+                className={cn(
+                  "no-drag relative grid size-12 place-items-center rounded-2xl text-xl transition-all",
+                  active
+                    ? "scale-105 ring-2"
+                    : "ring-1 ring-white/[0.06] hover:ring-white/20",
+                )}
+                style={
+                  {
+                    background: active
+                      ? `color-mix(in srgb, ${c.color} 22%, var(--color-bg-elevated))`
+                      : "var(--color-bg-elevated)",
+                    color: c.color,
+                    boxShadow: active ? `0 0 18px ${c.color}66` : undefined,
+                    ["--tw-ring-color" as string]: active ? c.color : undefined,
+                  } as React.CSSProperties
+                }
+              >
+                {c.emblem || c.name.slice(0, 1)}
+                {c.isMaster && (
+                  <span
+                    title="Crew maître — tout le launcher"
+                    className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full bg-amber-400 text-[8px] font-bold text-bg-base ring-2 ring-bg-soft"
+                  >
+                    ★
+                  </span>
+                )}
+                {active && (
+                  <span
+                    className="absolute -left-3 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full"
+                    style={{ background: c.color }}
+                  />
+                )}
+              </button>
+            );
+          })}
+          <div className="my-1 h-px w-8 bg-white/[0.06]" />
+          {/* Action buttons : browse, join by code, create */}
+          <button
+            type="button"
+            onClick={() => setBrowseOpen(true)}
+            title="Découvrir des crews publics"
+            className="no-drag grid size-12 place-items-center rounded-2xl bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-500/30 transition-all hover:bg-emerald-500/15"
+          >
+            <Compass className="size-5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setCodeOpen(true)}
+            title="Rejoindre par code"
+            className="no-drag grid size-12 place-items-center rounded-2xl bg-cyan-500/10 text-cyan-300 ring-1 ring-cyan-500/30 transition-all hover:bg-cyan-500/15"
+          >
+            <KeyRound className="size-5" />
+          </button>
+          {canCreateCrew ? (
             <button
-              key={c.id}
               type="button"
-              onClick={() => navigate({ name: "crews", crewId: c.id })}
-              title={c.name}
-              className={cn(
-                "no-drag relative grid size-12 place-items-center rounded-2xl text-xl transition-all",
-                active
-                  ? "scale-105 ring-2"
-                  : "ring-1 ring-white/[0.06] hover:ring-white/20",
-              )}
-              style={{
-                background: active
-                  ? `color-mix(in srgb, ${c.color} 22%, var(--color-bg-elevated))`
-                  : "var(--color-bg-elevated)",
-                color: c.color,
-                boxShadow: active ? `0 0 18px ${c.color}66` : undefined,
-                ["--tw-ring-color" as string]: active ? c.color : undefined,
-              } as React.CSSProperties}
+              onClick={() => setCreateOpen(true)}
+              title="Créer un crew"
+              className="no-drag grid size-12 place-items-center rounded-2xl bg-amber-500/10 text-amber-300 ring-1 ring-amber-500/30 transition-all hover:bg-amber-500/15"
             >
-              {c.emblem || c.name.slice(0, 1)}
-              {active && (
-                <span
-                  className="absolute -left-3 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full"
-                  style={{ background: c.color }}
-                />
-              )}
+              <Plus className="size-5" />
             </button>
-          );
-        })}
+          ) : (
+            <button
+              type="button"
+              onClick={() => navigate({ name: "vip" })}
+              title="Création de crew réservée aux supporters"
+              className="no-drag grid size-12 place-items-center rounded-2xl bg-white/[0.03] text-fg-dim ring-1 ring-white/[0.06] transition-all hover:bg-white/[0.05]"
+            >
+              <Crown className="size-5" />
+            </button>
+          )}
+        </div>
       </aside>
 
       {/* ─── Channels rail ─────────────────────────────────── */}
       <aside className="flex w-56 shrink-0 flex-col border-r border-white/[0.06] bg-bg-soft/30">
         <div
           className="flex items-center gap-2 border-b border-white/[0.06] p-4"
-          style={{ background: selectedCrew ? `linear-gradient(180deg, ${selectedCrew.color}15, transparent)` : undefined }}
+          style={{
+            background: selectedCrew
+              ? `linear-gradient(180deg, ${selectedCrew.color}15, transparent)`
+              : undefined,
+          }}
         >
           <span className="text-2xl">{selectedCrew?.emblem ?? "🏰"}</span>
-          <div className="min-w-0">
-            <div className="truncate font-display text-lg" style={{ color: selectedCrew?.color }}>
+          <div className="min-w-0 flex-1">
+            <div
+              className="truncate font-display text-lg"
+              style={{ color: selectedCrew?.color }}
+            >
               {selectedCrew?.name ?? "—"}
             </div>
+            <div className="mt-0.5 flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-fg-dim">
+              {selectedCrew?.isMaster ? (
+                <>★ Communauté</>
+              ) : selectedCrew?.isPublic ? (
+                <>🌐 Public</>
+              ) : (
+                <>
+                  <Lock className="size-3" /> Privé
+                </>
+              )}
+            </div>
           </div>
+          {selectedCrew && !selectedCrew.isMaster && (
+            <button
+              type="button"
+              onClick={handleLeaveCrew}
+              title="Quitter ce crew"
+              className="grid size-8 place-items-center rounded-lg text-fg-dim transition-colors hover:bg-danger/10 hover:text-danger"
+            >
+              <LogOut className="size-4" />
+            </button>
+          )}
         </div>
         <div className="flex-1 overflow-y-auto p-2">
           {channels.length === 0 ? (
             <div className="px-3 py-2 text-xs text-fg-dim">
-              Pas encore de salon. L'admin doit en créer.
+              Pas encore de salon.{" "}
+              {selectedCrew?.ownerUid === me?.uid
+                ? "Va dans l'admin pour en créer."
+                : "L'admin du crew doit en créer."}
             </div>
           ) : (
             channels.map((ch) => {
@@ -189,6 +375,24 @@ export function CrewsPage() {
           </div>
         )}
       </main>
+
+      {/* Modals */}
+      <BrowseCrewsModal
+        open={browseOpen}
+        onClose={() => setBrowseOpen(false)}
+        myCrewIds={myCrewIds}
+        onJoined={(id) => navigate({ name: "crews", crewId: id })}
+      />
+      <JoinByCodeModal
+        open={codeOpen}
+        onClose={() => setCodeOpen(false)}
+        onJoined={(id) => navigate({ name: "crews", crewId: id })}
+      />
+      <CreateCrewModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={(id) => navigate({ name: "crews", crewId: id })}
+      />
     </div>
   );
 }

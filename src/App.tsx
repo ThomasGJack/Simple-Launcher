@@ -9,6 +9,7 @@ import { useUIStore } from "@/store/ui";
 import { getFirebase } from "@/firebase/config";
 import { recordPlaytime } from "@/firebase/playtime";
 import { recordLaunchDay } from "@/firebase/launchDays";
+import { ensureMasterMemberships } from "@/firebase/crews";
 import { pushHeartbeat, type CurrentActivity } from "@/firebase/presence";
 import { watchFavorites } from "@/firebase/favorites";
 import { useFavoritesStore } from "@/store/favorites";
@@ -119,6 +120,16 @@ function App() {
         // Bump the global "totalUsers" counter once per uid per boot —
         // feeds the rarity % shown next to each achievement.
         bumpTotalUsersOnce(u.uid).catch(() => {});
+        // Ensure the user is a member of every master crew (currently
+        // just "Simple Games"). Idempotent: setDoc(merge) is a no-op
+        // if the membership already exists.
+        ensureMasterMemberships(
+          u.uid,
+          u.displayName ?? null,
+          u.photoURL ?? null,
+        ).catch((err) =>
+          console.warn("[crews] master memberships ensure failed:", err),
+        );
       } else {
         // Logout / no user → clear the cache so we don't show stale
         // identity on the next launch.

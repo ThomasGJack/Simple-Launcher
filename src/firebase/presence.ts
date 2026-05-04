@@ -58,6 +58,13 @@ export type UserPresence = {
    *  "top games by playtime" on the profile page. Max 3. */
   pinnedModuleIds: string[];
   privacy: UserPrivacy;
+  /**
+   * Paid supporter tier — drives the VIP / Légende badge on the user's
+   * profile and unlocks features gated behind a tier (e.g. creating
+   * private crews). Granted manually by the admin until subscription
+   * payments are wired up. `null` for free users.
+   */
+  tier: import("@/lib/supporterTier").SupporterTier | null;
 };
 
 export type PresenceStatus = "online" | "idle" | "offline";
@@ -147,5 +154,9 @@ export function parseUserDoc(uid: string, data: Record<string, unknown>): UserPr
       showPlaytime: privacyRaw.showPlaytime !== false,
       allowDirectMessages: privacyRaw.allowDirectMessages !== false,
     },
+    tier:
+      data.tier === "supporter" || data.tier === "vip" || data.tier === "legend"
+        ? data.tier
+        : null,
   };
 }
