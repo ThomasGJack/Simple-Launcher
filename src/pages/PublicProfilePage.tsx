@@ -224,7 +224,7 @@ export function PublicProfilePage() {
   };
 
   return (
-    <div className="relative h-full overflow-y-auto p-12" style={accentStyle}>
+    <div className="scroll-y-only relative h-full p-12" style={accentStyle}>
       <button
         onClick={() => navigate(isMe ? { name: "home" } : { name: "community" })}
         className="mb-6 inline-flex items-center gap-2 text-xs uppercase tracking-wider text-fg-muted hover:text-fg-primary transition-colors"

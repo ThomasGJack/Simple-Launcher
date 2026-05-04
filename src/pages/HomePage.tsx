@@ -152,7 +152,7 @@ export function HomePage() {
   }, [playtime, modules, lastPlayed]);
 
   return (
-    <div className="relative h-full overflow-y-auto px-10 py-10">
+    <div className="scroll-y-only relative h-full px-10 py-10">
       {/* Animated gradient mesh — three colored radial blobs layered with
           time-of-day-tinted hues, each pulsing at its own slow tempo so
           the background "breathes" without becoming distracting. */}

@@ -118,8 +118,10 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="no-drag flex w-20 shrink-0 flex-col items-center justify-between overflow-y-auto border-r border-white/[0.04] bg-bg-soft/60 py-5 backdrop-blur-md">
-      <div className="flex flex-col items-center gap-3">
+    <aside className="no-drag flex w-20 shrink-0 flex-col items-center border-r border-white/[0.04] bg-bg-soft/60 py-5 backdrop-blur-md">
+      {/* Top section — logo + main nav. Always fully visible regardless
+          of the favorites count or window height. */}
+      <div className="flex shrink-0 flex-col items-center gap-3">
         {/* Logo doubles as the "Accueil" button — clicking it navigates
             home. We share the `sidebar-active` layoutId with NavButton so
             the accent ring smoothly transitions in/out as the user moves
@@ -165,11 +167,18 @@ export function Sidebar() {
             onClick={() => navigate({ name: "vip" })}
           />
         </nav>
+      </div>
 
+      {/* Middle section — favorites. The only variable-size area : when
+          the user has many favorites and the window is short, this
+          scrolls (wheel only — no visible bar via scrollbar-hidden).
+          Top + bottom always stay anchored so the layout is self-
+          adapting in real time without a global scrollbar. */}
+      <div className="scrollbar-hidden flex min-h-0 flex-1 flex-col items-center overflow-y-auto pt-3">
         {favoriteModules.length > 0 && (
           <>
-            <div className="my-2 h-px w-8 bg-white/[0.06]" />
-            <div className="flex flex-col items-center gap-2">
+            <div className="mb-2 h-px w-8 shrink-0 bg-white/[0.06]" />
+            <div className="flex flex-col items-center gap-2 pb-2">
               {favoriteModules.map((m) => (
                 <FavoriteButton
                   key={m.id}
@@ -183,7 +192,10 @@ export function Sidebar() {
         )}
       </div>
 
-      <div className="flex flex-col items-center gap-2 pt-3">
+      {/* Bottom section — settings + avatar. Always visible at the
+          bottom of the sidebar regardless of how many favorites are
+          above. */}
+      <div className="flex shrink-0 flex-col items-center gap-2 pt-3">
         {/* Bell button → toggles the notifications panel. Shows an unread
             count badge sourced from the same `useNotifications` subscription
             as the panel so the badge updates live as new notifs come in

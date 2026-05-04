@@ -101,6 +101,42 @@ textarea {
   scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
 }
 
+/* ─── Scrollbar utilities ─────────────────────────────────────────────
+ * `.scrollbar-hidden` : completely hides the scrollbar visually while
+ *  keeping wheel / touch / keyboard scroll functional. Used on the
+ *  Sidebar (vertical) and on page containers where a horizontal
+ *  scroll bar would never look right.
+ *
+ * `.scroll-y-only` : a stricter shorthand for "vertical scroll only,
+ *  never horizontal" applied to top-level page containers. Replaces
+ *  the bare `overflow-y-auto` that lets a too-wide child paint a
+ *  horizontal bar at the bottom of the viewport.
+ */
+.scrollbar-hidden {
+  scrollbar-width: none; /* Firefox + modern */
+  -ms-overflow-style: none; /* legacy Edge / IE */
+}
+.scrollbar-hidden::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.scroll-y-only {
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* Hidden visual scrollbar — wheel + touchpad still scroll. The
+   * launcher is mouse-wheel-first so a permanent grey track on the
+   * right edge of every page would just be visual noise. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scroll-y-only::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
 /* ─── Reduced-motion override ──────────────────────────────────────────
  * When the user toggles off animations in Settings → Apparence, the
  * Apparence effect in App.tsx adds `data-reduced-motion="true"` on

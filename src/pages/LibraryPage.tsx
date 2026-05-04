@@ -69,7 +69,7 @@ export function LibraryPage() {
 
   return (
     <>
-      <div className="relative h-full overflow-y-auto p-12">
+      <div className="scroll-y-only relative h-full p-12">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}

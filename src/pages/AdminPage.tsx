@@ -553,7 +553,7 @@ export function AdminPage() {
   const currentTab = tabs.find((t) => t.id === activeTab) ?? tabs[0];
 
   return (
-    <div className="relative h-full overflow-y-auto p-12">
+    <div className="scroll-y-only relative h-full p-12">
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
         <p className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-accent">
           <Shield className="size-3" /> Administration

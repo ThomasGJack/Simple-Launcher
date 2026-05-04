@@ -206,7 +206,7 @@ export function ModuleDetailPage() {
 
   return (
     <div
-      className="relative h-full overflow-y-auto"
+      className="scroll-y-only relative h-full"
       style={themeStyle}
     >
       {heroIsBlock && migratedPage ? (

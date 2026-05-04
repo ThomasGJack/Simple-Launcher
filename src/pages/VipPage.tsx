@@ -145,7 +145,7 @@ function ensureEngine(): Promise<void> {
 
 export function VipPage() {
   return (
-    <div className="relative h-full overflow-y-auto">
+    <div className="scroll-y-only relative h-full">
       <AuroraBackground />
       <div className="relative z-10 mx-auto max-w-[1280px] px-12 py-16">
         <Hero />

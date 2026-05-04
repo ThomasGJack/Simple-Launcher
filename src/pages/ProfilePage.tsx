@@ -68,7 +68,7 @@ export function ProfilePage() {
   };
 
   return (
-    <div className="relative h-full overflow-y-auto p-12">
+    <div className="scroll-y-only relative h-full p-12">
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-10">
         <p className="text-xs uppercase tracking-[0.25em] text-accent">Profil</p>
         <h1 className="mt-2 font-display text-5xl text-fg-primary">Mon compte</h1>

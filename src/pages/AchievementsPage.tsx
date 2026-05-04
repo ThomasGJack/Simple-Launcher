@@ -148,7 +148,7 @@ export function AchievementsPage() {
   }, [unlockedById, ctx]);
 
   return (
-    <div className="relative h-full overflow-y-auto p-12">
+    <div className="scroll-y-only relative h-full p-12">
       <button
         onClick={() => {
           sounds.click();
