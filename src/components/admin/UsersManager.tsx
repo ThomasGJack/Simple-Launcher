@@ -14,6 +14,7 @@ import { setUserTier } from "@/firebase/userProfile";
 import { TIER_LABEL, type SupporterTier } from "@/lib/supporterTier";
 import { TierAvatar } from "@/components/tier/TierAvatar";
 import { TierName } from "@/components/tier/TierName";
+import { TierBannerOverlay } from "@/components/tier/TierBanner";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
 import type { UserPresence } from "@/firebase/presence";
@@ -191,8 +192,9 @@ function UserRow({
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: Math.min(index, 12) * 0.02 }}
-      className="flex flex-wrap items-center gap-3 rounded-2xl bg-bg-soft/30 p-3 ring-1 ring-white/[0.06]"
+      className="relative flex flex-wrap items-center gap-3 rounded-2xl bg-bg-soft/30 p-3 ring-1 ring-white/[0.06]"
     >
+      <TierBannerOverlay tier={user.tier} rounded="2xl" />
       <TierAvatar
         tier={user.tier}
         src={user.avatarUrl}

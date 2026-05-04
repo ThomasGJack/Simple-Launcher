@@ -23,6 +23,7 @@ import { useAuthStore } from "@/store/auth";
 import { useUIStore } from "@/store/ui";
 import { TierAvatar } from "@/components/tier/TierAvatar";
 import { TierName } from "@/components/tier/TierName";
+import { TierBannerOverlay } from "@/components/tier/TierBanner";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
 
@@ -344,10 +345,11 @@ function MemberRow({
 
   return (
     <div className="group relative">
+      <TierBannerOverlay tier={live?.tier ?? null} rounded="lg" />
       <button
         type="button"
         onClick={onOpenProfile}
-        className="no-drag flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-white/[0.04]"
+        className="no-drag relative flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-white/[0.04]"
       >
         <div className="relative shrink-0">
           <TierAvatar

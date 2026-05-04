@@ -9,6 +9,7 @@ import { ensureConversation } from "@/firebase/messaging";
 import { conversationIdFor } from "@/types/messaging";
 import { TierAvatar } from "@/components/tier/TierAvatar";
 import { TierName } from "@/components/tier/TierName";
+import { TierBannerOverlay } from "@/components/tier/TierBanner";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
 
@@ -160,8 +161,9 @@ function UserRow({
       initial={{ opacity: 0, x: -12 }}
       animate={{ opacity: 1, x: 0 }}
       whileHover={{ x: 2 }}
-      className="flex items-center gap-4 rounded-2xl glass p-4"
+      className="relative flex items-center gap-4 rounded-2xl glass p-4"
     >
+      <TierBannerOverlay tier={user.tier} rounded="2xl" />
       <button
         onClick={() => useUIStore.getState().navigate({ name: "user-profile", uid: user.uid })}
         className="no-drag relative shrink-0 transition-transform hover:scale-105"
