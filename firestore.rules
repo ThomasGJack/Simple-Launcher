@@ -107,11 +107,6 @@ service cloud.firestore {
           exists(/databases/$(database)/documents/crews/$(crewId)/members/$(request.auth.uid))
         );
       }
-      function memberRole() {
-        return isMasterCrew()
-          ? "member"
-          : memberDoc().data.role;
-      }
       function isCrewOwner() {
         return request.auth != null &&
           (isAdmin() || crewData().ownerUid == request.auth.uid);
@@ -125,15 +120,24 @@ service cloud.firestore {
         );
       }
 
-      // Crew metadata read : public crews + master crews are
-      // discoverable; private crews require membership. The browse
-      // page filters on the client to avoid leaking private crew
-      // names + emblems to the public list.
-      allow read: if request.auth != null && (
-        isMasterCrew() ||
-        isPublicCrew() ||
-        exists(/databases/$(database)/documents/crews/$(crewId)/members/$(request.auth.uid))
-      );
+      // Crew metadata read : open to any authed user. Firestore rules
+      // for COLLECTION queries require every returned doc to satisfy
+      // the rule — so scoping read to "master OR public OR member"
+      // breaks `watchCrews` whenever ANY private crew exists where
+      // the caller isn't a member. Crew metadata (name, emblem,
+      // description, memberCount) is fundamentally discoverable
+      // anyway — that's the point of the directory + invite-by-code.
+      // Sensitive content (members list, channels, messages) stays
+      // gated by inner rules below.
+      //
+      // KNOWN trade-off : `joinCode` lives on the crew doc and is
+      // therefore visible to anyone who can read the crew. With
+      // 30^8 ≈ 6.5e11 combinations the codes are unguessable by
+      // brute force, but a malicious client could scrape every
+      // crew's code by reading the collection. Acceptable for now —
+      // if abuse appears, move joinCode to a separate `joinCodes/
+      // {code}` mapping doc gated by owner-only rules.
+      allow read: if request.auth != null;
 
       // Create (user-owned) : any authed user can create a crew. The
       // VIP-tier gate lives client-side because tiers are admin-
