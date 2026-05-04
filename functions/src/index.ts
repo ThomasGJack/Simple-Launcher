@@ -9,14 +9,11 @@ import { getStorage } from "firebase-admin/storage";
 
 initializeApp();
 
-// Stripe billing — supporter tier subscriptions (callable + webhook).
-// Lives in stripe.ts to keep this index file readable. Secrets are
-// declared inside that module via defineSecret.
-export {
-  createSupporterCheckoutSession,
-  createSupporterPortalSession,
-  stripeWebhook,
-} from "./stripe.js";
+// Ko-fi billing — supporter tier subscriptions via Ko-fi memberships.
+// Webhook receives Ko-fi transactions, scheduled job revokes expired
+// subscriptions. Lives in kofi.ts ; secrets declared inside that
+// module via defineSecret.
+export { kofiWebhook, cleanupExpiredKofiSubscriptions } from "./kofi.js";
 
 const DISCORD_CLIENT_SECRET = defineSecret("DISCORD_CLIENT_SECRET");
 const DISCORD_CLIENT_ID = defineSecret("DISCORD_CLIENT_ID");

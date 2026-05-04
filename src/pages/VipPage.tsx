@@ -19,6 +19,9 @@ import {
   Palette,
   Flame,
   Image,
+  Copy,
+  ExternalLink,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import Particles, { initParticlesEngine } from "@tsparticles/react";
@@ -26,7 +29,7 @@ import { loadSlim } from "@tsparticles/slim";
 import type { ISourceOptions } from "@tsparticles/engine";
 import { useAuthStore } from "@/store/auth";
 import { useUsers } from "@/store/firebaseStores";
-import { startSupporterCheckout, openSupporterPortal } from "@/firebase/stripe";
+import { copyUserCodeToClipboard, openKofiTiers, KOFI_PAGE_URL } from "@/firebase/kofi";
 import { sounds } from "@/lib/sounds";
 import type { SupporterTier } from "@/lib/supporterTier";
 
@@ -546,52 +549,27 @@ function TierCard({ tier, index }: { tier: Tier; index: number }) {
  * Smart CTA that adapts to the viewer's current tier :
  *
  *  - Logged out         → "Connecte-toi" (greyed out)
- *  - Free, lower tier   → "Souscrire — N €" → opens Stripe Checkout
- *  - Already this tier  → "Tu es {Tier} — gérer" → opens Stripe portal
+ *  - Already this tier  → "Tu es {Tier} — actif" (greyed out, no
+ *                          re-checkout needed) + "gérer sur Ko-fi"
  *  - Higher tier        → "Inclus dans ton tier" (disabled)
- *  - Lower tier         → "Passer au tier supérieur" → Stripe Checkout
+ *  - Free / lower tier  → "Souscrire — N €/mois" → opens KofiSubscribeModal
  *
- * Uses sounds.click on success and sounds.error on failure so the
- * launcher confirms the action even before the system browser opens.
+ * Ko-fi flow : the modal copies the user's UID to the clipboard and
+ * opens the Ko-fi tiers page in the system browser. The user pastes
+ * the UID into Ko-fi's "Message" field during checkout ; the
+ * `kofiWebhook` Cloud Function picks it up and grants the tier on
+ * `users/{uid}`.
  */
 function ActiveCTA({ tier }: { tier: Tier }) {
   const me = useAuthStore((s) => s.user);
   const myProfile = useUsers().find((u) => u.uid === me?.uid);
   const myTier = myProfile?.tier ?? null;
-  const [busy, setBusy] = useState<"checkout" | "portal" | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
   const tierRank: Record<SupporterTier, number> = { supporter: 1, vip: 2, legend: 3 };
   const isMine = myTier === tier.key;
   const isUpgrade = myTier && tierRank[myTier] < tierRank[tier.key];
   const isCovered = myTier && tierRank[myTier] > tierRank[tier.key];
-
-  const onCheckout = async () => {
-    if (!me) return;
-    setBusy("checkout");
-    try {
-      sounds.click();
-      await startSupporterCheckout(tier.key);
-    } catch (err) {
-      console.error("[stripe] checkout failed:", err);
-      sounds.error();
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const onPortal = async () => {
-    if (!me) return;
-    setBusy("portal");
-    try {
-      sounds.click();
-      await openSupporterPortal();
-    } catch (err) {
-      console.error("[stripe] portal failed:", err);
-      sounds.error();
-    } finally {
-      setBusy(null);
-    }
-  };
 
   // ─── State: not logged in ──────────────────────────────────────
   if (!me) {
@@ -611,14 +589,16 @@ function ActiveCTA({ tier }: { tier: Tier }) {
     );
   }
 
-  // ─── State: already this tier — show portal/manage ────────────
+  // ─── State: already this tier — show "manage on Ko-fi" ───────
   if (isMine) {
     return (
       <button
         type="button"
-        onClick={onPortal}
-        disabled={busy !== null}
-        className="group relative w-full overflow-hidden rounded-2xl border px-5 py-3.5 text-sm font-semibold transition-shadow hover:shadow-[0_0_24px_rgba(255,255,255,0.15)] disabled:opacity-60"
+        onClick={() => {
+          sounds.click();
+          openKofiTiers().catch(() => sounds.error());
+        }}
+        className="group relative w-full overflow-hidden rounded-2xl border px-5 py-3.5 text-sm font-semibold transition-shadow hover:shadow-[0_0_24px_rgba(255,255,255,0.15)]"
         style={{
           background: `linear-gradient(135deg, ${tier.colors.from}, ${tier.colors.to})`,
           borderColor: tier.colors.ring,
@@ -627,7 +607,7 @@ function ActiveCTA({ tier }: { tier: Tier }) {
       >
         <span className="relative inline-flex items-center justify-center gap-2">
           <Crown className="size-4" />
-          {busy === "portal" ? "Ouverture du portail…" : `Tu es ${tier.name} — gérer`}
+          Tu es {tier.name} — gérer sur Ko-fi
         </span>
       </button>
     );
@@ -654,38 +634,234 @@ function ActiveCTA({ tier }: { tier: Tier }) {
     );
   }
 
-  // ─── State: free user or lower tier — checkout ────────────────
+  // ─── State: free user or lower tier — open subscribe modal ───
   return (
-    <button
-      type="button"
-      onClick={onCheckout}
-      disabled={busy !== null}
-      className="group relative w-full overflow-hidden rounded-2xl border px-5 py-3.5 text-sm font-semibold transition-all hover:scale-[1.02] hover:shadow-[0_0_28px_rgba(255,255,255,0.2)] disabled:opacity-60"
-      style={{
-        background: `linear-gradient(135deg, ${tier.colors.from}, ${tier.colors.to})`,
-        borderColor: tier.colors.ring,
-        color: "#0a0d12",
-      }}
-    >
-      {/* Shimmer band */}
-      <motion.span
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            "linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.35) 50%, transparent 70%)",
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          sounds.click();
+          setModalOpen(true);
         }}
-        animate={{ x: ["-100%", "100%"] }}
-        transition={{ duration: 2.8, repeat: Infinity, ease: "linear" }}
-      />
-      <span className="relative inline-flex items-center justify-center gap-2">
-        {busy === "checkout"
-          ? "Redirection vers Stripe…"
-          : isUpgrade
+        className="group relative w-full overflow-hidden rounded-2xl border px-5 py-3.5 text-sm font-semibold transition-all hover:scale-[1.02] hover:shadow-[0_0_28px_rgba(255,255,255,0.2)]"
+        style={{
+          background: `linear-gradient(135deg, ${tier.colors.from}, ${tier.colors.to})`,
+          borderColor: tier.colors.ring,
+          color: "#0a0d12",
+        }}
+      >
+        {/* Shimmer band */}
+        <motion.span
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.35) 50%, transparent 70%)",
+          }}
+          animate={{ x: ["-100%", "100%"] }}
+          transition={{ duration: 2.8, repeat: Infinity, ease: "linear" }}
+        />
+        <span className="relative inline-flex items-center justify-center gap-2">
+          {isUpgrade
             ? `Passer à ${tier.name} — ${tier.price} €/mois`
             : `Souscrire — ${tier.price} €/mois`}
+        </span>
+      </button>
+
+      <AnimatePresence>
+        {modalOpen && (
+          <KofiSubscribeModal
+            tier={tier}
+            userUid={me.uid}
+            onClose={() => setModalOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
+// ─── Ko-fi subscribe modal ─────────────────────────────────────────────
+
+/**
+ * Modal popped when the user wants to subscribe. Walks them through
+ * the 4-step Ko-fi flow with a copy-to-clipboard helper for their
+ * UID — the critical bit that lets the webhook match the payment
+ * back to their Firebase account.
+ */
+function KofiSubscribeModal({
+  tier,
+  userUid,
+  onClose,
+}: {
+  tier: Tier;
+  userUid: string;
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const [opening, setOpening] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await copyUserCodeToClipboard(userUid);
+      sounds.success();
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2200);
+    } catch {
+      sounds.error();
+    }
+  };
+
+  const handleOpen = async () => {
+    setOpening(true);
+    try {
+      // Auto-copy on open so users don't forget — no harm if they
+      // already clicked the dedicated copy button.
+      await copyUserCodeToClipboard(userUid);
+      sounds.click();
+      await openKofiTiers();
+      setCopied(true);
+    } catch (err) {
+      console.error("[kofi] open failed:", err);
+      sounds.error();
+    } finally {
+      setOpening(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="fixed inset-0 z-50 grid place-items-center bg-bg-base/80 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.92, y: 20, opacity: 0 }}
+        animate={{ scale: 1, y: 0, opacity: 1 }}
+        exit={{ scale: 0.92, y: 20, opacity: 0 }}
+        transition={{ type: "spring", stiffness: 300, damping: 28 }}
+        className="relative max-w-md rounded-3xl border border-white/[0.08] bg-bg-soft/95 p-7 shadow-[0_30px_80px_rgba(0,0,0,0.6)] backdrop-blur-xl"
+        onClick={(e) => e.stopPropagation()}
+        style={{ boxShadow: `0 30px 80px -20px ${tier.colors.glow}` }}
+      >
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          className="absolute right-4 top-4 grid size-8 place-items-center rounded-full text-fg-muted transition-colors hover:bg-white/[0.06] hover:text-fg-primary"
+          aria-label="Fermer"
+        >
+          <X className="size-4" />
+        </button>
+
+        {/* Header */}
+        <div className="mb-5 flex items-center gap-3">
+          <div
+            className="grid size-12 place-items-center rounded-2xl ring-1 ring-white/10"
+            style={{
+              background: `linear-gradient(135deg, ${tier.colors.from}33, ${tier.colors.to}33)`,
+              boxShadow: `0 0 24px ${tier.colors.glow}`,
+            }}
+          >
+            <tier.icon
+              className="size-6"
+              strokeWidth={1.6}
+              style={{ color: tier.colors.from }}
+            />
+          </div>
+          <div>
+            <h3
+              className="font-display text-2xl"
+              style={{
+                backgroundImage: `linear-gradient(110deg, ${tier.colors.from}, ${tier.colors.to})`,
+                WebkitBackgroundClip: "text",
+                backgroundClip: "text",
+                color: "transparent",
+              }}
+            >
+              Souscrire {tier.name}
+            </h3>
+            <p className="text-xs text-fg-muted">{tier.price} €/mois sur Ko-fi</p>
+          </div>
+        </div>
+
+        {/* User code */}
+        <div className="mb-5 rounded-2xl bg-bg-base/50 p-4 ring-1 ring-white/[0.06]">
+          <p className="mb-2 text-[11px] uppercase tracking-[0.2em] text-fg-dim">
+            Ton code utilisateur
+          </p>
+          <div className="flex items-center gap-2">
+            <code className="min-w-0 flex-1 truncate rounded-lg bg-bg-base/80 px-3 py-2 font-mono text-sm text-fg-primary">
+              {userUid}
+            </code>
+            <button
+              onClick={handleCopy}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-accent/15 px-3 py-2 text-xs font-medium text-accent ring-1 ring-accent/30 transition-colors hover:bg-accent/25"
+            >
+              {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+              {copied ? "Copié !" : "Copier"}
+            </button>
+          </div>
+        </div>
+
+        {/* Steps */}
+        <div className="mb-6 space-y-2.5 text-sm">
+          <Step n={1}>
+            Clique sur <strong>« Ouvrir Ko-fi »</strong> ci-dessous (ton code
+            sera copié automatiquement).
+          </Step>
+          <Step n={2}>
+            Sur Ko-fi, choisis le tier <strong>« {tier.name} »</strong> ({tier.price} €/mois).
+          </Step>
+          <Step n={3}>
+            Pendant le paiement, <strong>colle ton code</strong> dans le champ
+            <span className="mx-1 rounded bg-bg-base/80 px-1.5 py-0.5 font-mono text-[11px]">
+              Message
+            </span>
+            (Ctrl+V).
+          </Step>
+          <Step n={4}>
+            Ton tier <strong>{tier.name}</strong> sera activé automatiquement
+            dans 1-2 minutes.
+          </Step>
+        </div>
+
+        {/* CTA */}
+        <button
+          onClick={handleOpen}
+          disabled={opening}
+          className="group relative w-full overflow-hidden rounded-2xl px-5 py-3.5 text-sm font-bold transition-all hover:scale-[1.02] disabled:opacity-60"
+          style={{
+            background: `linear-gradient(135deg, ${tier.colors.from}, ${tier.colors.to})`,
+            color: "#0a0d12",
+            boxShadow: `0 10px 30px -10px ${tier.colors.glow}`,
+          }}
+        >
+          <span className="relative inline-flex items-center justify-center gap-2">
+            <ExternalLink className="size-4" />
+            {opening ? "Ouverture de Ko-fi…" : `Ouvrir Ko-fi ${tier.name}`}
+          </span>
+        </button>
+
+        <p className="mt-3 text-center text-[11px] text-fg-dim">
+          Paiement sécurisé via Ko-fi · annulation à tout moment depuis ton
+          compte Ko-fi
+        </p>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function Step({ n, children }: { n: number; children: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="grid size-6 shrink-0 place-items-center rounded-full bg-accent/15 text-[11px] font-bold text-accent ring-1 ring-accent/30">
+        {n}
       </span>
-    </button>
+      <span className="text-fg-primary/90">{children}</span>
+    </div>
   );
 }
 
@@ -835,9 +1011,22 @@ function Footnote() {
     >
       <Heart className="mx-auto mb-2 size-5 text-fg-dim" strokeWidth={1.5} />
       <p>
-        Paiement sécurisé via Stripe. Tu peux annuler à tout moment depuis le
-        portail client (bouton « gérer »). Pas de fidélité, pas d'engagement —
-        chaque mois reconduit ou annulé librement. Merci pour ton soutien 💜
+        Paiement sécurisé via{" "}
+        <a
+          href={KOFI_PAGE_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="text-accent underline-offset-2 hover:underline"
+          onClick={(e) => {
+            e.preventDefault();
+            openKofiTiers().catch(() => {});
+          }}
+        >
+          Ko-fi
+        </a>
+        . Tu peux annuler ton abonnement à tout moment depuis ton compte
+        Ko-fi — aucun engagement, chaque mois est reconduit ou annulé
+        librement. Merci pour ton soutien 💜
       </p>
     </motion.div>
   );
