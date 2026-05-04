@@ -17,7 +17,6 @@ import {
   type Message,
 } from "@/types/messaging";
 import { TierAvatar } from "@/components/tier/TierAvatar";
-import { TierBannerOverlay } from "@/components/tier/TierBanner";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
 
@@ -160,7 +159,6 @@ function ConversationRow({
           : "hover:bg-white/[0.03]",
       )}
     >
-      <TierBannerOverlay tier={peerTier} rounded="xl" />
       <div className="relative shrink-0">
         <TierAvatar
           tier={peerTier}
@@ -169,7 +167,7 @@ function ConversationRow({
           size="md"
         />
       </div>
-      <div className="relative min-w-0 flex-1">
+      <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
           <span className={cn(
             "truncate text-sm",
@@ -289,10 +287,9 @@ function ChatPanel({ conv, myUid }: { conv: Conversation; myUid: string }) {
         </button>
         <button
           onClick={() => navigate({ name: "user-profile", uid: peerUid })}
-          className="no-drag relative flex min-w-0 flex-1 items-center gap-3 rounded-lg p-1 text-left transition-colors hover:bg-white/[0.03]"
+          className="no-drag flex min-w-0 flex-1 items-center gap-3 rounded-lg p-1 text-left transition-colors hover:bg-white/[0.03]"
           title={`Voir le profil de ${peerName}`}
         >
-          <TierBannerOverlay tier={peerTier} rounded="lg" />
           <div className="relative shrink-0">
             <TierAvatar
               tier={peerTier}
@@ -301,7 +298,7 @@ function ChatPanel({ conv, myUid }: { conv: Conversation; myUid: string }) {
               size="md"
             />
           </div>
-          <div className="relative min-w-0 flex-1">
+          <div className="min-w-0 flex-1">
             <div className="truncate font-medium text-fg-primary">{peerName}</div>
             <div className="text-[10px] uppercase tracking-wider text-fg-dim">Conversation privée · Voir le profil</div>
           </div>
