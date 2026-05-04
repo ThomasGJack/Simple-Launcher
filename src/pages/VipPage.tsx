@@ -15,14 +15,20 @@ import {
   Lock,
   Heart,
   Award,
-  Star,
+  Users,
   Palette,
   Flame,
+  Image,
   type LucideIcon,
 } from "lucide-react";
 import Particles, { initParticlesEngine } from "@tsparticles/react";
 import { loadSlim } from "@tsparticles/slim";
 import type { ISourceOptions } from "@tsparticles/engine";
+import { useAuthStore } from "@/store/auth";
+import { useUsers } from "@/store/firebaseStores";
+import { startSupporterCheckout, openSupporterPortal } from "@/firebase/stripe";
+import { sounds } from "@/lib/sounds";
+import type { SupporterTier } from "@/lib/supporterTier";
 
 /**
  * VIP / supporter tiers page. Three subscription tiers (1€/5€/10€ per
@@ -37,7 +43,7 @@ import type { ISourceOptions } from "@tsparticles/engine";
  * to communicate that supporting the dev is something premium.
  */
 
-type TierKey = "support" | "vip" | "legend";
+type TierKey = SupporterTier; // "supporter" | "vip" | "legend"
 
 type TierBenefit = {
   icon: LucideIcon;
@@ -58,7 +64,7 @@ type Tier = {
 
 const TIERS: Tier[] = [
   {
-    key: "support",
+    key: "supporter",
     name: "Soutien",
     tagline: "Le petit coup de pouce qui fait plaisir.",
     price: 1,
@@ -70,8 +76,11 @@ const TIERS: Tier[] = [
       glow: "rgba(255, 183, 94, 0.45)",
     },
     benefits: [
-      { icon: Award, text: "Badge “Soutien” sur ton profil" },
-      { icon: Star, text: "Ta voix compte sur les sondages publics" },
+      { icon: Heart, text: "Frame d'avatar bronze animée (shimmer rotatif)" },
+      { icon: Award, text: "Badge cœur permanent sur ton avatar" },
+      { icon: Palette, text: "Pseudo en couleur bronze chaude" },
+      { icon: Image, text: "Bordure bronze animée sur ton row partout" },
+      { icon: Users, text: "Création de Crews privés ou publics" },
       { icon: Heart, text: "Ma reconnaissance éternelle ❤️" },
     ],
   },
@@ -90,10 +99,11 @@ const TIERS: Tier[] = [
     },
     benefits: [
       { icon: Check, text: "Tout du tier Soutien" },
-      { icon: Crown, text: "Badge VIP doré animé sur ton profil" },
-      { icon: Palette, text: "Couleur de pseudo personnalisée" },
-      { icon: Sparkles, text: "Bannière de profil exclusive" },
-      { icon: Star, text: "Vote sur les prochaines features" },
+      { icon: Crown, text: "Frame d'avatar VIP rotative cyan→violet" },
+      { icon: Crown, text: "Badge couronne pulsant sur ton avatar" },
+      { icon: Palette, text: "Pseudo en gradient cyan/violet animé" },
+      { icon: Image, text: "Bordure cyan/violet conveyor-belt sur ton row" },
+      { icon: Sparkles, text: "Aura cyan/violet qui respire autour de toi" },
     ],
   },
   {
@@ -110,11 +120,12 @@ const TIERS: Tier[] = [
     },
     benefits: [
       { icon: Check, text: "Tout du tier VIP" },
-      { icon: Flame, text: "Badge “Légende” animé arc-en-ciel" },
-      { icon: Sparkles, text: "Frame d'avatar premium animée" },
-      { icon: Lock, text: "Module exclusif “Legends Club”" },
-      { icon: Award, text: "Mention dans les credits du launcher" },
-      { icon: Palette, text: "Thème exclusif du launcher en Gold" },
+      { icon: Flame, text: "Frame d'avatar 3 anneaux rainbow + or/orange" },
+      { icon: Sparkles, text: "Badge sparkles or qui se balance sur ton avatar" },
+      { icon: Palette, text: "Pseudo en shimmer arc-en-ciel animé" },
+      { icon: Image, text: "Bordure rainbow shimmer sur ton row" },
+      { icon: Award, text: "Aura or géante visible de loin" },
+      { icon: Lock, text: "Mention dans les crédits du launcher (à venir)" },
     ],
   },
 ];
@@ -518,9 +529,10 @@ function TierCard({ tier, index }: { tier: Tier; index: number }) {
             ))}
           </ul>
 
-          {/* CTA — disabled with shimmer to draw attention */}
+          {/* CTA — wired to Stripe : checkout for free users, portal for
+              already-subscribed, disabled for higher-tier viewers. */}
           <div className="relative z-10 mt-8">
-            <DisabledCTA tier={tier} />
+            <ActiveCTA tier={tier} />
           </div>
         </div>
       </motion.div>
@@ -528,43 +540,152 @@ function TierCard({ tier, index }: { tier: Tier; index: number }) {
   );
 }
 
-// ─── Disabled CTA ──────────────────────────────────────────────────────
+// ─── Active CTA ─────────────────────────────────────────────────────────
 
-function DisabledCTA({ tier }: { tier: Tier }) {
-  return (
-    <div className="relative">
+/**
+ * Smart CTA that adapts to the viewer's current tier :
+ *
+ *  - Logged out         → "Connecte-toi" (greyed out)
+ *  - Free, lower tier   → "Souscrire — N €" → opens Stripe Checkout
+ *  - Already this tier  → "Tu es {Tier} — gérer" → opens Stripe portal
+ *  - Higher tier        → "Inclus dans ton tier" (disabled)
+ *  - Lower tier         → "Passer au tier supérieur" → Stripe Checkout
+ *
+ * Uses sounds.click on success and sounds.error on failure so the
+ * launcher confirms the action even before the system browser opens.
+ */
+function ActiveCTA({ tier }: { tier: Tier }) {
+  const me = useAuthStore((s) => s.user);
+  const myProfile = useUsers().find((u) => u.uid === me?.uid);
+  const myTier = myProfile?.tier ?? null;
+  const [busy, setBusy] = useState<"checkout" | "portal" | null>(null);
+
+  const tierRank: Record<SupporterTier, number> = { supporter: 1, vip: 2, legend: 3 };
+  const isMine = myTier === tier.key;
+  const isUpgrade = myTier && tierRank[myTier] < tierRank[tier.key];
+  const isCovered = myTier && tierRank[myTier] > tierRank[tier.key];
+
+  const onCheckout = async () => {
+    if (!me) return;
+    setBusy("checkout");
+    try {
+      sounds.click();
+      await startSupporterCheckout(tier.key);
+    } catch (err) {
+      console.error("[stripe] checkout failed:", err);
+      sounds.error();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onPortal = async () => {
+    if (!me) return;
+    setBusy("portal");
+    try {
+      sounds.click();
+      await openSupporterPortal();
+    } catch (err) {
+      console.error("[stripe] portal failed:", err);
+      sounds.error();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  // ─── State: not logged in ──────────────────────────────────────
+  if (!me) {
+    return (
       <button
         type="button"
         disabled
-        className="group relative w-full overflow-hidden rounded-2xl border px-5 py-3.5 text-sm font-semibold cursor-not-allowed"
+        className="w-full cursor-not-allowed rounded-2xl border px-5 py-3.5 text-sm font-semibold opacity-60"
         style={{
           background: `linear-gradient(135deg, ${tier.colors.from}1a, ${tier.colors.to}1a)`,
           borderColor: tier.colors.ring,
           color: tier.colors.from,
         }}
       >
-        {/* Shimmer band sweeping the button so it's clearly alive but disabled */}
-        <motion.span
-          aria-hidden
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background: `linear-gradient(110deg, transparent 30%, ${tier.colors.glow} 50%, transparent 70%)`,
-          }}
-          animate={{ x: ["-100%", "100%"] }}
-          transition={{ duration: 2.8, repeat: Infinity, ease: "linear" }}
-        />
+        Connecte-toi pour souscrire
+      </button>
+    );
+  }
+
+  // ─── State: already this tier — show portal/manage ────────────
+  if (isMine) {
+    return (
+      <button
+        type="button"
+        onClick={onPortal}
+        disabled={busy !== null}
+        className="group relative w-full overflow-hidden rounded-2xl border px-5 py-3.5 text-sm font-semibold transition-shadow hover:shadow-[0_0_24px_rgba(255,255,255,0.15)] disabled:opacity-60"
+        style={{
+          background: `linear-gradient(135deg, ${tier.colors.from}, ${tier.colors.to})`,
+          borderColor: tier.colors.ring,
+          color: "#0a0d12",
+        }}
+      >
         <span className="relative inline-flex items-center justify-center gap-2">
-          <Lock className="size-4" />
-          Pas encore disponible
+          <Crown className="size-4" />
+          {busy === "portal" ? "Ouverture du portail…" : `Tu es ${tier.name} — gérer`}
         </span>
       </button>
-      <p
-        className="mt-2 text-center text-[11px] uppercase tracking-[0.2em]"
-        style={{ color: tier.colors.from + "cc" }}
+    );
+  }
+
+  // ─── State: covered by a higher tier ──────────────────────────
+  if (isCovered) {
+    return (
+      <button
+        type="button"
+        disabled
+        className="w-full cursor-not-allowed rounded-2xl border px-5 py-3.5 text-sm font-semibold opacity-60"
+        style={{
+          background: `linear-gradient(135deg, ${tier.colors.from}1a, ${tier.colors.to}1a)`,
+          borderColor: tier.colors.ring,
+          color: tier.colors.from,
+        }}
       >
-        Sortie prévue prochainement
-      </p>
-    </div>
+        <span className="inline-flex items-center justify-center gap-2">
+          <Check className="size-4" />
+          Inclus dans ton tier actuel
+        </span>
+      </button>
+    );
+  }
+
+  // ─── State: free user or lower tier — checkout ────────────────
+  return (
+    <button
+      type="button"
+      onClick={onCheckout}
+      disabled={busy !== null}
+      className="group relative w-full overflow-hidden rounded-2xl border px-5 py-3.5 text-sm font-semibold transition-all hover:scale-[1.02] hover:shadow-[0_0_28px_rgba(255,255,255,0.2)] disabled:opacity-60"
+      style={{
+        background: `linear-gradient(135deg, ${tier.colors.from}, ${tier.colors.to})`,
+        borderColor: tier.colors.ring,
+        color: "#0a0d12",
+      }}
+    >
+      {/* Shimmer band */}
+      <motion.span
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.35) 50%, transparent 70%)",
+        }}
+        animate={{ x: ["-100%", "100%"] }}
+        transition={{ duration: 2.8, repeat: Infinity, ease: "linear" }}
+      />
+      <span className="relative inline-flex items-center justify-center gap-2">
+        {busy === "checkout"
+          ? "Redirection vers Stripe…"
+          : isUpgrade
+            ? `Passer à ${tier.name} — ${tier.price} €/mois`
+            : `Souscrire — ${tier.price} €/mois`}
+      </span>
+    </button>
   );
 }
 
@@ -578,7 +699,7 @@ function CardParticles({ tier, active }: { tier: Tier; active: boolean }) {
 
   const options = useMemo<ISourceOptions>(() => {
     // More particles + brighter for higher tier — feels more luxe.
-    const density = tier.key === "support" ? 18 : tier.key === "vip" ? 30 : 45;
+    const density = tier.key === "supporter" ? 18 : tier.key === "vip" ? 30 : 45;
     return {
       fullScreen: { enable: false },
       background: { color: { value: "transparent" } },
@@ -712,11 +833,11 @@ function Footnote() {
       transition={{ delay: 0.8, duration: 0.6 }}
       className="mt-16 rounded-2xl border border-white/[0.05] bg-bg-soft/40 p-6 text-center text-sm text-fg-muted backdrop-blur-md"
     >
-      <Lock className="mx-auto mb-2 size-5 text-fg-dim" strokeWidth={1.5} />
+      <Heart className="mx-auto mb-2 size-5 text-fg-dim" strokeWidth={1.5} />
       <p>
-        Aucun paiement n'est requis pour le moment — les abonnements seront
-        activés dans une prochaine version. Cette page est juste un aperçu de ce
-        qui arrive. Merci d'avance pour ton soutien 💜
+        Paiement sécurisé via Stripe. Tu peux annuler à tout moment depuis le
+        portail client (bouton « gérer »). Pas de fidélité, pas d'engagement —
+        chaque mois reconduit ou annulé librement. Merci pour ton soutien 💜
       </p>
     </motion.div>
   );

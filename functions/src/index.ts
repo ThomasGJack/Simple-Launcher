@@ -9,6 +9,15 @@ import { getStorage } from "firebase-admin/storage";
 
 initializeApp();
 
+// Stripe billing — supporter tier subscriptions (callable + webhook).
+// Lives in stripe.ts to keep this index file readable. Secrets are
+// declared inside that module via defineSecret.
+export {
+  createSupporterCheckoutSession,
+  createSupporterPortalSession,
+  stripeWebhook,
+} from "./stripe.js";
+
 const DISCORD_CLIENT_SECRET = defineSecret("DISCORD_CLIENT_SECRET");
 const DISCORD_CLIENT_ID = defineSecret("DISCORD_CLIENT_ID");
 
