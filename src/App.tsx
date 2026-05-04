@@ -351,18 +351,29 @@ function App() {
     // gets re-toasted on every launch.
     if (!unlockedSetPrimed) return;
     // Build context fresh from the latest snapshots, via the shared
-    // helper so the gallery + home chip see identical numbers.
-    const myProfile = allUsers.find((u) => u.uid === user.uid) ?? null;
-    const ctx = buildAchievementContext({
-      me: user,
-      modules: allModules,
-      allUsers,
-      playtime,
-      conversations,
-      launchDays,
-      myProfile,
-      shortcutCount,
-    });
+    // helper so the gallery + home chip see identical numbers. Any
+    // throw here would prevent the unlock loop from running but is
+    // *not* fatal — we just skip this evaluation pass.
+    let ctx: AchievementContext;
+    try {
+      const myProfile = allUsers.find((u) => u.uid === user.uid) ?? null;
+      ctx = buildAchievementContext({
+        me: user,
+        modules: allModules,
+        allUsers,
+        playtime,
+        conversations,
+        launchDays,
+        myProfile,
+        shortcutCount,
+      });
+    } catch (err) {
+      logger.error(
+        `Achievement context build failed: ${err instanceof Error ? err.message : String(err)}`,
+        { source: "App.achievements" },
+      );
+      return;
+    }
     // Detect newly-unlocked achievements. Two layers of dedup:
     //   1. `unlockedSet` reflects the Firestore-persisted state — once a
     //      record exists, the effect skips it forever.

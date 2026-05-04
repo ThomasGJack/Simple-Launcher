@@ -54,17 +54,26 @@ export function NextAchievementChip() {
 
   const ctx: AchievementContext | null = useMemo(() => {
     if (!me) return null;
-    const myProfile = allUsers.find((u) => u.uid === me.uid) ?? null;
-    return buildAchievementContext({
-      me,
-      modules: allModules,
-      allUsers,
-      playtime,
-      conversations,
-      launchDays,
-      myProfile,
-      shortcutCount,
-    });
+    // Wrapped in try/catch — this component renders inside the home
+    // page, and any throw here would bubble past React's render phase
+    // and crash the route. Falling back to `null` simply hides the
+    // chip rather than killing Home.
+    try {
+      const myProfile = allUsers.find((u) => u.uid === me.uid) ?? null;
+      return buildAchievementContext({
+        me,
+        modules: allModules,
+        allUsers,
+        playtime,
+        conversations,
+        launchDays,
+        myProfile,
+        shortcutCount,
+      });
+    } catch (err) {
+      console.warn("[next-achievement] context build failed:", err);
+      return null;
+    }
   }, [me, allModules, allUsers, playtime, conversations, launchDays, shortcutCount]);
 
   // Rank locked + non-secret achievements with a numeric track by their

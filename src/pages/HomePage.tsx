@@ -11,6 +11,7 @@ import { FriendsOnlineStrip } from "@/components/home/FriendsOnlineStrip";
 import { NewsCard } from "@/components/home/NewsCard";
 import { ActionsChip } from "@/components/home/ActionsChip";
 import { NextAchievementChip } from "@/components/home/NextAchievementChip";
+import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 import { achievementFlags } from "@/lib/achievementFlags";
 import { sounds } from "@/lib/sounds";
 
@@ -55,6 +56,18 @@ export function HomePage() {
     ] as const;
     let buffer: string[] = [];
     const onKey = (e: KeyboardEvent) => {
+      // Skip when the user is typing in an input / textarea / contentEditable
+      // — otherwise the chat field's "b" or "a" presses would silently
+      // count toward the Konami buffer and feel weird.
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
       const next = e.key.length === 1 ? e.key.toLowerCase() : e.key;
       buffer.push(next);
       if (buffer.length > sequence.length) {
@@ -194,9 +207,14 @@ export function HomePage() {
           >
             <FriendsOnlineStrip />
             {/* Rotating "almost there" chip — auto-hides if the user has
-                no in-progress achievements. Click → AchievementsPage. */}
+                no in-progress achievements. Click → AchievementsPage.
+                Wrapped in its own ErrorBoundary so a crash inside the
+                chip (e.g. malformed Firestore snapshot, missing
+                profile field) never takes down the whole Home page. */}
             <div className="mt-4">
-              <NextAchievementChip />
+              <ErrorBoundary scope="next-achievement-chip">
+                <NextAchievementChip />
+              </ErrorBoundary>
             </div>
             <NewsCard />
           </motion.div>
