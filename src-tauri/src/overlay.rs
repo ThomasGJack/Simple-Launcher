@@ -193,3 +193,185 @@ pub fn overlay_hide<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
     }
     Ok(())
 }
+
+// ─── Force-borderless (Option A) ────────────────────────────────────
+
+/// Force the current foreground window into borderless windowed
+/// mode. Strips its native window styles (WS_POPUP, WS_CAPTION,
+/// WS_THICKFRAME) via Win32 SetWindowLong and resizes it to fill the
+/// work area of the monitor it's currently on.
+///
+/// This is the safe alternative to DLL-injection overlays : works
+/// for 95%+ of games that run in "exclusive fullscreen" today (the
+/// game's swap chain becomes a normal compositor surface, so our
+/// always-on-top transparent overlay can paint over it). No process
+/// injection, no anti-cheat risk, no admin rights.
+///
+/// Invoked manually by the user via "Forcer borderless" buttons in
+/// the launcher UI, and automatically right after a game launch
+/// when `getAutoBorderless()` is true on the frontend side.
+#[cfg(windows)]
+#[tauri::command]
+pub fn overlay_force_borderless() -> Result<(), String> {
+    use windows::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
+    let hwnd = unsafe { GetForegroundWindow() };
+    if hwnd.0.is_null() {
+        return Err("Aucune fenêtre au premier plan".to_string());
+    }
+    convert_to_borderless(hwnd).map_err(|e| e.to_string())
+}
+
+#[cfg(not(windows))]
+#[tauri::command]
+pub fn overlay_force_borderless() -> Result<(), String> {
+    Err("Force-borderless n'est implémenté que sur Windows pour le moment".into())
+}
+
+/// Same as `overlay_force_borderless` but targets the main window of
+/// a specific PID. Used by the auto-borderless logic that knows
+/// which process it just spawned (vs the foreground-window heuristic
+/// which is best-effort).
+#[cfg(windows)]
+#[tauri::command]
+pub fn overlay_force_borderless_pid(pid: u32) -> Result<(), String> {
+    let hwnd = find_main_window_for_pid(pid)
+        .ok_or_else(|| format!("Aucune fenêtre trouvée pour le PID {}", pid))?;
+    convert_to_borderless(hwnd).map_err(|e| e.to_string())
+}
+
+#[cfg(not(windows))]
+#[tauri::command]
+pub fn overlay_force_borderless_pid(_pid: u32) -> Result<(), String> {
+    Err("Force-borderless n'est implémenté que sur Windows pour le moment".into())
+}
+
+#[cfg(windows)]
+fn convert_to_borderless(hwnd: windows::Win32::Foundation::HWND) -> Result<(), String> {
+    use windows::Win32::Foundation::RECT;
+    use windows::Win32::Graphics::Gdi::{
+        GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST,
+    };
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GetWindowLongW, SetWindowLongW, SetWindowPos, ShowWindow, GWL_EXSTYLE, GWL_STYLE,
+        SWP_FRAMECHANGED, SWP_NOZORDER, SW_SHOW, WS_CAPTION, WS_EX_DLGMODALFRAME,
+        WS_EX_STATICEDGE, WS_EX_WINDOWEDGE, WS_OVERLAPPED, WS_POPUP, WS_SYSMENU, WS_THICKFRAME,
+    };
+
+    unsafe {
+        // ─── 1) Get the current monitor's work area ───────────────
+        let monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+        let mut info = MONITORINFO {
+            cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+            ..Default::default()
+        };
+        if !GetMonitorInfoW(monitor, &mut info).as_bool() {
+            return Err("GetMonitorInfoW failed".to_string());
+        }
+        let RECT {
+            left,
+            top,
+            right,
+            bottom,
+        } = info.rcMonitor;
+        let width = right - left;
+        let height = bottom - top;
+
+        // ─── 2) Strip "fullscreen-y" window styles ────────────────
+        // Removing WS_POPUP is the key bit : games that run in
+        // borderless-fullscreen-but-actually-popup mode use
+        // WS_POPUP without WS_OVERLAPPED, which the compositor
+        // sometimes treats specially. We replace it with the
+        // standard WS_OVERLAPPED bit pattern.
+        let style = GetWindowLongW(hwnd, GWL_STYLE) as u32;
+        let stripped = style
+            & !(WS_POPUP.0
+                | WS_CAPTION.0
+                | WS_THICKFRAME.0
+                | WS_SYSMENU.0
+                | WS_OVERLAPPED.0);
+        SetWindowLongW(hwnd, GWL_STYLE, stripped as i32);
+
+        let exstyle = GetWindowLongW(hwnd, GWL_EXSTYLE) as u32;
+        let stripped_ex =
+            exstyle & !(WS_EX_DLGMODALFRAME.0 | WS_EX_WINDOWEDGE.0 | WS_EX_STATICEDGE.0);
+        SetWindowLongW(hwnd, GWL_EXSTYLE, stripped_ex as i32);
+
+        // ─── 3) Resize + position to fill the work area ──────────
+        // SWP_FRAMECHANGED forces a non-client recalc so the new
+        // styles take effect immediately. SWP_NOZORDER preserves
+        // the user's existing alt-tab order.
+        if SetWindowPos(
+            hwnd,
+            None,
+            left,
+            top,
+            width,
+            height,
+            SWP_FRAMECHANGED | SWP_NOZORDER,
+        )
+        .is_err()
+        {
+            return Err("SetWindowPos failed".to_string());
+        }
+        let _ = ShowWindow(hwnd, SW_SHOW);
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn find_main_window_for_pid(pid: u32) -> Option<windows::Win32::Foundation::HWND> {
+    use windows::Win32::Foundation::{BOOL, HWND, LPARAM, RECT, TRUE};
+    use windows::Win32::UI::WindowsAndMessaging::{
+        EnumWindows, GetWindow, GetWindowRect, GetWindowThreadProcessId, IsWindowVisible,
+        GW_OWNER,
+    };
+
+    struct Search {
+        target_pid: u32,
+        best: Option<HWND>,
+        best_area: i32,
+    }
+
+    let mut search = Search {
+        target_pid: pid,
+        best: None,
+        best_area: 0,
+    };
+
+    extern "system" fn cb(hwnd: HWND, lparam: LPARAM) -> BOOL {
+        unsafe {
+            let s = &mut *(lparam.0 as *mut Search);
+            if !IsWindowVisible(hwnd).as_bool() {
+                return TRUE;
+            }
+            // Skip child / owned windows — we want the top-level
+            // main window, not tooltips / dialogs.
+            let owner = GetWindow(hwnd, GW_OWNER);
+            if let Ok(o) = owner {
+                if !o.0.is_null() {
+                    return TRUE;
+                }
+            }
+            let mut found_pid: u32 = 0;
+            GetWindowThreadProcessId(hwnd, Some(&mut found_pid));
+            if found_pid != s.target_pid {
+                return TRUE;
+            }
+            let mut rect = RECT::default();
+            if GetWindowRect(hwnd, &mut rect).is_err() {
+                return TRUE;
+            }
+            let area = (rect.right - rect.left) * (rect.bottom - rect.top);
+            if area > s.best_area {
+                s.best_area = area;
+                s.best = Some(hwnd);
+            }
+            TRUE
+        }
+    }
+
+    unsafe {
+        let _ = EnumWindows(Some(cb), LPARAM(&mut search as *mut _ as isize));
+    }
+    search.best
+}

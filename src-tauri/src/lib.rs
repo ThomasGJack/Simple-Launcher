@@ -156,6 +156,8 @@ pub fn run() {
             overlay::overlay_toggle,
             overlay::overlay_show,
             overlay::overlay_hide,
+            overlay::overlay_force_borderless,
+            overlay::overlay_force_borderless_pid,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

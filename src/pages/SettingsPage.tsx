@@ -19,6 +19,8 @@ import {
   ShieldCheck,
   Stethoscope,
   Star,
+  Layers,
+  Keyboard,
 } from "lucide-react";
 import { getVersion } from "@tauri-apps/api/app";
 import { useSettingsStore } from "@/store/settings";
@@ -41,6 +43,19 @@ import {
 import { cn } from "@/lib/cn";
 import { useTickEvery } from "@/hooks/useTickEvery";
 import { DiagnosticModal } from "@/components/settings/DiagnosticModal";
+import {
+  DEFAULT_OVERLAY_HOTKEY,
+  bootOverlayHotkey,
+  forceBorderlessForeground,
+  getAutoBorderless,
+  getOverlayEnabled,
+  getSavedOverlayHotkey,
+  setAutoBorderless,
+  setOverlayEnabled,
+  setOverlayHotkey,
+  showOverlay,
+  unregisterOverlayHotkey,
+} from "@/lib/overlay";
 
 export function SettingsPage() {
   const { soundsEnabled, toggleSounds } = useSettingsStore();
@@ -74,6 +89,7 @@ export function SettingsPage() {
           }}
         />
         <ApparenceCard />
+        <OverlayCard />
         <DownloadsCard />
         <LogsDiagnosticCard />
         <SettingButton
@@ -1060,6 +1076,272 @@ function MinecraftAccountsCard() {
           </motion.div>
         )}
       </AnimatePresence>
+    </motion.div>
+  );
+}
+
+// ─── Overlay (in-game) ──────────────────────────────────────────────────
+
+/**
+ * Settings card for the in-game overlay feature : enable / disable
+ * the global hotkey, customize the key combo, toggle auto-borderless
+ * mode (Option A — strips fullscreen-y window styles from the
+ * launched game so a transparent always-on-top overlay can paint
+ * over it). Also exposes a "Tester" button that shows the overlay
+ * window immediately so the user can preview the effect.
+ */
+function OverlayCard() {
+  const [enabled, setEnabledState] = useState<boolean>(() => getOverlayEnabled());
+  const [hotkey, setHotkeyState] = useState<string>(() => getSavedOverlayHotkey());
+  const [autoBorderless, setAutoBorderlessState] = useState<boolean>(() =>
+    getAutoBorderless(),
+  );
+  const [recording, setRecording] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  /** Listen for Esc to cancel and any normal key combo to capture. */
+  useEffect(() => {
+    if (!recording) return;
+    const onKey = (e: KeyboardEvent) => {
+      e.preventDefault();
+      if (e.key === "Escape") {
+        setRecording(false);
+        return;
+      }
+      // Skip pure modifier presses — wait for the user to actually
+      // pick a final key.
+      if (["Control", "Shift", "Alt", "Meta"].includes(e.key)) return;
+      const parts: string[] = [];
+      if (e.ctrlKey) parts.push("Ctrl");
+      if (e.shiftKey) parts.push("Shift");
+      if (e.altKey) parts.push("Alt");
+      if (e.metaKey) parts.push("Meta");
+      const code = e.code; // e.g. KeyO, F9, Space
+      let key: string;
+      if (code.startsWith("Key")) key = code.slice(3); // KeyO → O
+      else if (code.startsWith("Digit")) key = code.slice(5); // Digit5 → 5
+      else if (code.startsWith("F") && /^F\d{1,2}$/.test(code)) key = code; // F1..F12
+      else if (code === "Space") key = "Space";
+      else if (code === "Escape" || code === "Tab" || code === "Enter") key = code;
+      else {
+        // Unsupported key — ignore and keep recording
+        return;
+      }
+      parts.push(key);
+      const combo = parts.join("+");
+      // Require at least one modifier so the hotkey doesn't conflict
+      // with raw keypresses in games (e.g. binding "F" alone would
+      // toggle the overlay every time the player tries to interact
+      // with something in-game).
+      if (parts.length < 2 && !/^F\d/.test(key)) {
+        setError("Ajoute au moins un modificateur (Ctrl/Shift/Alt) ou utilise une touche Fn.");
+        return;
+      }
+      setError(null);
+      setHotkeyState(combo);
+      void setOverlayHotkey(combo).catch((err) => {
+        console.warn("[overlay] register failed:", err);
+        setError(`Impossible d'enregistrer ce raccourci : ${String(err)}`);
+      });
+      setRecording(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [recording]);
+
+  const handleToggle = async () => {
+    sounds.click();
+    const next = !enabled;
+    setEnabledState(next);
+    setOverlayEnabled(next);
+    try {
+      if (next) {
+        await bootOverlayHotkey();
+      } else {
+        await unregisterOverlayHotkey();
+      }
+    } catch (err) {
+      console.warn("[overlay] toggle failed:", err);
+    }
+  };
+
+  const handleTest = async () => {
+    sounds.click();
+    try {
+      await showOverlay();
+    } catch (err) {
+      setError(`Impossible d'ouvrir l'overlay : ${String(err)}`);
+    }
+  };
+
+  const handleResetHotkey = async () => {
+    sounds.click();
+    setHotkeyState(DEFAULT_OVERLAY_HOTKEY);
+    try {
+      await setOverlayHotkey(DEFAULT_OVERLAY_HOTKEY);
+      setError(null);
+    } catch (err) {
+      setError(String(err));
+    }
+  };
+
+  const handleToggleBorderless = () => {
+    sounds.click();
+    const next = !autoBorderless;
+    setAutoBorderlessState(next);
+    setAutoBorderless(next);
+  };
+
+  const handleForceBorderless = async () => {
+    sounds.click();
+    try {
+      await forceBorderlessForeground();
+    } catch (err) {
+      setError(String(err));
+    }
+  };
+
+  return (
+    <motion.div whileHover={{ x: 4 }} className="no-drag rounded-2xl glass p-5">
+      <div className="flex items-start gap-4">
+        <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-accent/10 text-accent ring-1 ring-accent/20">
+          <Layers className="size-5" strokeWidth={2} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <div className="font-medium text-fg-primary">Overlay in-game</div>
+            <span className="rounded-full bg-emerald-400/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-emerald-300 ring-1 ring-emerald-400/30">
+              Beta
+            </span>
+          </div>
+          <div className="text-sm text-fg-muted">
+            Affiche le launcher (amis, DM, notifs) par-dessus n'importe quel
+            jeu en mode borderless via un raccourci global.
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={handleToggle}
+          className={cn(
+            "relative h-6 w-11 shrink-0 rounded-full transition-colors",
+            enabled ? "bg-accent" : "bg-white/10",
+          )}
+        >
+          <motion.span
+            layout
+            className={cn(
+              "absolute top-0.5 size-5 rounded-full bg-white shadow-md",
+              enabled ? "right-0.5" : "left-0.5",
+            )}
+            transition={{ type: "spring", stiffness: 500, damping: 30 }}
+          />
+        </button>
+      </div>
+
+      {enabled && (
+        <div className="mt-5 space-y-4">
+          {/* Hotkey picker */}
+          <div className="rounded-xl bg-bg-base/40 p-3 ring-1 ring-white/[0.04]">
+            <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-wider text-fg-dim">
+              <Keyboard className="size-3.5" />
+              Raccourci global
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (recording) return;
+                  sounds.click();
+                  setRecording(true);
+                  setError(null);
+                }}
+                className={cn(
+                  "flex-1 rounded-lg border px-4 py-2.5 font-mono text-sm transition-colors",
+                  recording
+                    ? "animate-pulse border-accent bg-accent/10 text-accent"
+                    : "border-white/[0.08] bg-bg-base/40 text-fg-primary hover:bg-bg-base/60",
+                )}
+                title={recording ? "Appuie sur la combinaison désirée (Esc pour annuler)" : "Cliquer pour enregistrer un nouveau raccourci"}
+              >
+                {recording ? "Appuie sur la combinaison… (Esc pour annuler)" : hotkey}
+              </button>
+              {hotkey !== DEFAULT_OVERLAY_HOTKEY && (
+                <button
+                  type="button"
+                  onClick={handleResetHotkey}
+                  className="rounded-lg bg-white/[0.03] px-3 py-2 text-xs text-fg-muted ring-1 ring-white/[0.06] transition-colors hover:bg-white/[0.06] hover:text-fg-primary"
+                  title="Revenir à Shift+F9"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+            <p className="mt-2 text-[11px] text-fg-dim">
+              Doit inclure au moins un modificateur (Ctrl/Shift/Alt) ou être une
+              touche Fn. <span className="text-fg-muted">Pro tip :</span> évite
+              Ctrl+Shift+O (Chrome dev tools).
+            </p>
+          </div>
+
+          {/* Auto-borderless toggle */}
+          <div className="flex items-start gap-3 rounded-xl bg-bg-base/40 p-3 ring-1 ring-white/[0.04]">
+            <Gamepad2 className="mt-0.5 size-4 shrink-0 text-fg-muted" />
+            <div className="flex-1 min-w-0">
+              <div className="text-sm text-fg-primary">
+                Forcer auto le borderless au lancement
+              </div>
+              <p className="mt-0.5 text-[11px] text-fg-muted">
+                Convertit les jeux en exclusive fullscreen → borderless windowed
+                pour que l'overlay puisse s'afficher dessus. Aucun risque
+                anti-cheat (juste un changement de style de fenêtre Win32).
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleToggleBorderless}
+              className={cn(
+                "relative h-5 w-9 shrink-0 rounded-full transition-colors",
+                autoBorderless ? "bg-accent" : "bg-white/10",
+              )}
+            >
+              <motion.span
+                layout
+                className={cn(
+                  "absolute top-0.5 size-4 rounded-full bg-white shadow",
+                  autoBorderless ? "right-0.5" : "left-0.5",
+                )}
+                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+              />
+            </button>
+          </div>
+
+          {/* Manual actions */}
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleTest}
+              className="rounded-lg bg-accent/[0.08] px-4 py-2 text-xs font-medium text-accent ring-1 ring-accent/20 transition-colors hover:bg-accent/[0.15]"
+            >
+              Tester l'overlay
+            </button>
+            <button
+              type="button"
+              onClick={handleForceBorderless}
+              className="rounded-lg bg-white/[0.03] px-4 py-2 text-xs text-fg-muted ring-1 ring-white/[0.06] transition-colors hover:bg-white/[0.06] hover:text-fg-primary"
+              title="Force la fenêtre du jeu en cours en mode borderless"
+            >
+              Forcer borderless (jeu actif)
+            </button>
+          </div>
+
+          {error && (
+            <div className="flex items-start gap-2 rounded-xl bg-danger/10 p-3 text-xs text-danger ring-1 ring-danger/30">
+              <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+        </div>
+      )}
     </motion.div>
   );
 }
