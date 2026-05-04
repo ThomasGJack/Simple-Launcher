@@ -8,6 +8,7 @@ import {
   Lock,
   LogOut,
   Plus,
+  Settings,
 } from "lucide-react";
 import { useAuthStore } from "@/store/auth";
 import { useUIStore } from "@/store/ui";
@@ -24,6 +25,7 @@ import {
 } from "@/firebase/crews";
 import { ChannelView } from "@/components/crews/ChannelView";
 import { MembersList } from "@/components/crews/MembersList";
+import { CrewSettingsModal } from "@/components/crews/CrewSettingsModal";
 import { hasAnyTier } from "@/lib/supporterTier";
 import { isAdmin } from "@/lib/admin";
 import { sounds } from "@/lib/sounds";
@@ -67,6 +69,7 @@ export function CrewsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [browseOpen, setBrowseOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => watchCrews(setAllCrews), []);
 
@@ -346,6 +349,18 @@ export function CrewsPage() {
               )}
             </div>
           </div>
+          {selectedCrew &&
+            !selectedCrew.isMaster &&
+            selectedCrew.ownerUid === me?.uid && (
+              <button
+                type="button"
+                onClick={() => setSettingsOpen(true)}
+                title="Paramètres du crew"
+                className="grid size-8 place-items-center rounded-lg text-fg-dim transition-colors hover:bg-white/[0.06] hover:text-fg-primary"
+              >
+                <Settings className="size-4" />
+              </button>
+            )}
           {selectedCrew && !selectedCrew.isMaster && (
             <button
               type="button"
@@ -438,6 +453,14 @@ export function CrewsPage() {
         onClose={() => setCreateOpen(false)}
         onCreated={(id) => navigate({ name: "crews", crewId: id })}
       />
+      {selectedCrew && (
+        <CrewSettingsModal
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          crew={selectedCrew}
+          onDeleted={() => navigate({ name: "crews" })}
+        />
+      )}
     </div>
   );
 }
