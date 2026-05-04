@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { achievementFlags } from "@/lib/achievementFlags";
 
 /**
  * Frontend wrappers for the Modrinth modpack pipeline. Search lets the
@@ -69,6 +70,8 @@ export async function mcModrinthInstall(
   instanceId: string,
 ): Promise<void> {
   await invoke<void>("mc_modrinth_install", { mrpackUrl, instanceId });
+  // Modpack pipeline succeeded → unlock achievement #28.
+  achievementFlags.markModpackInstalled();
 }
 
 /** Convenience: pick the file in a Modrinth version that's the primary

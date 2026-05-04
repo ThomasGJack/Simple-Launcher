@@ -6,6 +6,7 @@ import { useUIStore } from "@/store/ui";
 import {
   useAchievements,
   useConversations,
+  useLaunchDays,
   useModules,
   usePlaytime,
   useUsers,
@@ -18,7 +19,8 @@ import {
   progressPercent,
   type AchievementContext,
 } from "@/lib/achievements";
-import { achievementFlags } from "@/lib/achievementFlags";
+import { buildAchievementContext } from "@/lib/achievementContext";
+import { watchUserShortcuts } from "@/firebase/shortcuts";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
 
@@ -37,39 +39,33 @@ export function NextAchievementChip() {
   const allUsers = useUsers();
   const playtime = usePlaytime(me?.uid);
   const conversations = useConversations(me?.uid);
+  const launchDays = useLaunchDays(me?.uid);
   const unlocked = useAchievements(me?.uid);
   const unlockedSet = useMemo(
     () => new Set(unlocked.map((u) => u.id)),
     [unlocked],
   );
 
+  const [shortcutCount, setShortcutCount] = useState(0);
+  useEffect(() => {
+    if (!me) return;
+    return watchUserShortcuts(me.uid, (s) => setShortcutCount(s.length));
+  }, [me]);
+
   const ctx: AchievementContext | null = useMemo(() => {
     if (!me) return null;
-    const distinctChatPartners = new Set(
-      conversations.flatMap((c) => c.participants.filter((p) => p && p !== me.uid)),
-    ).size;
-    const onlineUsersCount = allUsers.filter(
-      (u) => u.lastSeen && Date.now() - u.lastSeen < 60_000,
-    ).length;
-    const totalLaunches = playtime.reduce((s, p) => s + p.totalLaunches, 0);
-    const distinctModulesLaunched = playtime.filter((p) => p.totalLaunches > 0).length;
-    return {
+    const myProfile = allUsers.find((u) => u.uid === me.uid) ?? null;
+    return buildAchievementContext({
+      me,
       modules: allModules,
-      installedCount: 0,
+      allUsers,
       playtime,
       conversations,
-      distinctChatPartners,
-      onlineUsersCount,
-      totalMessagesSent: conversations.filter(
-        (c) => c.lastMessage?.senderUid === me.uid,
-      ).length,
-      totalLaunches,
-      distinctModulesLaunched,
-      bootHour: achievementFlags.getBootHour(),
-      sharedProfileOnce: achievementFlags.hasSharedProfile(),
-      usedOfflineModeOnce: achievementFlags.hasUsedOffline(),
-    };
-  }, [me, allModules, allUsers, playtime, conversations]);
+      launchDays,
+      myProfile,
+      shortcutCount,
+    });
+  }, [me, allModules, allUsers, playtime, conversations, launchDays, shortcutCount]);
 
   // Rank locked + non-secret achievements with a numeric track by their
   // progress %, descending. Pick the top 3 to rotate through. Secrets

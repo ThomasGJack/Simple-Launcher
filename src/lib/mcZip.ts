@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { achievementFlags } from "@/lib/achievementFlags";
 
 /**
  * "Bring-your-own-zip" modpack installer. The user (or admin) hands us
@@ -21,6 +22,8 @@ export async function mcZipInstall(
   instanceId: string,
 ): Promise<void> {
   await invoke<void>("mc_zip_install", { zipUrl, instanceId });
+  // Custom-zip modpack import counts as a modpack install (achievement #28).
+  achievementFlags.markModpackInstalled();
 }
 
 /**

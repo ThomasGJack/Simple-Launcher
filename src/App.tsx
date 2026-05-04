@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
@@ -8,6 +8,7 @@ import { useSettingsStore } from "@/store/settings";
 import { useUIStore } from "@/store/ui";
 import { getFirebase } from "@/firebase/config";
 import { recordPlaytime } from "@/firebase/playtime";
+import { recordLaunchDay } from "@/firebase/launchDays";
 import { pushHeartbeat, type CurrentActivity } from "@/firebase/presence";
 import { watchFavorites } from "@/firebase/favorites";
 import { useFavoritesStore } from "@/store/favorites";
@@ -35,6 +36,9 @@ import {
   type AchievementContext,
 } from "@/lib/achievements";
 import { achievementFlags } from "@/lib/achievementFlags";
+import { buildAchievementContext } from "@/lib/achievementContext";
+import { watchUserShortcuts } from "@/firebase/shortcuts";
+import { useLaunchDays } from "@/store/firebaseStores";
 import {
   pushAchievementToast,
   pushMilestoneToast,
@@ -172,6 +176,24 @@ function App() {
     });
   }, [route]);
 
+  // Listen for "tray-reopen" — fired by Rust when the user brought the
+  // window back from the system tray (left-click, "Ouvrir" menu item,
+  // or single-instance forwarder). Drives the #39 "Discret" achievement
+  // which requires having closed-to-tray then come back.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    listen("tray-reopen", () => {
+      achievementFlags.markTrayDiscovered();
+    })
+      .then((u) => {
+        unlisten = u;
+      })
+      .catch(() => {});
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, []);
+
   // Listen for tray-icon menu navigation events emitted from Rust.
   // The tray menu has shortcuts ("Communauté", "Messages", "Bibliothèque")
   // that fire a `tray-navigate` event with the route name; we forward
@@ -228,6 +250,11 @@ function App() {
       if (durationMs <= 0) return;
       recordPlaytime(uid, moduleId, durationMs).catch((err) =>
         console.warn("[playtime] write failed:", err),
+      );
+      // Mirror the launch into the per-day aggregate doc — drives the
+      // streak + weekend-warrior achievements.
+      recordLaunchDay(uid, durationMs).catch((err) =>
+        console.warn("[launchDays] write failed:", err),
       );
     });
     return () => {
@@ -294,12 +321,21 @@ function App() {
   const allUsers = useUsers();
   const playtime = usePlaytime(user?.uid);
   const conversations = useConversations(user?.uid);
+  const launchDays = useLaunchDays(user?.uid);
   const unlockedList = useAchievements(user?.uid);
   const unlockedSetPrimed = useAchievementsPrimed(user?.uid);
   const unlockedSet = useMemo(
     () => new Set(unlockedList.map((u) => u.id)),
     [unlockedList],
   );
+
+  // Track shortcut count locally for the shortcut-master achievement.
+  // Subscribed at App-level so the value is fresh in the unlock loop.
+  const [shortcutCount, setShortcutCount] = useState(0);
+  useEffect(() => {
+    if (!user) return;
+    return watchUserShortcuts(user.uid, (s) => setShortcutCount(s.length));
+  }, [user]);
   // Session-level guard against re-toasting an achievement multiple times.
   // The Firestore-derived `unlockedSet` should already prevent this, but if
   // the snapshot listener is delayed (e.g. rules issue, network blip), the
@@ -314,35 +350,19 @@ function App() {
     // which ones are already unlocked in Firestore. Otherwise the catalog
     // gets re-toasted on every launch.
     if (!unlockedSetPrimed) return;
-    // Build context fresh from the latest snapshots
-    const distinctChatPartners = new Set(
-      conversations.flatMap((c) => c.participants.filter((p) => p && p !== user.uid)),
-    ).size;
-    const onlineUsersCount = allUsers.filter((u) => {
-      if (!u.lastSeen) return false;
-      return Date.now() - u.lastSeen < 60_000;
-    }).length;
-    const totalLaunches = playtime.reduce((s, p) => s + p.totalLaunches, 0);
-    const distinctModulesLaunched = playtime.filter((p) => p.totalLaunches > 0).length;
-    const ctx: AchievementContext = {
+    // Build context fresh from the latest snapshots, via the shared
+    // helper so the gallery + home chip see identical numbers.
+    const myProfile = allUsers.find((u) => u.uid === user.uid) ?? null;
+    const ctx = buildAchievementContext({
+      me: user,
       modules: allModules,
-      installedCount: 0, // not tracked server-side; using playtime-based proxy
+      allUsers,
       playtime,
       conversations,
-      distinctChatPartners,
-      onlineUsersCount,
-      // Total messages sent — approximated as 1 per "I have a lastMessage I authored"
-      // (real counter would require a sentCount field on Conversation; left as
-      // a TODO for a future refactor). For now this gives 0/1 per conversation.
-      totalMessagesSent: conversations.filter(
-        (c) => c.lastMessage?.senderUid === user.uid,
-      ).length,
-      totalLaunches,
-      distinctModulesLaunched,
-      bootHour: achievementFlags.getBootHour(),
-      sharedProfileOnce: achievementFlags.hasSharedProfile(),
-      usedOfflineModeOnce: achievementFlags.hasUsedOffline(),
-    };
+      launchDays,
+      myProfile,
+      shortcutCount,
+    });
     // Detect newly-unlocked achievements. Two layers of dedup:
     //   1. `unlockedSet` reflects the Firestore-persisted state — once a
     //      record exists, the effect skips it forever.
@@ -391,7 +411,17 @@ function App() {
         maybeMilestoneToast(ach, ctx);
       }
     }
-  }, [user, allModules, allUsers, playtime, conversations, unlockedSet, unlockedSetPrimed]);
+  }, [
+    user,
+    allModules,
+    allUsers,
+    playtime,
+    conversations,
+    launchDays,
+    shortcutCount,
+    unlockedSet,
+    unlockedSetPrimed,
+  ]);
 
   // ─── Apparence : push the user's accent + animations prefs onto the
   // root element so every component that reads via CSS vars / data-attr

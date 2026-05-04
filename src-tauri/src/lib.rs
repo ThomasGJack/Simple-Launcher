@@ -19,7 +19,7 @@ mod oauth;
 mod rcon;
 mod tray;
 
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -36,6 +36,10 @@ pub fn run() {
                 let _ = window.show();
                 let _ = window.unminimize();
                 let _ = window.set_focus();
+                // Frontend listens for `tray-reopen` to know "the user
+                // closed me to the tray then came back" — drives the
+                // tray-discovered achievement (#39).
+                let _ = app.emit("tray-reopen", ());
             }
         }))
         .plugin(tauri_plugin_opener::init())

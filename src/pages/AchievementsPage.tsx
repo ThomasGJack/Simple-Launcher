@@ -6,6 +6,7 @@ import { useAuthStore } from "@/store/auth";
 import {
   useAchievements,
   useConversations,
+  useLaunchDays,
   useModules,
   usePlaytime,
   useUsers,
@@ -18,7 +19,8 @@ import {
   progressPercent,
   type AchievementContext,
 } from "@/lib/achievements";
-import { achievementFlags } from "@/lib/achievementFlags";
+import { buildAchievementContext } from "@/lib/achievementContext";
+import { watchUserShortcuts } from "@/firebase/shortcuts";
 import {
   computeRarity,
   watchAchievementStats,
@@ -45,11 +47,18 @@ export function AchievementsPage() {
   const allUsers = useUsers();
   const playtime = usePlaytime(me?.uid);
   const conversations = useConversations(me?.uid);
+  const launchDays = useLaunchDays(me?.uid);
   const unlocked = useAchievements(me?.uid);
   const unlockedById = useMemo(
     () => new Map(unlocked.map((u) => [u.id, u.unlockedAt] as const)),
     [unlocked],
   );
+
+  const [shortcutCount, setShortcutCount] = useState(0);
+  useEffect(() => {
+    if (!me) return;
+    return watchUserShortcuts(me.uid, (s) => setShortcutCount(s.length));
+  }, [me]);
 
   const [tierFilter, setTierFilter] = useState<TierFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -69,48 +78,30 @@ export function AchievementsPage() {
   const ctx: AchievementContext = useMemo(() => {
     if (!me) {
       // Not logged in (shouldn't happen here — auth gate elsewhere) —
-      // return a zeroed context so the catalog can still render.
-      return {
+      // return an empty context so the catalog can still render.
+      return buildAchievementContext({
+        me: { uid: "", displayName: null, photoURL: null, email: null } as never,
         modules: allModules,
-        installedCount: 0,
+        allUsers,
         playtime: [],
         conversations: [],
-        distinctChatPartners: 0,
-        onlineUsersCount: 0,
-        totalMessagesSent: 0,
-        totalLaunches: 0,
-        distinctModulesLaunched: 0,
-        bootHour: new Date().getHours(),
-        sharedProfileOnce: false,
-        usedOfflineModeOnce: false,
-      };
+        launchDays: [],
+        myProfile: null,
+        shortcutCount: 0,
+      });
     }
-    const distinctChatPartners = new Set(
-      conversations.flatMap((c) => c.participants.filter((p) => p && p !== me.uid)),
-    ).size;
-    const onlineUsersCount = allUsers.filter((u) => {
-      if (!u.lastSeen) return false;
-      return Date.now() - u.lastSeen < 60_000;
-    }).length;
-    const totalLaunches = playtime.reduce((s, p) => s + p.totalLaunches, 0);
-    const distinctModulesLaunched = playtime.filter((p) => p.totalLaunches > 0).length;
-    return {
+    const myProfile = allUsers.find((u) => u.uid === me.uid) ?? null;
+    return buildAchievementContext({
+      me,
       modules: allModules,
-      installedCount: 0,
+      allUsers,
       playtime,
       conversations,
-      distinctChatPartners,
-      onlineUsersCount,
-      totalMessagesSent: conversations.filter(
-        (c) => c.lastMessage?.senderUid === me.uid,
-      ).length,
-      totalLaunches,
-      distinctModulesLaunched,
-      bootHour: achievementFlags.getBootHour(),
-      sharedProfileOnce: achievementFlags.hasSharedProfile(),
-      usedOfflineModeOnce: achievementFlags.hasUsedOffline(),
-    };
-  }, [me, allModules, allUsers, playtime, conversations]);
+      launchDays,
+      myProfile,
+      shortcutCount,
+    });
+  }, [me, allModules, allUsers, playtime, conversations, launchDays, shortcutCount]);
 
   // Apply filters + sort: unlocked first, then by tier weight desc,
   // then by progress desc among locked.

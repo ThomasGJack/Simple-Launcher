@@ -15,6 +15,24 @@ import {
 } from "firebase/firestore";
 import { getFirebase } from "./config";
 
+const KEY_CREW_JOINED = "ach.flag.crewJoined.v1";
+
+/**
+ * Treat "user sent at least one crew message" as the trigger for the
+ * crew-joined achievement (#26 Esprit de clan), since every launcher
+ * user is technically a member of every crew (no per-crew membership
+ * model in the schema). The flag is read by the achievement evaluator
+ * via `achievementFlags.hasCrewJoined()`.
+ */
+function markCrewJoined(): void {
+  try {
+    if (localStorage.getItem(KEY_CREW_JOINED) === "1") return;
+    localStorage.setItem(KEY_CREW_JOINED, "1");
+  } catch {
+    /* non-fatal */
+  }
+}
+
 /**
  * Discord-like text-only "crew" hierarchy:
  *
@@ -180,6 +198,9 @@ export async function sendChannelMessage(
       sentAt: serverTimestamp(),
     },
   );
+  // Stamp the local "crew joined" flag — the achievement is awarded on
+  // first message sent in any crew channel.
+  markCrewJoined();
 }
 
 // ─── Admin ops ─────────────────────────────────────────────────────────

@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { achievementFlags } from "@/lib/achievementFlags";
 
 /**
  * Frontend wrapper for the auto-backup pipeline of native Minecraft
@@ -41,5 +42,7 @@ export async function mcBackupDelete(instanceId: string, backupId: string): Prom
  *  `saves.before-restore-{ts}/` before extracting the zip — so the user
  *  has a recovery path if they restored the wrong backup. */
 export async function mcBackupRestore(instanceId: string, backupId: string): Promise<void> {
-  return invoke<void>("mc_backup_restore", { instanceId, backupId });
+  await invoke<void>("mc_backup_restore", { instanceId, backupId });
+  // Restore succeeded → unlock #32 "Phoenix".
+  achievementFlags.markMcBackupRestored();
 }

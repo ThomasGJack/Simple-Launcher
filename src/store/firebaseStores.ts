@@ -29,6 +29,7 @@ import { watchConversationsFor } from "@/firebase/messaging";
 import { watchPlaytime, type PlaytimeEntry } from "@/firebase/playtime";
 import { watchAchievements, type UnlockedAchievement } from "@/firebase/achievements";
 import { watchNotifications, type AppNotification } from "@/firebase/notifications";
+import { watchLaunchDays, type LaunchDay } from "@/firebase/launchDays";
 import { loadCachedModules, saveCachedModules } from "@/lib/offlineCache";
 import type { LauncherModule } from "@/types/module";
 import type { Conversation } from "@/types/messaging";
@@ -202,3 +203,10 @@ const notificationsStore = makePerUidStore<AppNotification[]>([], (uid, cb) =>
 );
 /** All notifications for a specific user, newest first, capped at 50. */
 export const useNotifications = notificationsStore.useData;
+
+const launchDaysStore = makePerUidStore<LaunchDay[]>([], (uid, cb) =>
+  watchLaunchDays(uid, cb),
+);
+/** Daily launch / playtime aggregates for a user. Drives the streak +
+ *  weekend-warrior achievements. */
+export const useLaunchDays = launchDaysStore.useData;

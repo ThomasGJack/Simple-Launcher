@@ -41,8 +41,10 @@ export function ShareProfileModal({
   useEffect(() => {
     if (!open) return;
     // Stamp the local achievement flag the very first time the modal is
-    // opened — this is what unlocks the secret "evangelist" badge.
+    // opened. `markProfileShared` writes both the secret evangelist flag
+    // and the visible qr-shared flag in one shot.
     achievementFlags.markProfileShared();
+    achievementFlags.markQrShared();
     let cancelled = false;
     (async () => {
       setQrDataUrl(null);

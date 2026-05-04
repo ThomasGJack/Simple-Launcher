@@ -11,6 +11,8 @@ import { FriendsOnlineStrip } from "@/components/home/FriendsOnlineStrip";
 import { NewsCard } from "@/components/home/NewsCard";
 import { ActionsChip } from "@/components/home/ActionsChip";
 import { NextAchievementChip } from "@/components/home/NextAchievementChip";
+import { achievementFlags } from "@/lib/achievementFlags";
+import { sounds } from "@/lib/sounds";
 
 /**
  * Home page — bento-grid social hub. Surfaces in priority:
@@ -35,6 +37,43 @@ export function HomePage() {
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(t);
+  }, []);
+
+  // ─── Konami code listener ────────────────────────────────────────
+  // Watches the keyboard for ↑ ↑ ↓ ↓ ← → ← → B A. The buffer is
+  // reset on any wrong key, capped at the sequence length, and the
+  // unlock is one-shot (subsequent triggers no-op). Sounds celebratory
+  // success on first match. Installed on `window` so the user can be
+  // anywhere on Home — focus on an input would normally swallow arrow
+  // keys, but `keydown` at window level still sees them.
+  useEffect(() => {
+    if (achievementFlags.hasKonami()) return;
+    const sequence = [
+      "ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown",
+      "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight",
+      "b", "a",
+    ] as const;
+    let buffer: string[] = [];
+    const onKey = (e: KeyboardEvent) => {
+      const next = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+      buffer.push(next);
+      if (buffer.length > sequence.length) {
+        buffer = buffer.slice(buffer.length - sequence.length);
+      }
+      // Compare from the end so a partial mismatch doesn't lose us
+      // the next correct keypress (the user can recover by pressing
+      // the right key after a wrong one).
+      const ok = sequence.every(
+        (k, i) => buffer[buffer.length - sequence.length + i] === k,
+      );
+      if (ok) {
+        achievementFlags.markKonami();
+        sounds.achievementGold();
+        buffer = [];
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, []);
 
   const greeting = useMemo(() => greetingFor(new Date()), []);

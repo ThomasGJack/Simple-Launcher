@@ -108,9 +108,17 @@ fn handle_icon_event<R: Runtime>(tray: &tauri::tray::TrayIcon<R>, event: TrayIco
 
 fn show_main_window<R: Runtime>(app: &AppHandle<R>) {
     if let Some(window) = app.get_webview_window("main") {
+        // Only emit `tray-reopen` when the window was actually hidden —
+        // not when the user clicks the tray on a window that was just
+        // unfocused. This drives the "Discret" achievement (#39) which
+        // requires the user to have closed-to-tray then come back.
+        let was_hidden = !window.is_visible().unwrap_or(true);
         let _ = window.show();
         let _ = window.unminimize();
         let _ = window.set_focus();
+        if was_hidden {
+            let _ = app.emit("tray-reopen", ());
+        }
     }
 }
 
@@ -121,9 +129,13 @@ fn toggle_main_window<R: Runtime>(app: &AppHandle<R>) {
     if visible && focused {
         let _ = window.hide();
     } else {
+        let was_hidden = !visible;
         let _ = window.show();
         let _ = window.unminimize();
         let _ = window.set_focus();
+        if was_hidden {
+            let _ = app.emit("tray-reopen", ());
+        }
     }
 }
 

@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { achievementFlags } from "@/lib/achievementFlags";
 
 /**
  * Frontend wrappers for the Forge + NeoForge loader installers. Both
@@ -43,6 +44,8 @@ export async function mcForgeInstall(
   instanceId: string,
 ): Promise<void> {
   await invoke<void>("mc_forge_install", { mcVersion, loaderVersion, instanceId });
+  // Forge install is "modpack-class" (loader = mods-capable) → unlock #28.
+  achievementFlags.markModpackInstalled();
 }
 
 /**
@@ -57,4 +60,5 @@ export async function mcNeoforgeInstall(
   instanceId: string,
 ): Promise<void> {
   await invoke<void>("mc_neoforge_install", { mcVersion, loaderVersion, instanceId });
+  achievementFlags.markModpackInstalled();
 }

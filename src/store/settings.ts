@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { getSoundsEnabled, setSoundsEnabled } from "@/lib/sounds";
+import { achievementFlags } from "@/lib/achievementFlags";
 
 /**
  * Per-machine UI settings persisted in localStorage. Pure-frontend, no
@@ -82,6 +83,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setAccentColor: (hex) => {
     writeAccent(hex);
     set({ accentColor: hex });
+    // Achievements #4 (profile-personalized) + #33 (theme-changed) both
+    // trigger on a non-default accent. Keep the flag idempotent — once
+    // set, never cleared, even if the user resets to default.
+    if (hex !== null) achievementFlags.markThemeChanged();
   },
 
   animationsEnabled: readAnimations(),

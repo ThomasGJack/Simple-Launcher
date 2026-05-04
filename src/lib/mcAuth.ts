@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { achievementFlags } from "@/lib/achievementFlags";
 
 /**
  * Frontend wrapper around the Rust `mc_auth_*` Tauri commands. The
@@ -40,12 +41,22 @@ export type McAccount = {
  * any rejection text directly to the user.
  */
 export async function mcAuthLogin(): Promise<McAccount> {
-  return invoke<McAccount>("mc_auth_login");
+  const acc = await invoke<McAccount>("mc_auth_login");
+  // Stamp the achievement flag — same trigger for both the official
+  // Microsoft flow (this function) and the Mojang fallback below, so
+  // either path unlocks #3 "Compte de jeu".
+  achievementFlags.markMicrosoftLinked();
+  return acc;
 }
 
 /** Returns every Minecraft account stored locally. */
 export async function mcAuthList(): Promise<McAccount[]> {
-  return invoke<McAccount[]>("mc_auth_list");
+  const list = await invoke<McAccount[]>("mc_auth_list");
+  // If the user has at least one account stored from a previous session
+  // (from before we tracked the achievement flag), backfill it now so
+  // the badge unlocks on next evaluation pass.
+  if (list.length > 0) achievementFlags.markMicrosoftLinked();
+  return list;
 }
 
 /** Removes a stored account. Idempotent. */
@@ -81,7 +92,9 @@ export async function mcAuthFallbackStart(): Promise<void> {
  *  user pasted, then runs the full XBL → XSTS → Mojang chain (legacy
  *  XBL flavor) and persists the resulting account. */
 export async function mcAuthFallbackComplete(redirectUrl: string): Promise<McAccount> {
-  return invoke<McAccount>("mc_auth_fallback_complete", { redirectUrl });
+  const acc = await invoke<McAccount>("mc_auth_fallback_complete", { redirectUrl });
+  achievementFlags.markMicrosoftLinked();
+  return acc;
 }
 
 /** Convenience: true if the account's MC access token is within 5 min

@@ -4,6 +4,7 @@ import { Cpu, Globe, Server, Users, Wifi } from "lucide-react";
 import { useMinecraftStatus, type SamplePlayer } from "@/lib/minecraftStatus";
 import { countryFlag, useServerGeo } from "@/lib/serverGeo";
 import { postServerSnapshot, useServerActivity, type ServerSnapshot } from "@/lib/serverActivity";
+import { achievementFlags } from "@/lib/achievementFlags";
 import type { MinecraftModule } from "@/types/module";
 import { cn } from "@/lib/cn";
 
@@ -71,6 +72,13 @@ export function MinecraftServerCard({
       protocol: status.software?.protocol,
     };
   }, [status, module]);
+
+  // Achievement #29 "Co-op activé" — the user reached the module page,
+  // we successfully pinged the configured server and got an online
+  // response. That counts as "rejoindre un serveur (ping détecté)".
+  useEffect(() => {
+    if (status?.online) achievementFlags.markMcServerJoined();
+  }, [status?.online]);
 
   // Push snapshots to Firestore as new pollings arrive. The util itself
   // rate-limits so this effect can fire freely.

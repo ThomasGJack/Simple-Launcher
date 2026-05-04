@@ -16,6 +16,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { mcCrashCollect, type CrashCollectSnapshot } from "@/lib/mcCrash";
 import { sendCrashReport } from "@/firebase/crashReports";
 import { useAuthStore } from "@/store/auth";
+import { achievementFlags } from "@/lib/achievementFlags";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
 import type { MinecraftModule } from "@/types/module";
@@ -155,6 +156,9 @@ export function CrashReportModal({
       });
       sounds.success();
       setSendState("sent");
+      // #48 "Bug bounty" — secret achievement for sending a crash
+      // report. Kept idempotent (one-shot flag).
+      achievementFlags.markCrashReportSent();
     } catch (e) {
       sounds.error();
       setError(e instanceof Error ? e.message : String(e));

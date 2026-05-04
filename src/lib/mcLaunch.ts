@@ -1,5 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { mcVersionsTracker } from "@/lib/mcVersionsTracker";
+import { achievementFlags } from "@/lib/achievementFlags";
 
 /**
  * Frontend wrappers for the native Minecraft launch path. Ties together
@@ -55,6 +57,16 @@ export type LaunchLogLine = {
  */
 export async function mcNativeLaunch(options: LaunchOptions): Promise<void> {
   await invoke<void>("mc_native_launch", { options });
+  // Achievements:
+  //   - Record the MC version so #31 mc-multiple-versions can fire at 3.
+  //   - If the launch was targeted at a specific server (serverAddress
+  //     set), unlock #29 mc-server-joined immediately — we treat reaching
+  //     a server's loading screen as "joined" since we can't observe the
+  //     handshake from the launcher.
+  mcVersionsTracker.add(options.mcVersion);
+  if (options.serverAddress && options.serverAddress.trim().length > 0) {
+    achievementFlags.markMcServerJoined();
+  }
 }
 
 /** Subscribes to the launch log stream. Returns an unlisten function. */

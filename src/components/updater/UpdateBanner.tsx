@@ -7,6 +7,7 @@ import { listen } from "@tauri-apps/api/event";
 import { CheckCircle2, Loader2, RefreshCw, Sparkles, X } from "lucide-react";
 import { sounds } from "@/lib/sounds";
 import { formatDisplay } from "@/lib/version";
+import { achievementFlags } from "@/lib/achievementFlags";
 import { ChangelogRenderer } from "./ChangelogRenderer";
 
 type Status =
@@ -217,6 +218,10 @@ export function UpdateBanner() {
             break;
         }
       });
+      // Update finished downloading + installing → unlock #40 "Up to
+      // date". The relaunch happens immediately after but we mark first
+      // because relaunch tears down localStorage write paths abruptly.
+      achievementFlags.markUpdateInstalled();
       await relaunch();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

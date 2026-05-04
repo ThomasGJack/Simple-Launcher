@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { achievementFlags } from "@/lib/achievementFlags";
 
 /**
  * Frontend wrappers for the Fabric loader installer. Fabric reuses the
@@ -51,4 +52,5 @@ export async function mcFabricInstall(
   instanceId: string,
 ): Promise<void> {
   await invoke<void>("mc_fabric_install", { mcVersion, loaderVersion, instanceId });
+  achievementFlags.markModpackInstalled();
 }
