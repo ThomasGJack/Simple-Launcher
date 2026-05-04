@@ -21,6 +21,7 @@ import { useFavoritesStore } from "@/store/favorites";
 import { addFavorite, removeFavorite } from "@/firebase/favorites";
 import { useModules } from "@/store/firebaseStores";
 import { watchUserShortcuts } from "@/firebase/shortcuts";
+import { watchUserCustomMinecraft } from "@/firebase/customMinecraft";
 import {
   deriveStatus,
   getModuleState,
@@ -58,7 +59,8 @@ export function ModuleDetailPage() {
   const user = useAuthStore((s) => s.user);
   const hosted = useModules();
   const [shortcuts, setShortcuts] = useState<LauncherModule[]>([]);
-  const allModules = [...shortcuts, ...hosted];
+  const [customMc, setCustomMc] = useState<LauncherModule[]>([]);
+  const allModules = [...customMc, ...shortcuts, ...hosted];
   const [local, setLocal] = useState<ModuleStateLocal | null>(null);
   const [stateLoaded, setStateLoaded] = useState(false);
   const [action, setAction] = useState<Action>({ kind: "idle" });
@@ -73,8 +75,17 @@ export function ModuleDetailPage() {
   }, [user]);
 
   useEffect(() => {
+    if (!user) return;
+    return watchUserCustomMinecraft(user.uid, setCustomMc);
+  }, [user]);
+
+  useEffect(() => {
     if (!module) return;
-    if (module.type === "shortcut" || module.type === "minecraft") {
+    if (
+      module.type === "shortcut" ||
+      module.type === "minecraft" ||
+      module.type === "custom-minecraft"
+    ) {
       setStateLoaded(true);
       setLocal(null);
       return;
@@ -262,7 +273,7 @@ export function ModuleDetailPage() {
               )}
 
               <div className="mt-6">
-                {module.type === "minecraft" ? (
+                {module.type === "minecraft" || module.type === "custom-minecraft" ? (
                   <MinecraftActionPanel module={module} themePrimary={themePrimary} />
                 ) : action.kind === "installing" ? (
                   <ProgressDetailed progress={action.progress} />
@@ -623,11 +634,19 @@ function ErrorBanner({ message, onDismiss }: { message: string; onDismiss: () =>
   );
 }
 
+/** Either flavour of Minecraft module — admin-published `MinecraftModule`
+ *  or per-user `CustomMinecraftModule`. Both share the same launch
+ *  contract (nativeMcVersion / nativeLoader / nativeLoaderVersion /
+ *  maxRamMb), so the panel treats them uniformly. */
+type AnyMinecraftModule =
+  | import("@/types/module").MinecraftModule
+  | import("@/types/module").CustomMinecraftModule;
+
 function MinecraftActionPanel({
   module,
   themePrimary,
 }: {
-  module: import("@/types/module").MinecraftModule;
+  module: AnyMinecraftModule;
   themePrimary?: string;
 }) {
   // Single backend: the in-house native chain. Prism support was removed
@@ -650,7 +669,7 @@ function MinecraftActionPanel({
 function NativeMinecraftActionPanel({
   module,
 }: {
-  module: import("@/types/module").MinecraftModule;
+  module: AnyMinecraftModule;
   themePrimary?: string;
 }) {
   const navigate = useUIStore((s) => s.navigate);

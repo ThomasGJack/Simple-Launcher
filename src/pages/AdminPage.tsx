@@ -167,7 +167,7 @@ export function AdminPage() {
   };
 
   const startEdit = (m: LauncherModule) => {
-    if (m.type === "shortcut") return; // shortcuts are user-side
+    if (m.type === "shortcut" || m.type === "custom-minecraft") return; // user-side, never published
     const page = m.page;
     const v1Sections = page && !isModulePageV2(page) ? page.sections : undefined;
     const bg = page?.background && "particles" in page.background ? page.background.particles : undefined;

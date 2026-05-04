@@ -62,7 +62,10 @@ export function ModuleCard({
   const openDetail = () => navigate({ name: "module", moduleId: module.id });
 
   useEffect(() => {
-    if (module.type === "shortcut") {
+    if (module.type === "shortcut" || module.type === "custom-minecraft") {
+      // Custom MC instances don't go through the hosted-module install
+      // pipeline (no `module-version` on disk to compare). The Module
+      // detail page handles the MC-specific install + launch flow.
       setStateLoaded(true);
       return;
     }
@@ -95,7 +98,7 @@ export function ModuleCard({
     if (action.kind === "installing" || action.kind === "launching") return;
 
     // Minecraft modpacks: install flow is complex — open detail page
-    if (module.type === "minecraft") {
+    if (module.type === "minecraft" || module.type === "custom-minecraft") {
       openDetail();
       return;
     }
@@ -305,6 +308,15 @@ function SourceBadge({ module }: { module: LauncherModule }) {
     return (
       <Pill color="fuchsia">
         <Folder className="size-3" /> Local
+      </Pill>
+    );
+  }
+  if (module.type === "custom-minecraft") {
+    // User-created MC instance — same "private" flavor as a shortcut
+    // but flagged green to convey "this is your own modpack".
+    return (
+      <Pill color="emerald">
+        <Folder className="size-3" /> Mon MC
       </Pill>
     );
   }

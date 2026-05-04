@@ -52,9 +52,10 @@ export async function launchModule(module: LauncherModule): Promise<void> {
       executable: module.executable,
     });
   }
-  if (module.type === "minecraft") {
-    // Minecraft modules go through the dedicated native action panel in
-    // ModuleDetailPage (it calls `mc_native_launch` directly).
+  if (module.type === "minecraft" || module.type === "custom-minecraft") {
+    // Both flavours of Minecraft module go through the dedicated native
+    // action panel in ModuleDetailPage (it calls `mc_native_launch`
+    // directly). This top-level helper is only for non-MC entry points.
     throw new Error("Minecraft modules launch via the native action panel, not launchModule");
   }
   return invoke<void>("module_launch_shortcut", {
@@ -102,7 +103,9 @@ export type DerivedStatus =
 
 export function deriveStatus(module: LauncherModule, local: ModuleStateLocal | null): DerivedStatus {
   if (module.type === "shortcut") return { kind: "shortcut" };
-  if (module.type === "minecraft") return { kind: "minecraft" };
+  if (module.type === "minecraft" || module.type === "custom-minecraft") {
+    return { kind: "minecraft" };
+  }
   if (!local) return { kind: "not-installed" };
   if (local.version !== module.version) {
     return { kind: "update-available", localVersion: local.version, remoteVersion: module.version };

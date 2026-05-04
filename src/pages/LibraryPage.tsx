@@ -3,18 +3,29 @@ import { motion } from "framer-motion";
 import { Library as LibraryIcon, Loader2, Plus } from "lucide-react";
 import { ModuleCard } from "@/components/library/ModuleCard";
 import { ShortcutForm } from "@/components/library/ShortcutForm";
+import { CustomMinecraftForm } from "@/components/library/CustomMinecraftForm";
+import { AddGameTypePicker } from "@/components/library/AddGameTypePicker";
 import { useModules, useModulesPrimed } from "@/store/firebaseStores";
 import { watchUserShortcuts, type ShortcutModule } from "@/firebase/shortcuts";
+import { watchUserCustomMinecraft } from "@/firebase/customMinecraft";
 import { useAuthStore } from "@/store/auth";
 import { sounds } from "@/lib/sounds";
-import type { LauncherModule } from "@/types/module";
+import type { CustomMinecraftModule, LauncherModule } from "@/types/module";
 
 export function LibraryPage() {
   const user = useAuthStore((s) => s.user);
   const allModules = useModules();
   const modulesPrimed = useModulesPrimed();
   const [shortcuts, setShortcuts] = useState<ShortcutModule[] | null>(null);
-  const [editing, setEditing] = useState<{ kind: "new" } | { kind: "edit"; shortcut: ShortcutModule } | null>(null);
+  const [customMc, setCustomMc] = useState<CustomMinecraftModule[] | null>(null);
+  const [picker, setPicker] = useState<"closed" | "type" | "shortcut" | "custom-mc">(
+    "closed",
+  );
+  const [editing, setEditing] = useState<
+    | { kind: "shortcut"; shortcut: ShortcutModule }
+    | { kind: "custom-mc"; instance: CustomMinecraftModule }
+    | null
+  >(null);
 
   // Filter out legacy shortcuts that may still live under `/modules` —
   // those now belong under `/users/{uid}/shortcuts`. Memoised to avoid
@@ -27,18 +38,34 @@ export function LibraryPage() {
   useEffect(() => {
     if (!user) {
       setShortcuts([]);
+      setCustomMc([]);
       return;
     }
-    return watchUserShortcuts(user.uid, setShortcuts);
+    const unsubShortcuts = watchUserShortcuts(user.uid, setShortcuts);
+    const unsubCustomMc = watchUserCustomMinecraft(user.uid, setCustomMc);
+    return () => {
+      unsubShortcuts();
+      unsubCustomMc();
+    };
   }, [user]);
 
-  const loading = !modulesPrimed || shortcuts === null;
+  const loading = !modulesPrimed || shortcuts === null || customMc === null;
   const all: LauncherModule[] = [
+    ...(customMc ?? []),
     ...(shortcuts ?? []),
     ...hosted,
   ];
 
-  const ownedShortcutIds = new Set((shortcuts ?? []).map((s) => s.id));
+  // Sets keyed by id so the card edit button only shows up on the
+  // user's own creations (not on hosted admin-published modules).
+  const ownedShortcutIds = useMemo(
+    () => new Set((shortcuts ?? []).map((s) => s.id)),
+    [shortcuts],
+  );
+  const ownedCustomMcIds = useMemo(
+    () => new Set((customMc ?? []).map((c) => c.id)),
+    [customMc],
+  );
 
   return (
     <>
@@ -62,7 +89,7 @@ export function LibraryPage() {
           <button
             onClick={() => {
               sounds.click();
-              setEditing({ kind: "new" });
+              setPicker("type");
             }}
             onMouseEnter={() => sounds.hover()}
             className="no-drag inline-flex shrink-0 items-center gap-2 rounded-2xl bg-accent px-5 py-3 text-sm font-medium text-bg-base shadow-[0_0_24px_var(--color-accent-soft)] transition-shadow hover:shadow-[0_0_36px_var(--color-accent-glow)]"
@@ -79,12 +106,12 @@ export function LibraryPage() {
         ) : all.length === 0 ? (
           <div className="grid h-64 place-items-center">
             <button
-              onClick={() => setEditing({ kind: "new" })}
+              onClick={() => setPicker("type")}
               className="no-drag rounded-2xl glass p-10 text-center text-fg-muted transition-colors hover:bg-white/[0.06]"
             >
               <LibraryIcon className="mx-auto mb-3 size-10 text-fg-dim" strokeWidth={1.5} />
               <p>Bibliothèque vide.</p>
-              <p className="mt-1 text-xs text-accent">Clique pour ajouter ton premier raccourci.</p>
+              <p className="mt-1 text-xs text-accent">Clique pour ajouter ton premier jeu.</p>
             </button>
           </div>
         ) : (
@@ -94,16 +121,47 @@ export function LibraryPage() {
                 key={m.id}
                 module={m}
                 index={i}
-                onEdit={ownedShortcutIds.has(m.id) && m.type === "shortcut" ? () => setEditing({ kind: "edit", shortcut: m }) : undefined}
+                onEdit={
+                  ownedShortcutIds.has(m.id) && m.type === "shortcut"
+                    ? () => setEditing({ kind: "shortcut", shortcut: m })
+                    : ownedCustomMcIds.has(m.id) && m.type === "custom-minecraft"
+                      ? () => setEditing({ kind: "custom-mc", instance: m })
+                      : undefined
+                }
               />
             ))}
           </div>
         )}
       </div>
 
-      {editing && (
+      {/* Step 1: type picker */}
+      <AddGameTypePicker
+        open={picker === "type"}
+        onClose={() => setPicker("closed")}
+        onPickShortcut={() => setPicker("shortcut")}
+        onPickCustomMinecraft={() => setPicker("custom-mc")}
+      />
+
+      {/* Step 2a: shortcut form (creation) */}
+      {picker === "shortcut" && (
+        <ShortcutForm onClose={() => setPicker("closed")} />
+      )}
+
+      {/* Step 2b: custom MC form (creation) */}
+      {picker === "custom-mc" && (
+        <CustomMinecraftForm onClose={() => setPicker("closed")} />
+      )}
+
+      {/* Edit modes — opened from a card's Edit button */}
+      {editing?.kind === "shortcut" && (
         <ShortcutForm
-          initial={editing.kind === "edit" ? editing.shortcut : undefined}
+          initial={editing.shortcut}
+          onClose={() => setEditing(null)}
+        />
+      )}
+      {editing?.kind === "custom-mc" && (
+        <CustomMinecraftForm
+          initial={editing.instance}
           onClose={() => setEditing(null)}
         />
       )}

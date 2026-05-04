@@ -25,6 +25,14 @@ service cloud.firestore {
         allow read, write: if request.auth != null && request.auth.uid == uid;
       }
 
+      // Personal custom Minecraft instances — private to the owner. Same
+      // shape as the public Minecraft module type but stored per-user so
+      // the user can spin up their own modpacks (vanilla + loader + their
+      // own mods folder) without admin involvement.
+      match /customMinecraft/{instanceId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+
       // Per-user achievements — private to the owner (write) but readable
       // by any authed user so the public profile page can display badges.
       match /achievements/{achievementId} {
@@ -47,6 +55,28 @@ service cloud.firestore {
         allow update: if request.auth != null && request.auth.uid == uid;
         allow delete: if false;
       }
+
+      // Daily launch aggregates — used by the streak + weekend-warrior
+      // achievements. One doc per "YYYY-MM-DD" with cumulative launches
+      // + totalMs. Owner-only since the data trivially correlates with
+      // the user's playtime. Read is open to any authed user so a
+      // friend's PublicProfilePage can show their streak without
+      // requiring an extra rule round-trip.
+      match /launchDays/{date} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+
+    // Global achievement rarity counters. Single doc at
+    // `stats/achievements` with `{ counts: { [id]: number }, totalUsers
+    // : number }`. Every authed launcher increments one counter per
+    // unlock + bumps `totalUsers` once per uid per boot — no PII, just
+    // running totals. Read open to all authed users so the gallery can
+    // show "X % des joueurs l'ont".
+    match /stats/{statId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
     }
 
     // Crews — Discord-like text-only clans. Admin-only writes for crew/
@@ -66,23 +96,6 @@ service cloud.firestore {
           // No edits/deletes for now — keeps the chat audit trail honest.
           allow update, delete: if false;
         }
-      }
-    }
-
-    // Coordinated game sessions — any authed user can create their own,
-    // edit only their own, RSVP to anyone's. Host is locked to creator.
-    match /sessions/{sessionId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null &&
-        request.resource.data.hostUid == request.auth.uid;
-      allow update, delete: if request.auth != null &&
-        resource.data.hostUid == request.auth.uid;
-
-      // RSVPs — per-user doc, only the user can write theirs.
-      match /rsvps/{uid} {
-        allow read: if request.auth != null;
-        allow create, update, delete:
-          if request.auth != null && request.auth.uid == uid;
       }
     }
 

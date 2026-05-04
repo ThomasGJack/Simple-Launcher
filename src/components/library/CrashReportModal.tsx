@@ -19,7 +19,7 @@ import { useAuthStore } from "@/store/auth";
 import { achievementFlags } from "@/lib/achievementFlags";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
-import type { MinecraftModule } from "@/types/module";
+import type { CustomMinecraftModule, MinecraftModule } from "@/types/module";
 
 /**
  * Modal triggered automatically when a native MC launch exits with a
@@ -40,7 +40,7 @@ export function CrashReportModal({
 }: {
   open: boolean;
   onClose: () => void;
-  module: MinecraftModule;
+  module: MinecraftModule | CustomMinecraftModule;
   exitCode: number | null;
   /** Last lines from the launch panel's in-memory console — passed in
    *  rather than re-read from Tauri because this is the only chance to

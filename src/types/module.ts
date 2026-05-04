@@ -1,4 +1,4 @@
-export type ModuleType = "hosted" | "shortcut";
+export type ModuleType = "hosted" | "shortcut" | "minecraft" | "custom-minecraft";
 
 export type ModuleStatus =
   | "not-installed"
@@ -154,4 +154,34 @@ export type MinecraftModule = BaseModule & {
   nativeModpack?: NativeModpackSource;
 };
 
-export type LauncherModule = HostedModule | ShortcutModule | MinecraftModule;
+/**
+ * Personal/private Minecraft instance the user creates from the
+ * Library page (vs `MinecraftModule` which is admin-published and
+ * shared across the launcher community).
+ *
+ * Same shape as `MinecraftModule` minus the publishing fields, plus a
+ * stable `ownerUid` so Firestore rules can gate writes. Stored at
+ * `users/{uid}/customMinecraft/{id}` and merged with shortcuts in the
+ * Library list. Launch path is identical to hosted MC modules — the
+ * native `mc_native_launch` chain only cares about the `instanceId`.
+ */
+export type CustomMinecraftModule = BaseModule & {
+  type: "custom-minecraft";
+  ownerUid: string;
+  /** Vanilla MC version, e.g. "1.20.1". Required. */
+  nativeMcVersion: string;
+  /** Loader pick. */
+  nativeLoader: "vanilla" | "fabric" | "forge" | "neoforge";
+  /** Loader version (ignored for vanilla). */
+  nativeLoaderVersion?: string;
+  /** Optional Modrinth modpack overlay. */
+  nativeModpack?: NativeModpackSource;
+  /** Heap allocation in MiB. Defaults to 4096 in `mc_launch.rs`. */
+  maxRamMb?: number;
+};
+
+export type LauncherModule =
+  | HostedModule
+  | ShortcutModule
+  | MinecraftModule
+  | CustomMinecraftModule;
