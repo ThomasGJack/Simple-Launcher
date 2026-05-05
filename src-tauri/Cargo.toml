@@ -21,11 +21,12 @@ tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-notification = "2"
-# Enforces a single running instance of Simple Launcher : when the user
-# re-launches the .exe (double-click while the app is already in tray /
-# minimized / running), the second invocation forwards its argv to the
-# first one and exits, instead of spawning a duplicate process.
-tauri-plugin-single-instance = "2"
+# Single-instance enforcement is now done manually via Win32 named
+# mutex + named event (see `single_instance.rs`). The official
+# `tauri-plugin-single-instance` plugin used loopback TCP for argv
+# forwarding which failed in some setups (corporate AV, multi-NIC,
+# UAC elevation differences) — the manual implementation only relies
+# on kernel objects and works regardless of those edge cases.
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "io-util", "net", "macros", "sync", "time", "fs", "process"] }
@@ -58,4 +59,16 @@ sysinfo = "0.32"
 # `RegisterHotKey` on Windows so it triggers even when the game has
 # focus. See `overlay.rs`.
 tauri-plugin-global-shortcut = "2"
+# Win32 bindings — used by `single_instance.rs` to enforce only one
+# instance of Simple Launcher running at a time via a kernel-level
+# named mutex + a named event for cross-process "show window" IPC.
+# `tauri-plugin-single-instance` 2.4.2 was unreliable in some setups
+# (UAC elevation difference, antivirus locking the IPC pipe) — the
+# manual implementation works regardless of those edge cases.
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_Threading",
+] }
 

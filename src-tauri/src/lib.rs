@@ -18,58 +18,41 @@ mod modules;
 mod oauth;
 mod overlay;
 mod rcon;
+#[cfg(windows)]
+mod single_instance;
 mod tray;
 
 use tauri::{Emitter, Manager};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
-        // Single-instance guard: if a second `simple-launcher.exe` is
-        // launched (double-click while we're already running in the
-        // tray, or someone clicks the start-menu shortcut twice), the
-        // second process forwards its argv here and exits. We use the
-        // callback to surface the existing main window — show / unminimize
-        // / focus / always-on-top burst — so the user gets "I clicked
-        // launch and it came back" UX instead of a 2nd ghost window
-        // or "nothing happened".
-        //
-        // IMPORTANT — this plugin MUST be the first one called in the
-        // Builder chain. Tauri runs the second-process detection during
-        // plugin setup ; if another plugin runs first, the second exe
-        // can launch a partial instance before being killed. Don't
-        // reorder.
-        .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
+    // ── Single-instance guard (Windows only) ──────────────────────
+    //
+    // BEFORE any Tauri init : try to acquire a kernel mutex. If
+    // another simple-launcher.exe already holds it, signal it to
+    // surface its window and exit this process immediately.
+    //
+    // We deliberately do this before `tauri::Builder::default()` —
+    // any work after we know we're a duplicate is wasted.
+    #[cfg(windows)]
+    let _instance_lock = match single_instance::try_acquire_lock() {
+        Ok(handle) => {
+            // Leak the handle into a Box so it lives for the full
+            // process lifetime (Windows releases the mutex when the
+            // owning process exits, regardless of leak / drop).
+            Box::leak(Box::new(handle))
+        }
+        Err(()) => {
             eprintln!(
-                "[single-instance] second invocation forwarded — argv={:?} cwd={:?}",
-                argv, cwd,
+                "[single-instance] another Simple Launcher is already running — \
+                 signaling it and exiting."
             );
-            // Try to surface the main window so the user sees the
-            // existing app respond instead of "nothing happened".
-            if let Some(window) = app.get_webview_window("main") {
-                // unminimize first — if the window was minimized to
-                // tray, show() alone would only flash it in the
-                // taskbar without bringing it foreground.
-                let _ = window.unminimize();
-                let _ = window.show();
-                // The always-on-top burst is a Windows-only trick to
-                // bypass the foreground-lock that prevents a non-
-                // foreground process from stealing focus. We set it
-                // true momentarily, focus the window, then unset.
-                let _ = window.set_always_on_top(true);
-                let _ = window.set_focus();
-                let _ = window.set_always_on_top(false);
-                // Frontend listens for `tray-reopen` to know "the user
-                // closed me to the tray then came back" — drives the
-                // tray-discovered achievement (#39).
-                let _ = app.emit("tray-reopen", ());
-            } else {
-                eprintln!(
-                    "[single-instance] callback fired but 'main' window missing — \
-                     app likely shutting down. Second invocation will exit silently."
-                );
-            }
-        }))
+            single_instance::signal_show();
+            std::process::exit(0);
+        }
+    };
+
+    tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
@@ -113,6 +96,40 @@ pub fn run() {
             // headless Windows / CI). Just log and continue.
             if let Err(err) = tray::install(app.handle()) {
                 eprintln!("[tray] install failed: {}", err);
+            }
+            // Listen for "second instance was blocked" events from
+            // single_instance.rs — when a 2nd simple-launcher.exe
+            // tries to launch and signals our event, surface the
+            // main window so the user sees the existing app respond.
+            #[cfg(windows)]
+            {
+                let app_handle = app.handle().clone();
+                single_instance::install_show_listener(move || {
+                    eprintln!(
+                        "[single-instance] second invocation signaled — surfacing main window"
+                    );
+                    if let Some(window) = app_handle.get_webview_window("main") {
+                        // Order matters : unminimize → show → AOT
+                        // burst → focus → AOT off. The always-on-top
+                        // burst is a Windows trick to bypass the
+                        // foreground-lock that prevents a non-
+                        // foreground process from stealing focus.
+                        let _ = window.unminimize();
+                        let _ = window.show();
+                        let _ = window.set_always_on_top(true);
+                        let _ = window.set_focus();
+                        let _ = window.set_always_on_top(false);
+                        // Drive the tray-discovered achievement (#39)
+                        // and any other UI hooks that listen for
+                        // "user came back from tray".
+                        let _ = app_handle.emit("tray-reopen", ());
+                    } else {
+                        eprintln!(
+                            "[single-instance] listener fired but 'main' window missing — \
+                             app shutting down ?"
+                        );
+                    }
+                });
             }
             Ok(())
         })
