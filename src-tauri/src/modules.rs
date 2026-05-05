@@ -62,6 +62,35 @@ impl LaunchTrackerHandle {
         let mut running = self.inner.running.lock().await;
         running.remove(module_id);
     }
+
+    /// True if this module is currently flagged as running. Used by
+    /// the launch commands to refuse double-launch — clicking "Play"
+    /// twice on the same game spawns 2 processes which usually
+    /// causes save-file corruption (Minecraft) or licensing errors
+    /// (most modern games detect their own running instance and
+    /// refuse to start, but with a confusing error popup).
+    pub async fn is_running(&self, module_id: &str) -> bool {
+        let running = self.inner.running.lock().await;
+        running.contains(module_id)
+    }
+
+    /// Atomic "reserve if not present" : returns `true` if the slot
+    /// was free (and we just claimed it), `false` if the module was
+    /// already running. Caller is responsible for calling
+    /// `mark_stopped` when the process actually exits OR if the
+    /// launch fails before reaching the spawn (use a Drop-guard).
+    ///
+    /// Atomicity matters because the `is_running` + `mark_running`
+    /// sequence has a TOCTOU window where two near-simultaneous
+    /// clicks could both pass the check and both spawn processes.
+    pub async fn try_mark_running(&self, module_id: &str) -> bool {
+        let mut running = self.inner.running.lock().await;
+        if running.contains(module_id) {
+            return false;
+        }
+        running.insert(module_id.to_string());
+        true
+    }
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -276,17 +305,38 @@ async fn spawn_tracked(
     module_name: &str,
     cmd: &mut Command,
 ) -> Result<(), String> {
-    let mut child = cmd
-        .kill_on_drop(false)
-        .spawn()
-        .map_err(|e| format!("spawn: {}", e))?;
-
-    let started_at = now_ms();
-
+    // ── Refuse-double-launch guard ────────────────────────────────
+    //
+    // Reserve the module_id in the tracker BEFORE spawning. If it's
+    // already there, another instance of this module is running —
+    // refuse this launch and surface a clear message to the frontend.
+    // Doing the check + insert atomically under the same lock avoids
+    // a TOCTOU window where two near-simultaneous clicks could both
+    // pass the check.
     {
         let mut running = tracker.inner.running.lock().await;
+        if running.contains(module_id) {
+            return Err(format!(
+                "{} est déjà lancé. Ferme l'instance existante avant d'en relancer une autre.",
+                module_name,
+            ));
+        }
         running.insert(module_id.to_string());
     }
+
+    // From here on, if the spawn fails we MUST remove the module
+    // from `running` — otherwise a failed launch would block all
+    // future launches of the same module until the launcher restart.
+    let mut child = match cmd.kill_on_drop(false).spawn() {
+        Ok(c) => c,
+        Err(e) => {
+            let mut running = tracker.inner.running.lock().await;
+            running.remove(module_id);
+            return Err(format!("spawn: {}", e));
+        }
+    };
+
+    let started_at = now_ms();
     let _ = app.emit(
         "module-launched",
         LaunchEvent {

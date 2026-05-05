@@ -29,7 +29,7 @@ use crate::mc_java::mc_java_resolve;
 use crate::mc_vanilla::{
     instance_natives_dir, libraries_dir, maven_path, mc_root, versions_dir,
 };
-use crate::modules::LaunchTracker;
+use crate::modules::{self, LaunchTracker};
 
 // ─── Cross-launch tracking events ─────────────────────────────────────
 //
@@ -47,6 +47,47 @@ struct ModuleLaunchEvent<'a> {
     module_name: &'a str,
     #[serde(rename = "startedAt")]
     started_at: u128,
+}
+
+/// RAII guard that releases a reserved slot in the LaunchTracker if
+/// the launch fails before reaching the JVM spawn. Without this, a
+/// failed prep step (bad java install, manifest download error,
+/// missing asset, …) would leak the reservation and prevent the
+/// user from retrying until the launcher restarts.
+///
+/// Usage : create armed at the start of `launch()` right after the
+/// reservation, then call `.disarm()` once the JVM `child` is alive
+/// (the wait-task takes over the slot's lifecycle from there).
+struct LaunchSlot {
+    handle: modules::LaunchTrackerHandle,
+    instance_id: String,
+    armed: bool,
+}
+
+impl LaunchSlot {
+    fn armed(handle: modules::LaunchTrackerHandle, instance_id: String) -> Self {
+        Self { handle, instance_id, armed: true }
+    }
+    fn disarm(&mut self) {
+        self.armed = false;
+    }
+}
+
+impl Drop for LaunchSlot {
+    fn drop(&mut self) {
+        if self.armed {
+            // Tokio's Mutex doesn't support blocking lock from Drop —
+            // spawn a fire-and-forget task to release the slot
+            // asynchronously. Best-effort : if the executor is
+            // shutting down (whole launcher quitting), the spawn
+            // itself fails and Windows reclaims everything anyway.
+            let h = self.handle.clone();
+            let id = self.instance_id.clone();
+            tokio::spawn(async move {
+                h.mark_stopped(&id).await;
+            });
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -502,6 +543,35 @@ pub async fn launch<R: Runtime>(
     discord: State<'_, DiscordRpc>,
     opts: LaunchOptions,
 ) -> Result<(), String> {
+    // ── Refuse-double-launch guard ────────────────────────────────
+    //
+    // Reserve the instance slot in the shared LaunchTracker via the
+    // public `try_mark_running` helper. Returns Err if the same
+    // instance_id is already running ; the check + insert is atomic
+    // under the tracker's mutex so two near-simultaneous clicks
+    // can't both pass.
+    let tracker_handle = tracker.handle();
+    if !tracker_handle.try_mark_running(&opts.instance_id).await {
+        let display = if opts.module_name.trim().is_empty() {
+            opts.instance_id.clone()
+        } else {
+            opts.module_name.clone()
+        };
+        return Err(format!(
+            "{} est déjà lancé. Ferme l'instance existante avant d'en relancer une autre.",
+            display,
+        ));
+    }
+
+    // The reservation is now active. We use a Drop-guard so that
+    // ANY early `?` error propagation below auto-releases the slot
+    // (otherwise a failed prep step — bad java install, manifest
+    // download error, etc. — would block the user from retrying
+    // until launcher restart). On the happy path we `.disarm()` the
+    // guard right after the JVM spawn succeeds — at that point the
+    // wait-task takes over and will mark_stopped on process exit.
+    let mut launch_slot = LaunchSlot::armed(tracker_handle.clone(), opts.instance_id.clone());
+
     // Diagnostic: surface what we received from the frontend so a
     // misconfigured `serverAddress` (None / empty / malformed) is easy
     // to spot in the launch console.
@@ -981,6 +1051,13 @@ pub async fn launch<R: Runtime>(
         .spawn()
         .map_err(|e| format!("Spawn javaw échoué : {}", e))?;
 
+    // JVM is alive — disarm the LaunchSlot guard. From now on, the
+    // wait-task spawned below owns the slot's lifecycle and will
+    // call mark_stopped when the process exits. If the function
+    // returned an error before this point, the guard's Drop would
+    // have auto-released the reservation.
+    launch_slot.disarm();
+
     // ── Cross-launch tracking ─────────────────────────────────────
     //
     // Wire this MC instance into the shared `LaunchTracker` + emit
@@ -998,8 +1075,9 @@ pub async fn launch<R: Runtime>(
         opts.module_name.clone()
     };
 
-    let tracker_handle = tracker.handle();
-    tracker_handle.mark_running(&opts.instance_id).await;
+    // tracker_handle was declared at the top of launch() during the
+    // refuse-double-launch reservation. The slot is already marked
+    // running — no second mark_running needed here.
     let _ = app.emit(
         "module-launched",
         ModuleLaunchEvent {
