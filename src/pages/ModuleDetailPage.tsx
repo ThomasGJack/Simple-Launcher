@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Play, Download, RefreshCw, Trash2, Folder, Loader2, AlertTriangle, Star, CheckCircle2, KeyRound, Archive } from "lucide-react";
+import { ArrowLeft, Play, Download, RefreshCw, Trash2, Folder, Loader2, AlertTriangle, Star, CheckCircle2, KeyRound, Archive, Square } from "lucide-react";
+import { listen } from "@tauri-apps/api/event";
+import type { ModuleLaunchEvent, ModuleExitEvent } from "@/lib/modules";
 import { MinecraftBackupsModal } from "@/components/library/MinecraftBackupsModal";
 import { CrashReportModal } from "@/components/library/CrashReportModal";
 
@@ -51,6 +53,12 @@ type Action =
   | { kind: "idle" }
   | { kind: "installing"; progress?: ModuleProgress }
   | { kind: "launching" }
+  /** The module is currently running (a process spawned by us is
+   *  alive). Set when a `module-launched` event for our moduleId
+   *  fires ; cleared when `module-exited` fires. While in this
+   *  state the primary button is disabled with "EN COURS" label
+   *  so a 2nd click can't double-launch the same game. */
+  | { kind: "running" }
   | { kind: "error"; message: string };
 
 export function ModuleDetailPage() {
@@ -104,6 +112,34 @@ export function ModuleDetailPage() {
 
   useEffect(() => () => cleanupRef.current?.(), []);
 
+  // Subscribe to launch / exit events filtered by THIS module's id —
+  // when the user clicks "Lancer" the launch flow ends quickly (the
+  // process is detached from the launcher), but the game keeps
+  // running in the background. Without this listener the primary
+  // button would revert to "JOUER" / "INSTALLER" after 1.4 s and
+  // the user might re-click thinking nothing happened — which would
+  // either start a 2nd instance (now blocked by the LaunchTracker
+  // guard) or trigger a confusing "déjà lancé" error. Tracking the
+  // running state explicitly lets us show "EN COURS" disabled
+  // throughout the session.
+  useEffect(() => {
+    if (!moduleId) return;
+    const launchPromise = listen<ModuleLaunchEvent>("module-launched", (event) => {
+      if (event.payload.moduleId === moduleId) {
+        setAction({ kind: "running" });
+      }
+    });
+    const exitPromise = listen<ModuleExitEvent>("module-exited", (event) => {
+      if (event.payload.moduleId === moduleId) {
+        setAction({ kind: "idle" });
+      }
+    });
+    return () => {
+      launchPromise.then((u) => u()).catch(() => {});
+      exitPromise.then((u) => u()).catch(() => {});
+    };
+  }, [moduleId]);
+
   const pageThemeFontDisplay = module?.page?.theme?.fontDisplay;
   const pageThemeFontDisplayUrl = isModulePageV2(module?.page) ? module?.page?.theme?.fontDisplayUrl : undefined;
   useEffect(() => {
@@ -150,7 +186,17 @@ export function ModuleDetailPage() {
   const heroIsBlock = migratedPage?.blocks[0]?.type === "hero-parallax";
 
   const handlePrimary = async () => {
-    if (action.kind === "installing" || action.kind === "launching") return;
+    if (
+      action.kind === "installing" ||
+      action.kind === "launching" ||
+      action.kind === "running"
+    ) {
+      // No-op clicks while a launch / install / running game holds
+      // the slot. The button is also visually disabled in those
+      // states so the user shouldn't actually be able to trigger
+      // this — defensive belt-and-suspenders.
+      return;
+    }
     if (status.kind === "shortcut" || status.kind === "installed") {
       setAction({ kind: "launching" });
       sounds.launch();
@@ -161,7 +207,10 @@ export function ModuleDetailPage() {
         setAction({ kind: "error", message: e instanceof Error ? e.message : String(e) });
         return;
       }
-      setTimeout(() => setAction({ kind: "idle" }), 1400);
+      // Don't flip back to idle here — the `module-launched` event
+      // listener (effect above) will set state to 'running' as soon
+      // as the spawn fires. State only goes back to idle when the
+      // matching `module-exited` event lands.
       return;
     }
 
@@ -533,6 +582,7 @@ function PrimaryButton({
   style?: "neon-pulse" | "solid" | "outline" | "ghost";
 }) {
   const launching = action.kind === "launching";
+  const running = action.kind === "running";
   let label = customLabel ?? "JOUER";
   let Icon = Play;
 
@@ -547,8 +597,19 @@ function PrimaryButton({
       break;
     case "installed":
     case "shortcut":
-      label = launching ? "LANCEMENT…" : (customLabel ?? "JOUER");
-      Icon = Play;
+      if (running) {
+        // Game is currently running — disable the button + change
+        // label so the user knows clicking does nothing. Forces them
+        // to close the game window first.
+        label = "EN COURS";
+        Icon = Square;
+      } else if (launching) {
+        label = "LANCEMENT…";
+        Icon = Play;
+      } else {
+        label = customLabel ?? "JOUER";
+        Icon = Play;
+      }
       break;
   }
   const scale = sizeScale ?? 1;
@@ -558,32 +619,51 @@ function PrimaryButton({
     ? `linear-gradient(90deg, ${themePrimary}, ${themePrimary}dd, ${themePrimary})`
     : undefined;
   const shadow = themePrimary ? `0 0 32px ${themePrimary}80` : undefined;
+  const disabled = launching || running;
 
   return (
     <motion.button
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.97 }}
+      whileHover={disabled ? undefined : { scale: 1.02 }}
+      whileTap={disabled ? undefined : { scale: 0.97 }}
       onClick={onClick}
-      disabled={launching}
+      disabled={disabled}
+      title={running ? "Le jeu tourne déjà — ferme-le pour relancer" : undefined}
       className={cn(
         "no-drag group relative inline-flex items-center gap-3 overflow-hidden rounded-2xl px-12 py-4 font-display text-xl tracking-[0.18em] text-bg-base",
         "shadow-[0_0_32px_var(--color-accent-glow)] ring-1 ring-white/30",
         "disabled:cursor-not-allowed disabled:opacity-60",
       )}
       style={
-        themePrimary
-          ? { background: bg, boxShadow: shadow, transform: scale !== 1 ? `scale(${scale})` : undefined }
-          : {
-              background: "linear-gradient(90deg, var(--color-accent), #4ed6ff, var(--color-accent))",
-              backgroundSize: "200% 100%",
-              animation: "shimmer 4s linear infinite, glow-pulse 2.4s ease-in-out infinite",
+        running
+          ? {
+              // Running state : neutral grey gradient, no shimmer, no
+              // glow — visually says "this is locked, not clickable".
+              background: "linear-gradient(90deg, #2a3441, #3a4554, #2a3441)",
+              boxShadow: "0 0 16px rgba(74,222,128,0.18)",
               transform: scale !== 1 ? `scale(${scale})` : undefined,
+              color: "#cbd5e1",
             }
+          : themePrimary
+            ? { background: bg, boxShadow: shadow, transform: scale !== 1 ? `scale(${scale})` : undefined }
+            : {
+                background: "linear-gradient(90deg, var(--color-accent), #4ed6ff, var(--color-accent))",
+                backgroundSize: "200% 100%",
+                animation: "shimmer 4s linear infinite, glow-pulse 2.4s ease-in-out infinite",
+                transform: scale !== 1 ? `scale(${scale})` : undefined,
+              }
       }
     >
-      <Icon className="size-5 fill-bg-base" strokeWidth={0} />
+      <Icon
+        className={cn("size-5", running ? "" : "fill-bg-base")}
+        strokeWidth={running ? 2 : 0}
+      />
       <span>{label}</span>
-      <span className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent group-hover:translate-x-full transition-transform duration-700" />
+      {running && (
+        <span className="ml-1 inline-flex size-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(74,222,128,0.8)]" />
+      )}
+      {!running && (
+        <span className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent group-hover:translate-x-full transition-transform duration-700" />
+      )}
     </motion.button>
   );
 }
@@ -879,8 +959,23 @@ function NativeMinecraftActionPanel({
       setPhase("running");
     } catch (err) {
       sounds.error();
-      setError(err instanceof Error ? err.message : String(err));
-      setPhase("error");
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+      // Detect "already running" : the LaunchTracker guard returns
+      // a message containing "déjà lancé". In that case the game is
+      // alive and we should stay in "running" mode (the original
+      // process is still going) rather than flipping to "error"
+      // which would swap the Jouer button back to Installer and
+      // confuse the user. For genuine launch failures (java not
+      // installed, asset corrupt, …) we revert to "ready" — the
+      // install is still good, the user just needs to fix the
+      // underlying issue. Never reset to "ready-to-install" or
+      // "error" from this catch — install state is unchanged.
+      if (message.toLowerCase().includes("déjà lancé")) {
+        setPhase("running");
+      } else {
+        setPhase("ready");
+      }
     }
   };
 
@@ -965,7 +1060,7 @@ function NativeMinecraftActionPanel({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        {phase === "ready-to-install" || phase === "error" ? (
+        {phase === "ready-to-install" ? (
           <button
             type="button"
             onClick={handleInstall}
@@ -985,17 +1080,40 @@ function NativeMinecraftActionPanel({
           <button
             type="button"
             onClick={handleLaunch}
-            disabled={!selectedUuid || phase === "launching"}
+            // Disable while running OR launching — clicking Jouer
+            // again on a running game would hit the LaunchTracker
+            // guard and show the "déjà lancé" error then transition
+            // phase to "error", which would swap the button back to
+            // "Installer" (very confusing UX). Keep the button
+            // visible-but-disabled with an explicit "EN COURS"
+            // label so the user knows the game is alive.
+            disabled={
+              !selectedUuid || phase === "launching" || phase === "running"
+            }
+            title={
+              phase === "running"
+                ? "Le jeu tourne déjà — ferme-le pour relancer."
+                : undefined
+            }
             className={cn(
               "inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-medium",
-              "bg-emerald-400/15 text-emerald-300 ring-1 ring-emerald-400/30",
-              "hover:bg-emerald-400/25 hover:shadow-[0_0_18px_rgba(74,222,128,0.3)]",
-              "disabled:opacity-50 disabled:cursor-not-allowed",
+              phase === "running"
+                ? "bg-emerald-500/10 text-emerald-300/90 ring-1 ring-emerald-400/40 cursor-not-allowed"
+                : "bg-emerald-400/15 text-emerald-300 ring-1 ring-emerald-400/30 hover:bg-emerald-400/25 hover:shadow-[0_0_18px_rgba(74,222,128,0.3)]",
+              "disabled:opacity-90",
             )}
           >
             {phase === "launching" ? (
               <>
                 <Loader2 className="size-4 animate-spin" /> Lancement…
+              </>
+            ) : phase === "running" ? (
+              <>
+                <span className="relative flex size-2.5 shrink-0">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/70" />
+                  <span className="relative inline-flex size-2.5 rounded-full bg-emerald-400" />
+                </span>
+                En cours
               </>
             ) : (
               <>
