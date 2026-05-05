@@ -18,6 +18,16 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.05.05] - 2026-05-05  · semver `26.505.0`
+
+
+### Ajouté
+
+- **Toasts in-game (Phase 2 de l'overlay)** ([src/components/overlay/ToastsApp.tsx](src/components/overlay/ToastsApp.tsx) + [toasts.html](toasts.html) + [src/toasts.tsx](src/toasts.tsx) + [src/lib/toasts.ts](src/lib/toasts.ts)) — 3e fenêtre Tauri transparente click-through always-on-top, positionnée automatiquement en bas-droit du moniteur primaire (DPI-aware). Affiche des notifications discrètes pendant que l'utilisateur joue, **sans intercepter les inputs** (`setIgnoreCursorEvents(true)` global). Trois types de toasts auto-détectés :
+  - **Ami passe en ligne** (transition offline → online via `lastSeen`)
+  - **Ami lance un jeu** (transition `currentActivity` null → set, pas de spam si l'ami switch entre 2 jeux)
+  - **Nouveau message** (diff sur `lastMessage.sentAt` par conversation, skip ses propres messages)
+  Stack max 5 toasts simultanés, lifetime 4.5 s par toast, slide-in depuis la droite + scale up via Framer Motion, son Soft Lofi (`messageReceived` ou `notification` selon le type). Settings → Overlay in-game → sous-section "Toasts in-game" : toggle master + 3 checkboxes individuelles par kind. Default tout ON pour découverte de la feature.
 ## [v26.05.04.2] - 2026-05-04  · semver `26.504.1`
 
 
