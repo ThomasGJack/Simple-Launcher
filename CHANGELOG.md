@@ -18,6 +18,16 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.05.05.2] - 2026-05-05  · semver `26.505.1`
+
+
+### Changé
+
+- **Single-instance guard durci** ([src-tauri/src/lib.rs](src-tauri/src/lib.rs)) — quand l'utilisateur double-clique le shortcut alors qu'une instance tourne déjà (en tray ou minimisée), le 2e exe forwarde son argv au 1er process et exit. Le callback côté process existant est maintenant plus robuste : ordre `unminimize → show` corrigé (l'inverse ne déminimisait pas), burst `set_always_on_top(true) → set_focus → set_always_on_top(false)` pour bypass le foreground-lock Windows qui empêche un process non-foreground de gagner le focus, gestion explicite du cas "main window destroyed" (app en cours de quit), et logging diagnostic. Garantit que la fenêtre existante revient bien au premier plan dans tous les cas.
+
+### Supprimé
+
+- **Force borderless windowed** ([src-tauri/src/overlay.rs](src-tauri/src/overlay.rs) + [src/lib/overlay.ts](src/lib/overlay.ts) + [src/pages/SettingsPage.tsx](src/pages/SettingsPage.tsx)) — l'implémentation Win32 SetWindowLong + SWP_FRAMECHANGED ne fonctionnait pas en pratique : les moteurs modernes (Unity, Unreal, GLFW, etc.) re-set leur style de fenêtre à chaque frame, donc le strip était immédiatement annulé. Code retiré complètement (~400 lignes + dep Rust `windows = "0.58"`) : commandes `overlay_force_borderless` / `overlay_force_borderless_pid`, helper Win32 `convert_to_borderless`, hook auto après chaque `module-launched`, toggle "Forcer auto borderless" dans Settings, bouton "Forcer borderless (jeu actif)", champ `pid` sur les events de launch. Remplacé par une note Settings : "L'overlay marche en mode borderless/fenêtré uniquement". À ré-explorer plus tard avec une approche externe (sub-process Borderless Gaming) ou DLL injection signée si demande réelle.
 ## [v26.05.05] - 2026-05-05  · semver `26.505.0`
 
 
