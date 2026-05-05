@@ -45,6 +45,25 @@
         "skipTaskbar": true,
         "visible": false,
         "focus": false
+      },
+      {
+        "label": "toasts",
+        "title": "Simple Launcher Toasts",
+        "url": "/toasts.html",
+        "width": 360,
+        "height": 520,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "center": false,
+        "resizable": false,
+        "fullscreen": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "focus": false,
+        "x": 100,
+        "y": 100
       }
     ],
     "security": {

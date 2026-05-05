@@ -56,6 +56,14 @@ import {
   showOverlay,
   unregisterOverlayHotkey,
 } from "@/lib/overlay";
+import {
+  getToastsEnabled,
+  getToastsKindEnabled,
+  setToastsEnabled,
+  setToastsKindEnabled,
+  TOAST_KIND_LABEL,
+  type ToastKind,
+} from "@/lib/toasts";
 
 export function SettingsPage() {
   const { soundsEnabled, toggleSounds } = useSettingsStore();
@@ -1334,6 +1342,9 @@ function OverlayCard() {
             </button>
           </div>
 
+          {/* Toasts in-game (Phase 2) */}
+          <ToastsSubSection />
+
           {error && (
             <div className="flex items-start gap-2 rounded-xl bg-danger/10 p-3 text-xs text-danger ring-1 ring-danger/30">
               <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
@@ -1343,5 +1354,86 @@ function OverlayCard() {
         </div>
       )}
     </motion.div>
+  );
+}
+
+/**
+ * Settings sub-section listing the toast event kinds the user wants
+ * to see in-game (friend online, friend launched, new message). Lives
+ * inside `OverlayCard` so it's hidden when the whole overlay feature
+ * is off — toasts are an extension of the overlay, not a standalone
+ * feature.
+ */
+function ToastsSubSection() {
+  const [enabled, setEnabledState] = useState<boolean>(() => getToastsEnabled());
+  const [kindsState, setKindsState] = useState<Record<ToastKind, boolean>>(() => ({
+    "friend-online": getToastsKindEnabled("friend-online"),
+    "friend-launched": getToastsKindEnabled("friend-launched"),
+    message: getToastsKindEnabled("message"),
+  }));
+
+  const toggleEnabled = () => {
+    sounds.click();
+    const next = !enabled;
+    setEnabledState(next);
+    setToastsEnabled(next);
+  };
+
+  const toggleKind = (kind: ToastKind) => {
+    sounds.click();
+    const next = !kindsState[kind];
+    setKindsState((prev) => ({ ...prev, [kind]: next }));
+    setToastsKindEnabled(kind, next);
+  };
+
+  return (
+    <div className="rounded-xl bg-bg-base/40 p-3 ring-1 ring-white/[0.04]">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div>
+          <div className="text-sm text-fg-primary">Toasts in-game</div>
+          <p className="text-[11px] text-fg-muted">
+            Petites notifications coin bas-droit qui apparaissent par-dessus le
+            jeu sans intercepter les clics. Auto-fade après 4&nbsp;s.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={toggleEnabled}
+          className={cn(
+            "relative h-5 w-9 shrink-0 rounded-full transition-colors",
+            enabled ? "bg-accent" : "bg-white/10",
+          )}
+        >
+          <motion.span
+            layout
+            className={cn(
+              "absolute top-0.5 size-4 rounded-full bg-white shadow",
+              enabled ? "right-0.5" : "left-0.5",
+            )}
+            transition={{ type: "spring", stiffness: 500, damping: 30 }}
+          />
+        </button>
+      </div>
+      {enabled && (
+        <div className="mt-2 grid grid-cols-1 gap-1.5">
+          {(["friend-online", "friend-launched", "message"] as ToastKind[]).map(
+            (kind) => (
+              <label
+                key={kind}
+                className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-xs text-fg-muted transition-colors hover:bg-white/[0.03]"
+              >
+                <input
+                  type="checkbox"
+                  checked={kindsState[kind]}
+                  onChange={() => toggleKind(kind)}
+                  className="size-3.5 accent-accent"
+                />
+                <span>{TOAST_KIND_LABEL[kind]}</span>
+              </label>
+            ),
+          )}
+        </div>
+      )}
+    </div>
   );
 }
