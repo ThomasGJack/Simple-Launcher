@@ -30,17 +30,44 @@ pub fn run() {
         // tray, or someone clicks the start-menu shortcut twice), the
         // second process forwards its argv here and exits. We use the
         // callback to surface the existing main window — show / unminimize
-        // / focus — so the user gets "I clicked launch and it came back"
-        // UX instead of a 2nd ghost window or "nothing happened".
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+        // / focus / always-on-top burst — so the user gets "I clicked
+        // launch and it came back" UX instead of a 2nd ghost window
+        // or "nothing happened".
+        //
+        // IMPORTANT — this plugin MUST be the first one called in the
+        // Builder chain. Tauri runs the second-process detection during
+        // plugin setup ; if another plugin runs first, the second exe
+        // can launch a partial instance before being killed. Don't
+        // reorder.
+        .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
+            eprintln!(
+                "[single-instance] second invocation forwarded — argv={:?} cwd={:?}",
+                argv, cwd,
+            );
+            // Try to surface the main window so the user sees the
+            // existing app respond instead of "nothing happened".
             if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
+                // unminimize first — if the window was minimized to
+                // tray, show() alone would only flash it in the
+                // taskbar without bringing it foreground.
                 let _ = window.unminimize();
+                let _ = window.show();
+                // The always-on-top burst is a Windows-only trick to
+                // bypass the foreground-lock that prevents a non-
+                // foreground process from stealing focus. We set it
+                // true momentarily, focus the window, then unset.
+                let _ = window.set_always_on_top(true);
                 let _ = window.set_focus();
+                let _ = window.set_always_on_top(false);
                 // Frontend listens for `tray-reopen` to know "the user
                 // closed me to the tray then came back" — drives the
                 // tray-discovered achievement (#39).
                 let _ = app.emit("tray-reopen", ());
+            } else {
+                eprintln!(
+                    "[single-instance] callback fired but 'main' window missing — \
+                     app likely shutting down. Second invocation will exit silently."
+                );
             }
         }))
         .plugin(tauri_plugin_opener::init())
