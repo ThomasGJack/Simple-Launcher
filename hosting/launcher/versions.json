@@ -1,5 +1,17 @@
 [
   {
+    "version": "26.505.3",
+    "displayVersion": "v26.05.05.4",
+    "notes": "### Corrigé\n\n- **Empêcher de lancer 2 fois le même jeu** ([src-tauri/src/modules.rs](src-tauri/src/modules.rs) + [src-tauri/src/mc_launch.rs](src-tauri/src/mc_launch.rs)) — avant, cliquer 2× sur \"Lancer\" sur le même module spawnait 2 processes simultanés (corruption potentielle des saves Minecraft, erreurs licensing confuses sur les jeux modernes, comportement imprévisible sur les shortcuts). Guard atomique au niveau `LaunchTracker` :\n  - **Nouvelle méthode** `LaunchTrackerHandle::try_mark_running(module_id) -> bool` qui fait check + insert sous le même mutex Tokio (zéro TOCTOU race possible).\n  - **modules.rs spawn_tracked** : reservation atomique avant le spawn ; cleanup explicite si `cmd.spawn()` lui-même échoue (sinon leak permanent du slot).\n  - **mc_launch.rs `launch()`** : `try_mark_running` au tout début + nouveau struct `LaunchSlot` RAII guard avec Drop qui release auto le slot si la fonction return `Err` avant le spawn JVM (download manifest échoué, java install KO, asset corruption…). `launch_slot.disarm()` après spawn réussi — la wait-task reprend le relais et `mark_stopped` à l'exit du process.\n  Message d'erreur clair côté UI : `<module> est déjà lancé. Ferme l'instance existante avant d'en relancer une autre.`",
+    "pub_date": "2026-05-05T23:04:16.918Z",
+    "platforms": {
+      "windows-x86_64": {
+        "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVReExlbkZGc0Y5eENCdjZ2M2JDL25xcjZ5NndIaFlzK2ZBMVZuaVoyelgxZ3lyOGsybi8wWmtYMVZ0OHBzUDdyTUNvTmJRYkZiUTJwdnF1cnRCdmtWcXZTOC95UlVIYXdjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc4MDIyMjU2CWZpbGU6U2ltcGxlIExhdW5jaGVyXzI2LjUwNS4zX3g2NC1zZXR1cC5leGUKYTIyRFJPc2FUT1ZUYmtsV3hjL3BBWHdWejVDWDVGRnVOSEl2WFdNY01JK1NuUHRRY0RLc2RkNHlYcDlaaHM0emx3TW8xMmNqQ1Z0dEgzakpxVVJQQ3c9PQo=",
+        "url": "https://simplelaunche.web.app/releases/26.505.3/Simple Launcher_26.505.3_x64-setup.exe"
+      }
+    }
+  },
+  {
     "version": "26.505.2",
     "displayVersion": "v26.05.05.3",
     "notes": "### Corrigé\n\n- **Empêcher le double-lancement de l'app (Single-instance manuel Win32)** ([src-tauri/src/single_instance.rs](src-tauri/src/single_instance.rs)) — `tauri-plugin-single-instance` v2.4.2 utilisait une socket TCP loopback pour forwarder les argv entre processes, ce qui échouait dans plusieurs configs (antivirus corporate qui bloque le bind loopback, multi-NIC avec firewall strict, différence d'élévation UAC, lancement simultané depuis 2 contextes). Résultat : 2 fenêtres Simple Launcher s'ouvraient au lieu d'une. Remplacé par une implémentation manuelle qui n'utilise QUE des kernel objects Win32 :\n  - **Mutex** `Global\\\\SimpleLauncher_SingleInstance_Mutex_v1` via `CreateMutexW` — le 1er process leak le handle (Windows libère auto à la mort du process). Le 2e process voit `ERROR_ALREADY_EXISTS`, ferme son duplicate, signale puis exit immédiatement.\n  - **Named event** `Global\\\\SimpleLauncher_ShowEvent_v1` via `CreateEventW` auto-reset — le 1er process spawn un thread qui `WaitForSingleObject(INFINITE)` en boucle. Le 2e process appelle `OpenEventW` + `SetEvent` pour réveiller le 1er, qui surface sa fenêtre (unminimize → show → burst always-on-top → focus → AOT off pour bypass le foreground-lock Windows).\n  Aucune dépendance réseau, atomique au niveau kernel, survit aux crashes. Dépendance `tauri-plugin-single-instance` retirée, `windows = \"0.58\"` ajoutée (features Win32_Foundation + Win32_Security + Win32_System_Threading).",

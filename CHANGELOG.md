@@ -18,6 +18,16 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.05.05.4] - 2026-05-05  · semver `26.505.3`
+
+
+### Corrigé
+
+- **Empêcher de lancer 2 fois le même jeu** ([src-tauri/src/modules.rs](src-tauri/src/modules.rs) + [src-tauri/src/mc_launch.rs](src-tauri/src/mc_launch.rs)) — avant, cliquer 2× sur "Lancer" sur le même module spawnait 2 processes simultanés (corruption potentielle des saves Minecraft, erreurs licensing confuses sur les jeux modernes, comportement imprévisible sur les shortcuts). Guard atomique au niveau `LaunchTracker` :
+  - **Nouvelle méthode** `LaunchTrackerHandle::try_mark_running(module_id) -> bool` qui fait check + insert sous le même mutex Tokio (zéro TOCTOU race possible).
+  - **modules.rs spawn_tracked** : reservation atomique avant le spawn ; cleanup explicite si `cmd.spawn()` lui-même échoue (sinon leak permanent du slot).
+  - **mc_launch.rs `launch()`** : `try_mark_running` au tout début + nouveau struct `LaunchSlot` RAII guard avec Drop qui release auto le slot si la fonction return `Err` avant le spawn JVM (download manifest échoué, java install KO, asset corruption…). `launch_slot.disarm()` après spawn réussi — la wait-task reprend le relais et `mark_stopped` à l'exit du process.
+  Message d'erreur clair côté UI : `<module> est déjà lancé. Ferme l'instance existante avant d'en relancer une autre.`
 ## [v26.05.05.3] - 2026-05-05  · semver `26.505.2`
 
 
