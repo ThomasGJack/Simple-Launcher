@@ -18,6 +18,15 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.05.05.3] - 2026-05-05  · semver `26.505.2`
+
+
+### Corrigé
+
+- **Empêcher le double-lancement de l'app (Single-instance manuel Win32)** ([src-tauri/src/single_instance.rs](src-tauri/src/single_instance.rs)) — `tauri-plugin-single-instance` v2.4.2 utilisait une socket TCP loopback pour forwarder les argv entre processes, ce qui échouait dans plusieurs configs (antivirus corporate qui bloque le bind loopback, multi-NIC avec firewall strict, différence d'élévation UAC, lancement simultané depuis 2 contextes). Résultat : 2 fenêtres Simple Launcher s'ouvraient au lieu d'une. Remplacé par une implémentation manuelle qui n'utilise QUE des kernel objects Win32 :
+  - **Mutex** `Global\\SimpleLauncher_SingleInstance_Mutex_v1` via `CreateMutexW` — le 1er process leak le handle (Windows libère auto à la mort du process). Le 2e process voit `ERROR_ALREADY_EXISTS`, ferme son duplicate, signale puis exit immédiatement.
+  - **Named event** `Global\\SimpleLauncher_ShowEvent_v1` via `CreateEventW` auto-reset — le 1er process spawn un thread qui `WaitForSingleObject(INFINITE)` en boucle. Le 2e process appelle `OpenEventW` + `SetEvent` pour réveiller le 1er, qui surface sa fenêtre (unminimize → show → burst always-on-top → focus → AOT off pour bypass le foreground-lock Windows).
+  Aucune dépendance réseau, atomique au niveau kernel, survit aux crashes. Dépendance `tauri-plugin-single-instance` retirée, `windows = "0.58"` ajoutée (features Win32_Foundation + Win32_Security + Win32_System_Threading).
 ## [v26.05.05.2] - 2026-05-05  · semver `26.505.1`
 
 
