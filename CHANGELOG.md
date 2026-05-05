@@ -18,6 +18,15 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.05.05.5] - 2026-05-05  · semver `26.505.4`
+
+
+### Corrigé
+
+- **Bouton "Jouer" devient "En cours" pendant l'exécution** ([src/pages/ModuleDetailPage.tsx](src/pages/ModuleDetailPage.tsx)) — avant : après avoir lancé un jeu, le bouton "Jouer" restait actif et re-cliquable, ce qui déclenchait l'erreur "déjà lancé" puis flippait l'UI sur "Installer" (donnant l'impression que le jeu n'était pas installé). Fix triple :
+  - **PrimaryButton (modules hosted/shortcut)** : nouvel état `running` synchronisé sur les events Tauri `module-launched` / `module-exited`. Bouton gris neutre avec dot vert pulsant + icône Square + disabled + tooltip "Le jeu tourne déjà". Suppression du `setTimeout(1400ms)` qui faisait revenir le bouton à "JOUER" prématurément.
+  - **MinecraftActionPanel `handleLaunch`** : si l'erreur contient "déjà lancé", on garde `phase="running"` (le jeu réel tourne, pas une erreur d'install). Pour les autres erreurs de launch (Java manquant, asset corrupt…), retour à `"ready"` au lieu de `"error"` — l'install est intacte, pas de raison de proposer une réinstallation.
+  - **Bouton "Jouer" MC** : `disabled` étendu à `phase === "running"`, label "En cours" + dot vert ping animé. Bouton "Installer" ne s'affiche plus pour `phase === "error"` (uniquement `"ready-to-install"`).
 ## [v26.05.05.4] - 2026-05-05  · semver `26.505.3`
 
 
