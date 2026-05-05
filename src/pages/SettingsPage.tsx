@@ -46,11 +46,8 @@ import { DiagnosticModal } from "@/components/settings/DiagnosticModal";
 import {
   DEFAULT_OVERLAY_HOTKEY,
   bootOverlayHotkey,
-  forceBorderlessForeground,
-  getAutoBorderless,
   getOverlayEnabled,
   getSavedOverlayHotkey,
-  setAutoBorderless,
   setOverlayEnabled,
   setOverlayHotkey,
   showOverlay,
@@ -1101,9 +1098,6 @@ function MinecraftAccountsCard() {
 function OverlayCard() {
   const [enabled, setEnabledState] = useState<boolean>(() => getOverlayEnabled());
   const [hotkey, setHotkeyState] = useState<string>(() => getSavedOverlayHotkey());
-  const [autoBorderless, setAutoBorderlessState] = useState<boolean>(() =>
-    getAutoBorderless(),
-  );
   const [recording, setRecording] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -1193,22 +1187,6 @@ function OverlayCard() {
     }
   };
 
-  const handleToggleBorderless = () => {
-    sounds.click();
-    const next = !autoBorderless;
-    setAutoBorderlessState(next);
-    setAutoBorderless(next);
-  };
-
-  const handleForceBorderless = async () => {
-    sounds.click();
-    try {
-      await forceBorderlessForeground();
-    } catch (err) {
-      setError(String(err));
-    }
-  };
-
   return (
     <motion.div whileHover={{ x: 4 }} className="no-drag rounded-2xl glass p-5">
       <div className="flex items-start gap-4">
@@ -1291,38 +1269,6 @@ function OverlayCard() {
             </p>
           </div>
 
-          {/* Auto-borderless toggle */}
-          <div className="flex items-start gap-3 rounded-xl bg-bg-base/40 p-3 ring-1 ring-white/[0.04]">
-            <Gamepad2 className="mt-0.5 size-4 shrink-0 text-fg-muted" />
-            <div className="flex-1 min-w-0">
-              <div className="text-sm text-fg-primary">
-                Forcer auto le borderless au lancement
-              </div>
-              <p className="mt-0.5 text-[11px] text-fg-muted">
-                Convertit les jeux en exclusive fullscreen → borderless windowed
-                pour que l'overlay puisse s'afficher dessus. Aucun risque
-                anti-cheat (juste un changement de style de fenêtre Win32).
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={handleToggleBorderless}
-              className={cn(
-                "relative h-5 w-9 shrink-0 rounded-full transition-colors",
-                autoBorderless ? "bg-accent" : "bg-white/10",
-              )}
-            >
-              <motion.span
-                layout
-                className={cn(
-                  "absolute top-0.5 size-4 rounded-full bg-white shadow",
-                  autoBorderless ? "right-0.5" : "left-0.5",
-                )}
-                transition={{ type: "spring", stiffness: 500, damping: 30 }}
-              />
-            </button>
-          </div>
-
           {/* Manual actions */}
           <div className="flex flex-wrap gap-2">
             <button
@@ -1332,15 +1278,15 @@ function OverlayCard() {
             >
               Tester l'overlay
             </button>
-            <button
-              type="button"
-              onClick={handleForceBorderless}
-              className="rounded-lg bg-white/[0.03] px-4 py-2 text-xs text-fg-muted ring-1 ring-white/[0.06] transition-colors hover:bg-white/[0.06] hover:text-fg-primary"
-              title="Force la fenêtre du jeu en cours en mode borderless"
-            >
-              Forcer borderless (jeu actif)
-            </button>
           </div>
+
+          {/* Note compatibilité borderless */}
+          <p className="text-[11px] text-fg-dim">
+            ⚠️ L'overlay s'affiche uniquement par-dessus les jeux en mode
+            <strong className="ml-1 text-fg-muted">borderless</strong> ou
+            <strong className="ml-1 text-fg-muted">fenêtré</strong>. Si ton jeu
+            est en exclusive fullscreen, change-le dans ses propres options.
+          </p>
 
           {/* Toasts in-game (Phase 2) */}
           <ToastsSubSection />

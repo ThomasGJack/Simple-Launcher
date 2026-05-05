@@ -70,10 +70,6 @@ export type ModuleLaunchEvent = {
   moduleId: string;
   moduleName: string;
   startedAt: number;
-  /** PID of the spawned game process. Used by the auto-borderless
-   *  hook (App.tsx) to find the game window 2-3 s after launch and
-   *  force it into borderless mode if the user has the option on. */
-  pid?: number | null;
 };
 
 export type ModuleExitEvent = {
