@@ -29,8 +29,14 @@
         "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }]
       },
       {
-        "source": "**/*.{exe,msi,zip,sig,nupkg}",
+        "source": "/launcher/**/*.{exe,msi,zip,sig,nupkg}",
         "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+      },
+      {
+        "source": "/download/**",
+        "headers": [
+          { "key": "Cache-Control", "value": "public, max-age=300, must-revalidate" }
+        ]
       },
       {
         "source": "**/RELEASES",

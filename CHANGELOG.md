@@ -18,6 +18,14 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.05.06.8] - 2026-05-06  · semver `26.506.7`
+
+
+
+
+### Corrigé
+
+- **Cache CDN Firebase qui servait l'ancien Setup.exe cassé** ([firebase.json](firebase.json)) — les headers `Cache-Control: max-age=31536000, immutable` étaient appliqués indistinctement à TOUS les .exe du hosting, y compris `/download/SimpleLauncher-Setup.exe` qui est l'URL stable mise à jour à chaque release. Résultat : même après deploy d'une version fixée, le CDN edge servait la version cachée précédente aux users qui re-téléchargeaient. Fix : split des règles de cache — `/launcher/**/*.{exe,nupkg,...}` (fichiers versionnés, vraiment immutables) gardent le cache long-terme, `/download/**` (URL stable mirroir) passe à `max-age=300, must-revalidate` pour qu'un nouveau deploy soit visible immédiatement.
 ## [v26.05.06.7] - 2026-05-06  · semver `26.506.6`
 
 
