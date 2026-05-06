@@ -25,20 +25,26 @@ import {
 } from "lucide-react";
 import {
   createChannel,
+  createCustomRole,
   deleteChannel,
   deleteCrew,
+  deleteCustomRole,
   kickCrewMember,
   rotateCrewJoinCode,
   setCrewMemberRole,
+  setMemberCustomRole,
   updateChannel,
+  updateCustomRole,
   updateUserCrew,
   uploadCrewIcon,
   watchCrewChannels,
+  watchCrewCustomRoles,
   watchCrews,
   watchCrewMembers,
   type Crew,
   type CrewChannel,
   type CrewMember,
+  type CustomRole,
 } from "@/firebase/crews";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/auth";
@@ -85,6 +91,7 @@ export function CrewConfigPage() {
   const [crews, setCrews] = useState<Crew[]>([]);
   const [channels, setChannels] = useState<CrewChannel[]>([]);
   const [members, setMembers] = useState<CrewMember[]>([]);
+  const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
 
   useEffect(() => {
     if (!crewId) return;
@@ -99,6 +106,11 @@ export function CrewConfigPage() {
   useEffect(() => {
     if (!crewId) return;
     return watchCrewMembers(crewId, setMembers);
+  }, [crewId]);
+
+  useEffect(() => {
+    if (!crewId) return;
+    return watchCrewCustomRoles(crewId, setCustomRoles);
   }, [crewId]);
 
   const crew = useMemo(() => crews.find((c) => c.id === crewId), [crews, crewId]);
@@ -288,6 +300,7 @@ export function CrewConfigPage() {
           {tab === "roles" && (
             <RolesTab
               members={displayedMembers}
+              customRoles={customRoles}
               crew={crew}
               myUid={me?.uid ?? null}
               canModerate={isAdmin}
@@ -857,12 +870,14 @@ function ChannelRow({
 
 function RolesTab({
   members,
+  customRoles,
   crew,
   myUid,
   canModerate,
   isOwner,
 }: {
   members: CrewMember[];
+  customRoles: CustomRole[];
   crew: Crew;
   myUid: string | null;
   /** True if the viewer can promote / demote / kick (admin or
@@ -966,6 +981,13 @@ function RolesTab({
         )}
       </div>
 
+      {/* Custom roles management — visible to admin/owner only.
+          These are purely cosmetic badges (VIP, Citoyen, Vétéran…)
+          assigned on top of the structural Owner/Admin/Member trio. */}
+      {canModerate && (
+        <CustomRolesManager crew={crew} customRoles={customRoles} />
+      )}
+
       {error && (
         <div className="flex items-start gap-2 rounded-xl bg-danger/10 p-3 text-sm ring-1 ring-danger/30">
           <AlertTriangle className="mt-0.5 size-4 shrink-0 text-danger" />
@@ -1015,6 +1037,9 @@ function RolesTab({
               effectiveRole !== "owner" &&
               (isOwner || effectiveRole === "member");
 
+            const memberCustomRole = customRoles.find(
+              (r) => r.id === m.customRoleId,
+            );
             return (
               <div
                 key={m.uid}
@@ -1032,13 +1057,37 @@ function RolesTab({
                     {(m.displayName ?? "?").slice(0, 1).toUpperCase()}
                   </div>
                 )}
-                <div className="min-w-0 flex-1 text-sm text-fg-primary">
-                  {m.displayName ?? "Anonyme"}
-                  {isMe && (
-                    <span className="ml-2 text-[10px] text-fg-dim">(toi)</span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm text-fg-primary">
+                    {m.displayName ?? "Anonyme"}
+                    {isMe && (
+                      <span className="ml-2 text-[10px] text-fg-dim">
+                        (toi)
+                      </span>
+                    )}
+                  </div>
+                  {memberCustomRole && (
+                    <span
+                      className="mt-0.5 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium ring-1"
+                      style={{
+                        background: `color-mix(in srgb, ${memberCustomRole.color} 15%, transparent)`,
+                        color: memberCustomRole.color,
+                        ["--tw-ring-color" as string]: `color-mix(in srgb, ${memberCustomRole.color} 35%, transparent)`,
+                      } as React.CSSProperties}
+                    >
+                      {memberCustomRole.name}
+                    </span>
                   )}
                 </div>
                 <RoleBadge role={effectiveRole} />
+                {canModerate && customRoles.length > 0 && !isMemberOwner && (
+                  <CustomRolePicker
+                    crewId={crew.id}
+                    memberUid={m.uid}
+                    currentRoleId={m.customRoleId ?? null}
+                    customRoles={customRoles}
+                  />
+                )}
                 {(canPromote || canDemote || canKick) && (
                   <div className="flex items-center gap-1.5">
                     {canPromote && (
@@ -1079,6 +1128,279 @@ function RolesTab({
         )}
       </div>
     </div>
+  );
+}
+
+// ─── Custom roles management (admin / owner) ────────────────────────────
+
+function CustomRolesManager({
+  crew,
+  customRoles,
+}: {
+  crew: Crew;
+  customRoles: CustomRole[];
+}) {
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState("");
+  const [color, setColor] = useState("#a78bfa");
+  const [error, setError] = useState<string | null>(null);
+
+  const handleCreate = async () => {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setError("Donne un nom au rôle.");
+      return;
+    }
+    setCreating(true);
+    setError(null);
+    try {
+      await createCustomRole(crew.id, {
+        name: trimmed,
+        color,
+        position: customRoles.length,
+      });
+      sounds.success();
+      setName("");
+      setColor("#a78bfa");
+    } catch (err) {
+      sounds.error();
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl bg-bg-soft/30 p-4 ring-1 ring-white/[0.06]">
+      <div className="mb-3 flex items-center gap-2 text-sm font-medium text-fg-primary">
+        <Users className="size-4 text-accent" />
+        Rôles custom
+        <span className="text-[11px] font-normal text-fg-muted">
+          · Badges décoratifs (VIP, Citoyen, Vétéran…) en plus
+          d'Owner/Admin/Member
+        </span>
+      </div>
+
+      {/* Create form */}
+      <div className="mb-3 flex items-center gap-2">
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+          placeholder="Nom du rôle (ex: VIP)"
+          maxLength={20}
+          className="flex-1 rounded-lg bg-bg-base/40 px-3 py-2 text-sm text-fg-primary ring-1 ring-white/[0.06] focus:outline-none focus:ring-1 focus:ring-accent/60"
+        />
+        <input
+          type="color"
+          value={color}
+          onChange={(e) => setColor(e.target.value)}
+          className="size-9 cursor-pointer rounded-lg bg-bg-base/40 ring-1 ring-white/[0.06]"
+          title="Couleur du badge"
+        />
+        <button
+          onClick={handleCreate}
+          disabled={creating || !name.trim()}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-xs font-medium text-bg-base shadow-[0_0_14px_var(--color-accent-soft)] hover:shadow-[0_0_20px_var(--color-accent-glow)] disabled:opacity-50"
+        >
+          {creating ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : (
+            <Plus className="size-3.5" />
+          )}
+          Créer
+        </button>
+      </div>
+
+      {error && (
+        <p className="mb-2 text-[11px] text-danger">{error}</p>
+      )}
+
+      {customRoles.length === 0 ? (
+        <p className="text-[11px] text-fg-dim">
+          Aucun rôle custom pour l'instant. Crée-en un ci-dessus pour
+          décorer tes membres.
+        </p>
+      ) : (
+        <div className="space-y-1.5">
+          {customRoles.map((role) => (
+            <CustomRoleRow key={role.id} crewId={crew.id} role={role} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CustomRoleRow({
+  crewId,
+  role,
+}: {
+  crewId: string;
+  role: CustomRole;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(role.name);
+  const [color, setColor] = useState(role.color);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setName(role.name);
+    setColor(role.color);
+  }, [role]);
+
+  const handleSave = async () => {
+    setBusy(true);
+    try {
+      await updateCustomRole(crewId, role.id, {
+        name: name.trim() || role.name,
+        color,
+      });
+      sounds.success();
+      setEditing(false);
+    } catch (err) {
+      sounds.error();
+      console.warn("[crew-config] update custom role failed:", err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (
+      !confirm(
+        `Supprimer le rôle '${role.name}' ? Les membres qui l'ont l'auront retiré.`,
+      )
+    )
+      return;
+    setBusy(true);
+    try {
+      await deleteCustomRole(crewId, role.id);
+      sounds.success();
+    } catch (err) {
+      sounds.error();
+      console.warn("[crew-config] delete custom role failed:", err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-2 rounded-lg bg-bg-base/40 p-2 ring-1 ring-accent/30">
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          maxLength={20}
+          className="flex-1 rounded-md bg-bg-base/60 px-2 py-1.5 text-xs text-fg-primary ring-1 ring-white/[0.06] focus:outline-none focus:ring-1 focus:ring-accent/60"
+        />
+        <input
+          type="color"
+          value={color}
+          onChange={(e) => setColor(e.target.value)}
+          className="size-8 cursor-pointer rounded-md bg-bg-base/60 ring-1 ring-white/[0.06]"
+        />
+        <button
+          onClick={() => {
+            setEditing(false);
+            setName(role.name);
+            setColor(role.color);
+          }}
+          className="rounded-md bg-white/[0.04] px-2 py-1.5 text-[11px] text-fg-muted ring-1 ring-white/[0.06] hover:bg-white/[0.08] hover:text-fg-primary"
+        >
+          Annuler
+        </button>
+        <button
+          onClick={handleSave}
+          disabled={busy}
+          className="inline-flex items-center gap-1 rounded-md bg-accent px-2 py-1.5 text-[11px] font-medium text-bg-base disabled:opacity-50"
+        >
+          {busy ? <Loader2 className="size-3 animate-spin" /> : <Check className="size-3" />}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-3 rounded-lg bg-bg-base/30 p-2 ring-1 ring-white/[0.04]">
+      <span
+        className="grid h-6 min-w-[60px] place-items-center rounded-md px-2 text-[11px] font-medium ring-1"
+        style={{
+          background: `color-mix(in srgb, ${role.color} 18%, transparent)`,
+          color: role.color,
+          ["--tw-ring-color" as string]: `color-mix(in srgb, ${role.color} 38%, transparent)`,
+        } as React.CSSProperties}
+      >
+        {role.name}
+      </span>
+      <span className="flex-1 truncate text-[11px] text-fg-dim">
+        {role.color}
+      </span>
+      <button
+        onClick={() => setEditing(true)}
+        className="rounded-md bg-white/[0.04] px-2 py-1 text-[11px] text-fg-muted ring-1 ring-white/[0.06] hover:bg-white/[0.08] hover:text-fg-primary"
+      >
+        Modifier
+      </button>
+      <button
+        onClick={handleDelete}
+        disabled={busy}
+        className="grid size-6 place-items-center rounded-md bg-white/[0.04] text-fg-muted ring-1 ring-white/[0.06] hover:bg-danger/10 hover:text-danger disabled:opacity-50"
+        title={`Supprimer ${role.name}`}
+      >
+        {busy ? (
+          <Loader2 className="size-3 animate-spin" />
+        ) : (
+          <Trash2 className="size-3" />
+        )}
+      </button>
+    </div>
+  );
+}
+
+function CustomRolePicker({
+  crewId,
+  memberUid,
+  currentRoleId,
+  customRoles,
+}: {
+  crewId: string;
+  memberUid: string;
+  currentRoleId: string | null;
+  customRoles: CustomRole[];
+}) {
+  const [busy, setBusy] = useState(false);
+  const handleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    setBusy(true);
+    try {
+      await setMemberCustomRole(crewId, memberUid, value || null);
+      sounds.success();
+    } catch (err) {
+      sounds.error();
+      console.warn("[crew-config] set custom role failed:", err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <select
+      value={currentRoleId ?? ""}
+      onChange={handleChange}
+      disabled={busy}
+      className="rounded-md bg-bg-base/40 px-2 py-1 text-[11px] text-fg-muted ring-1 ring-white/[0.06] focus:outline-none focus:ring-1 focus:ring-accent/60 disabled:opacity-50"
+      title="Attribuer un rôle custom à ce membre"
+    >
+      <option value="">— rôle custom —</option>
+      {customRoles.map((r) => (
+        <option key={r.id} value={r.id}>
+          {r.name}
+        </option>
+      ))}
+    </select>
   );
 }
 

@@ -207,12 +207,27 @@ service cloud.firestore {
            // crew id used in the path is only known if the lookup
            // succeeded, so the code itself acts as the gate.
            true);
-        // Update (role change) : owner only.
-        allow update: if isCrewOwner();
+        // Update : owner can set the structural role (member ↔
+        // admin). Owner OR admin can also assign / clear custom
+        // roles on any member (custom roles are purely
+        // cosmetic — admin moderation tools).
+        allow update: if isCrewOwner() ||
+          (isCrewAdminOrOwner() &&
+            request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['customRoleId']));
         // Delete (leave / kick) : self can leave; owner+admin can
         // kick non-owners.
         allow delete: if memberUid == request.auth.uid ||
           (isCrewAdminOrOwner() && memberDoc().data.role != "owner");
+      }
+
+      // Custom roles per crew — purely cosmetic labels (VIP /
+      // Citoyen / Vétéran etc) on top of the structural owner /
+      // admin / member trio. CRUD is admin/owner only ; read open
+      // to any crew member so the UI can show the badges.
+      match /customRoles/{roleId} {
+        allow read: if isCrewMember();
+        allow create, update, delete: if isCrewAdminOrOwner();
       }
 
       match /channels/{channelId} {

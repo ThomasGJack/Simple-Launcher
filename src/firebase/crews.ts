@@ -93,6 +93,32 @@ export type CrewMember = {
   joinedAt: number;
   displayName: string | null;
   avatarUrl: string | null;
+  /** Optional decorative role on top of the structural `role`. The
+   *  3 hardcoded roles (owner / admin / member) gate permissions ;
+   *  the custom role is purely cosmetic — a label like "VIP",
+   *  "Citoyen", "Vétéran" with a custom color, displayed as a
+   *  badge next to the member's name. References a doc id in the
+   *  crew's `customRoles` sub-collection. */
+  customRoleId?: string | null;
+};
+
+/**
+ * Custom roles defined per-crew, on top of the 3 structural ones.
+ * Owner can create / rename / recolor / delete them via the Crew
+ * Configuration page. They never gate permissions — purely a
+ * visual label so a crew can have its own server-style hierarchy
+ * (Citoyen / Bourgeois / Noble / Roi, or VIP / Whale / Legend, …).
+ *
+ * Stored at `crews/{crewId}/customRoles/{roleId}`. Members
+ * reference one via `members/{uid}.customRoleId`.
+ */
+export type CustomRole = {
+  id: string;
+  name: string;
+  color: string;
+  /** Smaller = higher in the displayed list (like Discord). Owner
+   *  can drag-reorder, we just persist the int. */
+  position: number;
 };
 
 export type CrewChannel = {
@@ -1007,6 +1033,96 @@ export async function deleteChannel(crewId: string, channelId: string): Promise<
   const fb = getFirebase();
   if (!fb) throw new Error("Firebase not configured");
   await deleteDoc(doc(fb.db, "crews", crewId, "channels", channelId));
+}
+
+// ─── Custom roles CRUD ──────────────────────────────────────────────
+
+export function watchCrewCustomRoles(
+  crewId: string,
+  callback: (roles: CustomRole[]) => void,
+): Unsubscribe {
+  const fb = getFirebase();
+  if (!fb) {
+    callback([]);
+    return () => {};
+  }
+  return onSnapshot(
+    collection(fb.db, "crews", crewId, "customRoles"),
+    (snap) => {
+      const roles: CustomRole[] = snap.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          name: typeof data.name === "string" ? data.name : "Sans nom",
+          color: typeof data.color === "string" ? data.color : "#00d4ff",
+          position: typeof data.position === "number" ? data.position : 0,
+        };
+      });
+      // Lower position = higher in the list (Discord convention).
+      roles.sort((a, b) => a.position - b.position);
+      callback(roles);
+    },
+    (err) => {
+      console.warn(`[crews] watchCustomRoles failed for ${crewId}:`, err);
+      callback([]);
+    },
+  );
+}
+
+export async function createCustomRole(
+  crewId: string,
+  role: Omit<CustomRole, "id">,
+): Promise<string> {
+  const fb = getFirebase();
+  if (!fb) throw new Error("Firebase not configured");
+  const ref = await addDoc(collection(fb.db, "crews", crewId, "customRoles"), {
+    name: role.name,
+    color: role.color,
+    position: role.position,
+  });
+  return ref.id;
+}
+
+export async function updateCustomRole(
+  crewId: string,
+  roleId: string,
+  patch: Partial<Omit<CustomRole, "id">>,
+): Promise<void> {
+  const fb = getFirebase();
+  if (!fb) throw new Error("Firebase not configured");
+  await setDoc(
+    doc(fb.db, "crews", crewId, "customRoles", roleId),
+    patch,
+    { merge: true },
+  );
+}
+
+export async function deleteCustomRole(crewId: string, roleId: string): Promise<void> {
+  const fb = getFirebase();
+  if (!fb) throw new Error("Firebase not configured");
+  await deleteDoc(doc(fb.db, "crews", crewId, "customRoles", roleId));
+  // Note : we DON'T cascade-clear customRoleId from members. The
+  // dangling reference is harmless (the UI just falls back to no
+  // badge when the role doc doesn't exist). Cleaner to keep this
+  // simple and lazy.
+}
+
+/**
+ * Set / clear the custom role of a member. Owner / admin can call
+ * this on any member. Pass `null` to clear an existing assignment.
+ */
+export async function setMemberCustomRole(
+  crewId: string,
+  memberUid: string,
+  customRoleId: string | null,
+): Promise<void> {
+  const fb = getFirebase();
+  if (!fb) throw new Error("Firebase not configured");
+  await setDoc(
+    doc(fb.db, "crews", crewId, "members", memberUid),
+    { customRoleId },
+    { merge: true },
+  );
 }
 
 /** Read a single crew doc one-shot (for the join-by-code lookup +
