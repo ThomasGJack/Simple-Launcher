@@ -24,6 +24,10 @@ import { sounds } from "@/lib/sounds";
 import { formatDisplay } from "@/lib/version";
 import { achievementFlags } from "@/lib/achievementFlags";
 import { ChangelogRenderer } from "./ChangelogRenderer";
+import {
+  OnboardingTour,
+  isOnboardingDone,
+} from "@/components/onboarding/OnboardingTour";
 import { cn } from "@/lib/cn";
 
 type Status =
@@ -106,6 +110,10 @@ export function UpdateBanner() {
    *  to feel like a flagship product launch. Skipped after a normal
    *  upgrade since lastSeen is already set. */
   const [welcome, setWelcome] = useState<{ version: string } | null>(null);
+  /** Onboarding tour that fires AFTER the welcome modal closes, on
+   *  first boot. Skipped if the user already completed it (LS flag).
+   *  Re-launchable from Settings → "Refaire le tour de présentation". */
+  const [tourOpen, setTourOpen] = useState(false);
 
   const seenVersion = useRef<string | null>(null);
   const startedAt = useRef(Date.now());
@@ -465,10 +473,26 @@ export function UpdateBanner() {
         {welcome && (
           <WelcomeModal
             version={welcome.version}
-            onClose={() => setWelcome(null)}
+            onClose={() => {
+              setWelcome(null);
+              // Chain into the onboarding tour right after the
+              // welcome modal closes on first boot. The tour itself
+              // checks the LS flag and skips if already done.
+              if (!isOnboardingDone()) setTourOpen(true);
+            }}
           />
         )}
       </AnimatePresence>
+
+      <AnimatePresence>
+        {tourOpen && <OnboardingTour onClose={() => setTourOpen(false)} />}
+      </AnimatePresence>
+
+      {/* Listen for the tray "redo onboarding" command — fired by
+          the Settings page button "Refaire le tour de présentation"
+          via window.dispatchEvent. Decoupled from the WelcomeModal
+          flow so it works any time, not just on first boot. */}
+      <OnboardingReplayBridge onOpen={() => setTourOpen(true)} />
     </>
   );
 }
@@ -1152,6 +1176,21 @@ const WELCOME_HIGHLIGHTS: { icon: typeof Rocket; title: string; body: string }[]
       body: "Auto-update silencieux, changelog joli, jamais d'install gênante.",
     },
   ];
+
+/**
+ * Tiny pub/sub bridge that lets the Settings page (or anywhere
+ * really) request a re-play of the onboarding tour without having
+ * to thread state through the React tree. Fires on a custom
+ * `launcher:replay-onboarding` window event.
+ */
+function OnboardingReplayBridge({ onOpen }: { onOpen: () => void }) {
+  useEffect(() => {
+    const handler = () => onOpen();
+    window.addEventListener("launcher:replay-onboarding", handler);
+    return () => window.removeEventListener("launcher:replay-onboarding", handler);
+  }, [onOpen]);
+  return null;
+}
 
 function WelcomeModal({
   version,

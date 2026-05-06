@@ -29,6 +29,7 @@ import {
   XCircle,
   MessageSquare,
   Trophy,
+  Sparkles,
 } from "lucide-react";
 import { getVersion } from "@tauri-apps/api/app";
 import { useSettingsStore } from "@/store/settings";
@@ -131,6 +132,24 @@ export function SettingsPage() {
           onClick={() => {
             sounds.click();
             setDiagOpen(true);
+          }}
+        />
+        <SettingButton
+          icon={Sparkles}
+          title="Refaire le tour de présentation"
+          description="Re-joue le tour guidé d'onboarding (Bibliothèque / Communauté / Crews / Profil / Paramètres). Idéal après un upgrade majeur ou pour montrer le launcher à un ami."
+          buttonLabel="Lancer le tour"
+          onClick={() => {
+            sounds.click();
+            // Reset the LS flag so the tour shows even if user
+            // already completed it once. Then dispatch the event
+            // that UpdateBanner listens for to open the tour.
+            try {
+              localStorage.removeItem("launcher.onboardingDone");
+            } catch {
+              /* non-fatal */
+            }
+            window.dispatchEvent(new CustomEvent("launcher:replay-onboarding"));
           }}
         />
         <MinecraftAccountsCard />

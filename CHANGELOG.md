@@ -18,6 +18,12 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.05.06.13] - 2026-05-06  · semver `26.506.12`
+
+
+### Ajouté
+
+- **Onboarding tour multi-étapes** ([src/components/onboarding/OnboardingTour.tsx](src/components/onboarding/OnboardingTour.tsx) + [src/components/updater/UpdateBanner.tsx](src/components/updater/UpdateBanner.tsx) + [src/pages/SettingsPage.tsx](src/pages/SettingsPage.tsx)) — tour guidé en 6 étapes qui se déclenche **après la WelcomeModal** au tout premier boot (Bibliothèque → Communauté → Crews → Profil → Paramètres → "Tu es prêt"). Chaque étape a une icône colorée animée avec halo, un body explicatif, un bouton "Voir [section]" qui navigue vers la page concernée + close le tour, plus Suivant / Retour / Passer. Step indicator en dots animés au top + compteur "Étape X / Y". Animation slide-x entre les étapes. One-shot (LS flag `launcher.onboardingDone`), refaisable depuis **Paramètres → "Refaire le tour de présentation"**. Architecture découplée : UpdateBanner monte le tour, SettingsPage dispatche un CustomEvent `launcher:replay-onboarding` qu'un `OnboardingReplayBridge` écoute pour ré-ouvrir le tour à n'importe quel moment.
 ## [v26.05.06.12] - 2026-05-06  · semver `26.506.11`
 
 
