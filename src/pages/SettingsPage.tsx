@@ -264,27 +264,16 @@ function ApparenceCard() {
             Recommandé sur PC peu puissant ou si tu es sensible aux animations.
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            sounds.click();
-            toggleAnimations();
-          }}
-          className={cn(
-            "relative ml-4 h-7 w-12 shrink-0 rounded-full transition-colors",
-            animationsEnabled ? "bg-accent" : "bg-white/[0.08]",
-          )}
-          aria-pressed={animationsEnabled}
-        >
-          <motion.span
-            layout
-            transition={{ type: "spring", stiffness: 600, damping: 32 }}
-            className={cn(
-              "absolute top-0.5 size-6 rounded-full bg-bg-base shadow-md",
-              animationsEnabled ? "right-0.5" : "left-0.5",
-            )}
+        <div className="ml-4">
+          <Toggle
+            value={animationsEnabled}
+            onToggle={() => {
+              sounds.click();
+              toggleAnimations();
+            }}
+            ariaLabel="Activer les animations"
           />
-        </button>
+        </div>
       </div>
     </motion.div>
   );
@@ -515,25 +504,72 @@ function SettingToggle({
         <div className="font-medium text-fg-primary">{title}</div>
         <div className="text-sm text-fg-muted">{description}</div>
       </div>
-      <button
-        onClick={onToggle}
-        role="switch"
-        aria-checked={value}
-        className={cn(
-          "relative h-7 w-12 shrink-0 rounded-full transition-colors duration-200 ring-1",
-          value ? "bg-accent/30 ring-accent/40 shadow-[0_0_18px_var(--color-accent-soft)]" : "bg-white/[0.06] ring-white/[0.08]",
-        )}
-      >
-        <motion.span
-          layout
-          transition={{ type: "spring", stiffness: 500, damping: 30 }}
-          className={cn(
-            "absolute top-0.5 size-6 rounded-full",
-            value ? "left-[calc(100%-1.625rem)] bg-accent shadow-[0_0_10px_var(--color-accent-glow)]" : "left-0.5 bg-fg-muted",
-          )}
-        />
-      </button>
+      <Toggle value={value} onToggle={onToggle} />
     </motion.div>
+  );
+}
+
+/**
+ * Unified accent-colored switch used everywhere in Settings — same
+ * shape, same ring + glow, same spring animation regardless of
+ * whether the toggle is the master "Sons d'interface", the inner
+ * "Animations" sub-setting, the overlay enable switch, or the
+ * toast kind toggle. Pick a size : `md` (default) for top-level
+ * cards, `sm` for sub-options nested inside an existing card. Both
+ * sizes share the same colors / states for visual consistency.
+ */
+function Toggle({
+  value,
+  onToggle,
+  size = "md",
+  ariaLabel,
+}: {
+  value: boolean;
+  onToggle: () => void;
+  size?: "sm" | "md";
+  ariaLabel?: string;
+}) {
+  const dims =
+    size === "sm"
+      ? {
+          track: "h-6 w-11",
+          thumbSize: "size-5",
+          thumbOff: "left-0.5",
+          thumbOn: "left-[calc(100%-1.375rem)]",
+        }
+      : {
+          track: "h-7 w-12",
+          thumbSize: "size-6",
+          thumbOff: "left-0.5",
+          thumbOn: "left-[calc(100%-1.625rem)]",
+        };
+  return (
+    <button
+      onClick={onToggle}
+      type="button"
+      role="switch"
+      aria-checked={value}
+      aria-label={ariaLabel}
+      className={cn(
+        "relative shrink-0 rounded-full transition-colors duration-200 ring-1",
+        dims.track,
+        value
+          ? "bg-accent/30 ring-accent/40 shadow-[0_0_18px_var(--color-accent-soft)]"
+          : "bg-white/[0.06] ring-white/[0.08]",
+      )}
+    >
+      <motion.span
+        layout
+        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+        className={cn(
+          "absolute top-0.5 rounded-full",
+          dims.thumbSize,
+          value
+            ? `${dims.thumbOn} bg-accent shadow-[0_0_10px_var(--color-accent-glow)]`
+            : `${dims.thumbOff} bg-fg-muted`,
+        )}
+      />
+    </button>
   );
 }
 
@@ -1205,23 +1241,11 @@ function OverlayCard() {
             jeu en mode borderless via un raccourci global.
           </div>
         </div>
-        <button
-          type="button"
-          onClick={handleToggle}
-          className={cn(
-            "relative h-6 w-11 shrink-0 rounded-full transition-colors",
-            enabled ? "bg-accent" : "bg-white/10",
-          )}
-        >
-          <motion.span
-            layout
-            className={cn(
-              "absolute top-0.5 size-5 rounded-full bg-white shadow-md",
-              enabled ? "right-0.5" : "left-0.5",
-            )}
-            transition={{ type: "spring", stiffness: 500, damping: 30 }}
-          />
-        </button>
+        <Toggle
+          value={enabled}
+          onToggle={handleToggle}
+          ariaLabel="Activer l'overlay in-game"
+        />
       </div>
 
       {enabled && (
@@ -1342,23 +1366,12 @@ function ToastsSubSection() {
             jeu sans intercepter les clics. Auto-fade après 4&nbsp;s.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={toggleEnabled}
-          className={cn(
-            "relative h-5 w-9 shrink-0 rounded-full transition-colors",
-            enabled ? "bg-accent" : "bg-white/10",
-          )}
-        >
-          <motion.span
-            layout
-            className={cn(
-              "absolute top-0.5 size-4 rounded-full bg-white shadow",
-              enabled ? "right-0.5" : "left-0.5",
-            )}
-            transition={{ type: "spring", stiffness: 500, damping: 30 }}
-          />
-        </button>
+        <Toggle
+          value={enabled}
+          onToggle={toggleEnabled}
+          size="sm"
+          ariaLabel="Activer les toasts in-game"
+        />
       </div>
       {enabled && (
         <div className="mt-2 grid grid-cols-1 gap-1.5">
