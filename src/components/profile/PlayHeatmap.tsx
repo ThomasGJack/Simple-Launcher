@@ -70,19 +70,24 @@ export function PlayHeatmap({
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      className="rounded-2xl glass p-5"
+      // `w-full` forces the card to fill its parent container — without
+      // it, motion.div shrinks to the natural width of its smallest
+      // child (e.g. the empty-state block has no min-width), which made
+      // the card collapse into a tall narrow column on resized
+      // launcher windows. With w-full the parent's max-w-* governs.
+      className="w-full rounded-2xl glass p-5"
     >
       <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-accent">
-            <Calendar className="size-3" />
-            {title}
+            <Calendar className="size-3 shrink-0" />
+            <span className="truncate">{title}</span>
           </div>
           <p className="mt-1 text-sm text-fg-muted">
             {subtitle ?? "Distribution des lancements de jeu par heure et jour de la semaine."}
           </p>
         </div>
-        <div className="text-right">
+        <div className="shrink-0 text-right">
           <div className="font-display text-2xl text-fg-primary tabular-nums">
             {total}
           </div>
@@ -93,8 +98,8 @@ export function PlayHeatmap({
       </div>
 
       {total === 0 ? (
-        <div className="grid h-32 place-items-center text-center text-xs text-fg-muted">
-          <div>
+        <div className="grid min-h-32 w-full place-items-center px-2 text-center text-xs text-fg-muted">
+          <div className="max-w-sm">
             <Clock className="mx-auto mb-2 size-5 text-fg-dim" />
             Pas encore de données — la heatmap se construit au fur et à
             mesure des lancements de jeu.

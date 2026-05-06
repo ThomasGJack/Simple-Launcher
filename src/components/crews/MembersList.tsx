@@ -160,8 +160,21 @@ export function MembersList({
       color: string | null;
       members: DisplayedMember[];
     };
+
+    // Extract the owner first — they're always pinned at the very top
+    // of the list, regardless of custom role grouping. Identified by
+    // role === "owner" OR uid match on crew.ownerUid (the latter
+    // catches the implicit owner of master-crews where a member doc
+    // may not exist yet).
+    const ownerMember = sortedMembers.find(
+      (m) => m.role === "owner" || m.uid === crew.ownerUid,
+    );
+    const remaining = ownerMember
+      ? sortedMembers.filter((m) => m.uid !== ownerMember.uid)
+      : sortedMembers;
+
     const byRole = new Map<string | null, DisplayedMember[]>();
-    for (const m of sortedMembers) {
+    for (const m of remaining) {
       // A customRoleId is only "real" if it points to an existing
       // role doc. Stale ids (deleted role) collapse into the
       // fallback group rather than rendering an orphan section.
@@ -174,7 +187,26 @@ export function MembersList({
       byRole.set(roleId, list);
     }
     const sections: Section[] = [];
-    // Custom-role sections first, ordered by position.
+
+    // Owner section at the very top. The label uses their custom
+    // role name + colour if any so the role identity isn't lost ;
+    // otherwise we show a generic "Propriétaire" with the amber
+    // crown tone consistent with the inline Crown icon.
+    if (ownerMember) {
+      const ownerRole =
+        ownerMember.customRoleId &&
+        customRolesById.get(ownerMember.customRoleId);
+      sections.push({
+        key: "__owner__",
+        label: ownerRole ? ownerRole.name : "Propriétaire",
+        // Amber matches the Crown glyph rendered next to the name —
+        // visually consistent with the existing owner cue.
+        color: ownerRole ? ownerRole.color : "#fcd34d",
+        members: [ownerMember],
+      });
+    }
+
+    // Custom-role sections next, ordered by position.
     const usedRoles = customRoles
       .filter((r) => byRole.has(r.id))
       .sort((a, b) => a.position - b.position);
@@ -197,7 +229,7 @@ export function MembersList({
       });
     }
     return sections;
-  }, [sortedMembers, customRoles, customRolesById]);
+  }, [sortedMembers, customRoles, customRolesById, crew.ownerUid]);
 
   const handlePromote = async (target: DisplayedMember) => {
     if (busyUid) return;
@@ -313,26 +345,37 @@ export function MembersList({
                   </span>
                 </div>
               )}
-              {section.members.map((m) => (
-                <MemberRow
-                  key={m.uid}
-                  member={m}
-                  customRoleColor={section.color}
-                  customRoleName={section.color ? section.label : null}
-                  myUid={myUid}
-                  amOwnerOrAdmin={amOwnerOrAdmin}
-                  isOwnerOfCrew={crew.ownerUid === m.uid}
-                  busy={busyUid === m.uid}
-                  myActivity={myActivity}
-                  onPromote={() => handlePromote(m)}
-                  onDemote={() => handleDemote(m)}
-                  onKick={() => handleKick(m)}
-                  onInvite={() => handleInviteToPlay(m)}
-                  onOpenProfile={() =>
-                    navigate({ name: "user-profile", uid: m.uid })
-                  }
-                />
-              ))}
+              {section.members.map((m) => {
+                // Name-coloring sources from the *member's actual*
+                // customRoleId, not the enclosing section. This keeps
+                // the synthetic "Propriétaire" section's owner row at
+                // their tier color when they have no custom role —
+                // the section header already conveys ownership in
+                // amber, no need to repeat it on the name.
+                const memberRole = m.customRoleId
+                  ? customRolesById.get(m.customRoleId) ?? null
+                  : null;
+                return (
+                  <MemberRow
+                    key={m.uid}
+                    member={m}
+                    customRoleColor={memberRole?.color ?? null}
+                    customRoleName={memberRole?.name ?? null}
+                    myUid={myUid}
+                    amOwnerOrAdmin={amOwnerOrAdmin}
+                    isOwnerOfCrew={crew.ownerUid === m.uid}
+                    busy={busyUid === m.uid}
+                    myActivity={myActivity}
+                    onPromote={() => handlePromote(m)}
+                    onDemote={() => handleDemote(m)}
+                    onKick={() => handleKick(m)}
+                    onInvite={() => handleInviteToPlay(m)}
+                    onOpenProfile={() =>
+                      navigate({ name: "user-profile", uid: m.uid })
+                    }
+                  />
+                );
+              })}
             </div>
           ))
         )}
