@@ -39,7 +39,8 @@ import {
 } from "@/firebase/crews";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/auth";
-import { isAdmin as isLauncherAdmin } from "@/lib/admin";
+import { useUsers } from "@/store/firebaseStores";
+import { isAdmin as isLauncherAdmin, isAdminUid } from "@/lib/admin";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
 
@@ -73,6 +74,7 @@ export function CrewConfigPage() {
   const route = useUIStore((s) => s.route);
   const navigate = useUIStore((s) => s.navigate);
   const me = useAuthStore((s) => s.user);
+  const allUsers = useUsers();
 
   const crewId = route.name === "crew-config" ? route.crewId : null;
   const tab: Tab = (route.name === "crew-config" && route.tab) || "general";
@@ -108,6 +110,42 @@ export function CrewConfigPage() {
   const isLauncherOwner = isLauncherAdmin(me);
   const isOwner = isLauncherOwner || (!!me && crew?.ownerUid === me.uid);
   const isAdmin = isOwner || myRole === "admin";
+
+  /**
+   * Master crew has implicit membership : every authed launcher user
+   * is auto-included even if they don't have a `members/{uid}` doc.
+   * We mirror what `MembersList` does — merge the live `useUsers()`
+   * presence list with the (sparse) members docs to surface every-
+   * one rather than just the few who triggered an explicit join.
+   *
+   * For user crews the members docs are the source of truth.
+   */
+  const displayedMembers = useMemo<CrewMember[]>(() => {
+    if (!crew) return [];
+    if (!crew.isMaster) return members;
+    const byUid = new Map(members.map((m) => [m.uid, m] as const));
+    return allUsers.map((u) => {
+      const m = byUid.get(u.uid);
+      // For the master crew, EVERY launcher admin is a de-facto
+      // owner (not just the original `ownerUid` who happened to
+      // create the crew doc). This handles the case where the
+      // master crew was bootstrapped by an earlier admin and a
+      // newer admin signs in — they should still see the Owner
+      // badge instead of MEMBER.
+      const isMasterOwner = u.uid === crew.ownerUid || isAdminUid(u.uid);
+      return {
+        uid: u.uid,
+        role: (isMasterOwner ? "owner" : (m?.role ?? "member")) as
+          | "owner"
+          | "admin"
+          | "member",
+        joinedAt: m?.joinedAt ?? 0,
+        displayName: m?.displayName ?? u.displayName ?? u.username ?? "Anonyme",
+        avatarUrl: m?.avatarUrl ?? u.avatarUrl ?? null,
+      };
+    });
+  }, [crew, members, allUsers]);
+  const realMemberCount = displayedMembers.length;
 
   const setTab = (next: Tab) => {
     if (!crewId) return;
@@ -189,8 +227,7 @@ export function CrewConfigPage() {
                       ? "membre"
                       : "non-membre"}
               </span>{" "}
-              · {crew.memberCount ?? members.length} membre
-              {(crew.memberCount ?? members.length) > 1 ? "s" : ""}
+              · {realMemberCount} membre{realMemberCount > 1 ? "s" : ""}
             </p>
           </div>
         </div>
@@ -246,7 +283,11 @@ export function CrewConfigPage() {
             />
           )}
           {tab === "roles" && (
-            <RolesTab members={members} crew={crew} myUid={me?.uid ?? null} />
+            <RolesTab
+              members={displayedMembers}
+              crew={crew}
+              myUid={me?.uid ?? null}
+            />
           )}
           {tab === "invite" && (
             <InviteTab crew={crew} canRotate={isOwner} />
@@ -864,7 +905,13 @@ function RolesTab({
           </div>
         ) : (
           sorted.map((m) => {
-            const isOwner = m.uid === crew.ownerUid;
+            // On the master crew, any launcher admin is treated as
+            // owner (their role got pre-set to "owner" in the parent's
+            // displayedMembers compute). For user crews, only the
+            // explicit `ownerUid` is the real owner.
+            const isOwner =
+              m.uid === crew.ownerUid ||
+              (crew.isMaster && isAdminUid(m.uid));
             return (
               <div
                 key={m.uid}
