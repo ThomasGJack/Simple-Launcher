@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#07090d" />
   <link rel="icon" type="image/png" href="/logo.png" />
-  <title>Simple Launcher — Le launcher pour ton crew</title>
-  <meta name="description" content="Simple Launcher : un launcher PC moderne pour Minecraft moddé, applications custom et raccourcis. Auto-update, Discord, voice chat, profils partageables." />
-  <meta property="og:title" content="Simple Launcher" />
-  <meta property="og:description" content="Le launcher PC pour ton crew. Minecraft moddé, apps custom, communautés Discord, auto-update." />
+  <title>Simple Launcher — L'outil du crew Simple Games</title>
+  <meta name="description" content="Simple Launcher, l'outil custom de la communauté Simple Games. Modpacks Minecraft moddés en un clic, chat de crew intégré, profils partageables, auto-update signé." />
+  <meta property="og:title" content="Simple Launcher · Simple Games" />
+  <meta property="og:description" content="L'outil du crew Simple Games. Minecraft moddé, channels intégrés, profils publics, auto-update signé." />
   <meta property="og:image" content="/logo.png" />
   <meta property="og:url" content="https://simplelaunche.web.app" />
   <meta name="twitter:card" content="summary_large_image" />
@@ -19,7 +19,7 @@
   <link rel="stylesheet" href="/styles.css" />
 
   <style>
-    /* ── Page-specific ── */
+    /* ── Hero ── */
     .hero {
       text-align: center;
       position: relative;
@@ -37,14 +37,19 @@
       0%, 100% { transform: translateY(0); }
       50% { transform: translateY(-10px); }
     }
-    .hero h1 {
-      margin: 16px 0 8px;
-    }
+    .hero h1 { margin: 16px 0 8px; }
     .hero h1 .accent-grad {
       background: linear-gradient(90deg, var(--accent), #4ed6ff 40%, var(--accent-2) 80%);
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
+    }
+    .hero h1 .gold-grad {
+      background: linear-gradient(90deg, var(--gold), var(--gold-strong) 60%, #f59e0b);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      text-shadow: 0 0 40px var(--gold-glow);
     }
     .hero .lead {
       margin: 24px auto 32px;
@@ -66,9 +71,7 @@
       font-size: 13px;
       color: var(--fg-muted);
     }
-    .hero-meta strong {
-      color: var(--fg-strong);
-    }
+    .hero-meta strong { color: var(--fg-strong); }
     .hero-meta-dot {
       width: 4px;
       height: 4px;
@@ -92,10 +95,7 @@
     @media (max-width: 720px) {
       .stats { grid-template-columns: repeat(2, 1fr); }
     }
-    .stat {
-      text-align: center;
-      padding: 8px;
-    }
+    .stat { text-align: center; padding: 8px; }
     .stat-num {
       font-family: var(--font-display);
       font-size: clamp(24px, 4vw, 36px);
@@ -103,12 +103,96 @@
       line-height: 1;
       text-shadow: 0 0 24px var(--accent-glow);
     }
+    .stat-num.gold {
+      color: var(--gold);
+      text-shadow: 0 0 24px var(--gold-glow);
+    }
     .stat-label {
       margin-top: 8px;
       font-size: 11px;
       text-transform: uppercase;
       letter-spacing: 0.18em;
       color: var(--fg-muted);
+    }
+
+    /* ── Communauté Simple Games (gold-themed band) ── */
+    .section--community {
+      position: relative;
+    }
+    .section--community::before {
+      content: "";
+      position: absolute;
+      inset: 64px 0;
+      border-radius: var(--radius-xl);
+      background:
+        radial-gradient(ellipse 60% 80% at 50% 0%, rgba(252, 211, 77, 0.08), transparent 60%),
+        radial-gradient(ellipse 40% 60% at 80% 100%, rgba(251, 191, 36, 0.05), transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .section--community > .container {
+      position: relative;
+      z-index: 1;
+    }
+    .community-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+    @media (max-width: 920px) { .community-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 600px) { .community-grid { grid-template-columns: 1fr; } }
+
+    .community-strip {
+      margin-top: 32px;
+      padding: 28px 32px;
+      border-radius: var(--radius-lg);
+      background:
+        linear-gradient(135deg, rgba(252, 211, 77, 0.06), rgba(168, 85, 247, 0.04));
+      border: 1px solid color-mix(in srgb, var(--gold) 18%, transparent);
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 24px;
+      align-items: center;
+    }
+    @media (max-width: 720px) {
+      .community-strip { grid-template-columns: 1fr; text-align: center; }
+    }
+    .community-strip-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 18px;
+      display: grid;
+      place-items: center;
+      background: var(--gold-soft);
+      color: var(--gold);
+      border: 1px solid color-mix(in srgb, var(--gold) 30%, transparent);
+      box-shadow: 0 0 28px var(--gold-glow);
+      margin: 0 auto;
+    }
+    @media (min-width: 721px) {
+      .community-strip-icon { margin: 0; }
+    }
+    .community-strip-icon svg { width: 28px; height: 28px; }
+    .community-strip-body h3 {
+      font-family: var(--font-display);
+      font-size: 18px;
+      letter-spacing: 0.06em;
+      color: var(--fg-strong);
+      margin-bottom: 6px;
+    }
+    .community-strip-body p {
+      font-size: 14px;
+      color: var(--fg-muted);
+      line-height: 1.6;
+    }
+    .community-strip-body .tags {
+      margin-top: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    @media (max-width: 720px) {
+      .community-strip-body .tags { justify-content: center; }
     }
 
     /* Features grid */
@@ -141,6 +225,9 @@
       font-size: 28px;
       color: rgba(0, 212, 255, 0.18);
       letter-spacing: 0.05em;
+    }
+    .step.gold-step::before {
+      color: rgba(252, 211, 77, 0.22);
     }
 
     /* Tech card */
@@ -192,7 +279,7 @@
     .terminal-body .ok  { color: var(--success); }
     .terminal-body .nu  { color: var(--accent-2); }
     .terminal-body .com { color: var(--fg-dim); }
-    .terminal-body .str { color: #ffcd6a; }
+    .terminal-body .str { color: var(--gold); }
 
     /* FAQ accordion */
     .faq {
@@ -234,6 +321,7 @@
       content: "−";
       transform: rotate(180deg);
     }
+    .qa.qa-gold summary::after { color: var(--gold); }
     .qa-body {
       padding: 0 22px 22px;
       color: var(--fg-muted);
@@ -304,9 +392,9 @@
       padding: 64px 32px;
       border-radius: var(--radius-xl);
       background:
-        radial-gradient(ellipse at center top, rgba(0, 212, 255, 0.18), transparent 60%),
+        radial-gradient(ellipse at center top, rgba(252, 211, 77, 0.14), transparent 60%),
         linear-gradient(180deg, rgba(13, 17, 23, 0.85), rgba(7, 9, 13, 0.95));
-      border: 1px solid var(--line);
+      border: 1px solid color-mix(in srgb, var(--gold) 18%, transparent);
       position: relative;
       overflow: hidden;
     }
@@ -327,6 +415,12 @@
       font-family: var(--font-display);
       font-size: clamp(28px, 4vw, 40px);
       margin-bottom: 12px;
+    }
+    .cta-band h2 .gold-grad {
+      background: linear-gradient(90deg, var(--gold), var(--gold-strong));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
     }
     .cta-band p {
       color: var(--fg-muted);
@@ -363,11 +457,41 @@
       line-height: 1.6;
     }
     .smartscreen-body strong { color: var(--fg-strong); }
-    .smartscreen-body ol {
-      margin: 10px 0;
-      padding-left: 20px;
-    }
+    .smartscreen-body ol { margin: 10px 0; padding-left: 20px; }
     .smartscreen-body li { margin: 4px 0; }
+
+    /* Brand twin (Simple Games / Simple Launcher) in nav */
+    .nav-brand-twin {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--fg-strong);
+      font-family: var(--font-display);
+      font-size: 16px;
+      letter-spacing: 0.12em;
+    }
+    .nav-brand-twin img {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      box-shadow: 0 0 20px var(--accent-glow);
+    }
+    .nav-brand-sub {
+      font-size: 9px;
+      letter-spacing: 0.32em;
+      color: var(--gold);
+      font-family: var(--font-body);
+      font-weight: 600;
+      text-transform: uppercase;
+      display: block;
+      margin-top: 2px;
+    }
+    .nav-brand-stack {
+      display: flex;
+      flex-direction: column;
+      line-height: 1;
+    }
   </style>
 </head>
 <body>
@@ -378,9 +502,12 @@
   <header class="site-header">
     <div class="container">
       <nav class="nav">
-        <a href="/" class="nav-brand">
+        <a href="/" class="nav-brand-twin">
           <img src="/logo.png" alt="" />
-          <span>SIMPLE LAUNCHER</span>
+          <span class="nav-brand-stack">
+            <span>SIMPLE LAUNCHER</span>
+            <span class="nav-brand-sub">★ Simple Games</span>
+          </span>
         </a>
         <button class="nav-toggle" aria-label="Menu" onclick="document.getElementById('nav-links').classList.toggle('is-open')">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -390,7 +517,8 @@
           </svg>
         </button>
         <div class="nav-links" id="nav-links">
-          <a href="#features">Fonctionnalités</a>
+          <a href="#community">La communauté</a>
+          <a href="#features">Le launcher</a>
           <a href="#how">Comment ça marche</a>
           <a href="#tech">Sous le capot</a>
           <a href="#faq">FAQ</a>
@@ -408,14 +536,14 @@
   <section class="section section--hero">
     <div class="container hero">
       <img src="/logo.png" alt="Simple Launcher" class="logo" />
-      <span class="eyebrow"><span id="status-pill">Disponible · Auto-update activé</span></span>
+      <span class="eyebrow eyebrow-gold">★ Simple Games · L'outil du crew</span>
       <h1 class="h-display">
-        SIMPLE<br />
-        <span class="accent-grad">LAUNCHER</span>
+        L'OUTIL<br />
+        <span class="gold-grad">DU CREW.</span>
       </h1>
       <p class="lead">
-        Le launcher PC pour ton crew. Minecraft moddé natif, applications custom, communautés Discord, voice chat,
-        profils partageables. Auto-update signé. Une seule app pour tout lancer.
+        <strong style="color: var(--fg-strong);">Simple Games</strong>, c'est notre crew, soudé autour des modpacks Minecraft qu'on lance ensemble.
+        <strong style="color: var(--fg-strong);">Simple Launcher</strong>, c'est l'outil qu'on a fait pour pas se prendre la tête : un seul exe, install moddée en un clic, channels intégrés, tout pareil chez tout le monde.
       </p>
 
       <div class="hero-cta">
@@ -423,9 +551,9 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Télécharger pour Windows
         </a>
-        <a class="btn btn-secondary" href="#features">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          Voir ce qu'il fait
+        <a class="btn btn-secondary" href="#community">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21l1.5-1.5M3 21h6m-6 0v-6M21 3l-7.5 7.5M21 3v6m0-6h-6M3 3l1.5 1.5M3 3h6M3 3v6"/><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/></svg>
+          Découvrir le crew
         </a>
       </div>
 
@@ -461,8 +589,8 @@
       <!-- Stats -->
       <div class="stats reveal">
         <div class="stat">
-          <div class="stat-num">9+</div>
-          <div class="stat-label">Modules pris en charge</div>
+          <div class="stat-num gold">★</div>
+          <div class="stat-label">Crew Simple Games</div>
         </div>
         <div class="stat">
           <div class="stat-num">∞</div>
@@ -480,14 +608,131 @@
     </div>
   </section>
 
+  <!-- Communauté Simple Games -->
+  <section class="section section--community" id="community">
+    <div class="container">
+      <div class="section-intro reveal">
+        <span class="eyebrow eyebrow-gold">★ La communauté</span>
+        <h2 class="h-section">Bienvenue chez <span style="background: linear-gradient(90deg, var(--gold), var(--gold-strong)); -webkit-background-clip: text; background-clip: text; color: transparent;">Simple Games</span>.</h2>
+        <p class="lead">
+          Simple Games rassemble tout ce qu'il y a sur le launcher autour d'un même chat. Tu te logues Discord,
+          tu y es. Pas de serveur Discord parallèle à chercher, pas d'invitation à demander — un crew maître
+          ouvert à tous les utilisateurs du launcher, c'est la base.
+        </p>
+      </div>
+
+      <div class="community-grid">
+        <div class="card accent-gold reveal" data-delay="1">
+          <div class="card-icon">
+            <!-- Castle (Lucide) — emblème du crew maître dans l'app -->
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 20v-9H2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2Z"/><path d="M18 11V4H6v7"/><path d="M15 22v-4a3 3 0 0 0-3-3a3 3 0 0 0-3 3v4"/><path d="M22 11V9"/><path d="M2 11V9"/><path d="M6 4V2"/><path d="M18 4V2"/><path d="M10 4V2"/><path d="M14 4V2"/></svg>
+          </div>
+          <h3 class="h-card">Le crew maître ★</h3>
+          <p>
+            Channels Discord-style, mentions, réactions, pinned messages.
+            Tous les joueurs du launcher sont membres dès le premier login. Le seul lieu où on peut tous
+            se croiser sans envoyer une invit.
+          </p>
+        </div>
+
+        <div class="card accent-gold reveal" data-delay="2">
+          <div class="card-icon">
+            <!-- Share / link icon -->
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/><path d="M12 13v8"/><path d="M9 17h6"/></svg>
+          </div>
+          <h3 class="h-card">Profils partageables</h3>
+          <p>
+            Chaque membre a un profil public sur <code>/u/ton-id</code> — avatar, bio, achievements, heatmap
+            de jeu, thème custom. Coller le lien dans un Discord externe ou une bio Twitch, c'est validé.
+          </p>
+        </div>
+
+        <div class="card accent-gold reveal" data-delay="3">
+          <div class="card-icon">
+            <!-- Heart icon -->
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+          </div>
+          <h3 class="h-card">Soutiens si tu kiffes</h3>
+          <p>
+            Trois tiers Ko-fi : <strong>Soutien</strong> 1 €, <strong>VIP</strong> 5 €, <strong>Légende</strong>
+            10 € / mois. Ribbon shimmer, créer ses propres crews privés, effets visuels premium.
+            Sans, t'as 100 % des fonctionnalités.
+          </p>
+        </div>
+
+        <div class="card accent-gold reveal" data-delay="1">
+          <div class="card-icon">
+            <!-- Users / friends icon -->
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6"/><path d="M23 11h-6"/></svg>
+          </div>
+          <h3 class="h-card">Présence en direct</h3>
+          <p>
+            Friends online strip dans la sidebar : qui est là, qui joue à quoi, depuis combien de temps.
+            Discord Rich Presence côté launcher montre ton activité Simple Games sur ton profil Discord
+            externe (optionnel).
+          </p>
+        </div>
+
+        <div class="card accent-gold reveal" data-delay="2">
+          <div class="card-icon">
+            <!-- Trophy icon — achievements -->
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+          </div>
+          <h3 class="h-card">Achievements partagés</h3>
+          <p>
+            39+ badges débloquables, avec rareté en %. Quand t'unlock un truc, le crew le voit. Les rares
+            (Discret, Fidèle des fidèles, Pionnier) deviennent un petit trophée que tu peux montrer.
+          </p>
+        </div>
+
+        <div class="card accent-gold reveal" data-delay="3">
+          <div class="card-icon">
+            <!-- Newspaper / news icon -->
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/></svg>
+          </div>
+          <h3 class="h-card">News & sondages</h3>
+          <p>
+            Quand un nouveau modpack débarque ou qu'un event se prépare, news directement dans le launcher
+            avec sondages + réactions. Plus efficace qu'un post Discord noyé dans 20 channels.
+          </p>
+        </div>
+      </div>
+
+      <!-- "On joue souvent à" strip -->
+      <div class="community-strip reveal" data-delay="2">
+        <div class="community-strip-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2"/><path d="M18 12h2a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-2"/><path d="M2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6"/><circle cx="12" cy="9" r="2"/><path d="M9 18v-2"/><path d="M15 18v-2"/></svg>
+        </div>
+        <div class="community-strip-body">
+          <h3>Ce qu'on lance ensemble</h3>
+          <p>
+            Le launcher embarque tous les modpacks que le crew a fait tourner — vanilla pour les novices,
+            Forge / Fabric / NeoForge pour les setups gros mods, modpacks Modrinth importables en un clic.
+            Auto-connect serveur quand le pack est joué en multi.
+          </p>
+          <div class="tags">
+            <span class="tag tag-gold">Minecraft Vanilla</span>
+            <span class="tag tag-gold">Fabric</span>
+            <span class="tag tag-gold">Forge</span>
+            <span class="tag tag-gold">NeoForge</span>
+            <span class="tag tag-gold">Modrinth</span>
+            <span class="tag tag-gold">CurseForge ZIP</span>
+            <span class="tag">Apps custom</span>
+            <span class="tag">Raccourcis Steam</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- Features -->
   <section class="section" id="features">
     <div class="container">
       <div class="section-intro reveal">
-        <span class="eyebrow">Fonctionnalités</span>
-        <h2 class="h-section">Tout ce qu'il te faut, dans un seul launcher.</h2>
+        <span class="eyebrow">Le launcher</span>
+        <h2 class="h-section">Tout ce qu'il faut pour jouer ensemble.</h2>
         <p class="lead">
-          Pensé comme un OS pour ton crew : modules indépendants, Minecraft natif, comms intégrées, et zéro
+          Pensé comme un OS pour le crew : modules indépendants, Minecraft natif, comms intégrées, et zéro
           friction de mise à jour.
         </p>
       </div>
@@ -520,16 +765,7 @@
           un clic, c'est installé. Pas de popup Windows à chaque update.</p>
         </div>
 
-        <div class="card accent-warn reveal" data-delay="1">
-          <div class="card-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          </div>
-          <h3 class="h-card">Communauté & profils</h3>
-          <p>Login Discord OAuth, profils publics partageables (<code>/u/discord_id</code>), achievements,
-          stats de jeu, clans/crews et sessions multijoueurs.</p>
-        </div>
-
-        <div class="card accent-success reveal" data-delay="2">
+        <div class="card reveal" data-delay="1">
           <div class="card-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
           </div>
@@ -538,7 +774,7 @@
           que tu joues. Personnalisable par module.</p>
         </div>
 
-        <div class="card reveal" data-delay="3">
+        <div class="card accent-success reveal" data-delay="2">
           <div class="card-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
           </div>
@@ -547,7 +783,7 @@
           sanitization d'environnement Java. Optimisé pour Sodium / Iris / Distant Horizons.</p>
         </div>
 
-        <div class="card accent-purple reveal" data-delay="1">
+        <div class="card accent-purple reveal" data-delay="3">
           <div class="card-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>
           </div>
@@ -556,7 +792,7 @@
           pour piloter ton instance directement depuis le launcher.</p>
         </div>
 
-        <div class="card accent-pink reveal" data-delay="2">
+        <div class="card accent-pink reveal" data-delay="1">
           <div class="card-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
           </div>
@@ -565,13 +801,22 @@
           changelog, citations, stats animées, embed HTML. Façon vitrine Steam.</p>
         </div>
 
-        <div class="card accent-success reveal" data-delay="3">
+        <div class="card reveal" data-delay="2">
           <div class="card-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
           </div>
           <h3 class="h-card">System tray & background</h3>
           <p>Comme Discord ou Steam : ferme la fenêtre, le launcher reste en arrière-plan dans la tray. Quitter
           vraiment se fait depuis le menu tray. Notifications natives Windows.</p>
+        </div>
+
+        <div class="card accent-success reveal" data-delay="3">
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          </div>
+          <h3 class="h-card">Overlay in-game</h3>
+          <p>Shift+F9 pour faire apparaître une fenêtre transparente always-on-top par-dessus n'importe quel
+          jeu en mode windowed/borderless. Stats, chat du crew, contrôles RCON sans alt-tab.</p>
         </div>
       </div>
     </div>
@@ -581,37 +826,37 @@
   <section class="section" id="how">
     <div class="container">
       <div class="section-intro reveal">
-        <span class="eyebrow">Comment ça marche</span>
-        <h2 class="h-section">Trois étapes pour jouer.</h2>
-        <p class="lead">Pas de configuration manuelle, pas de fichiers à déplacer. Le launcher gère tout.</p>
+        <span class="eyebrow eyebrow-gold">★ Trois étapes</span>
+        <h2 class="h-section">Rejoindre Simple Games.</h2>
+        <p class="lead">Pas de configuration manuelle, pas de fichiers à déplacer. Tu télécharges, tu te connectes, tu joues.</p>
       </div>
 
       <div class="steps">
-        <div class="card step reveal" data-delay="1">
+        <div class="card step gold-step reveal accent-gold" data-delay="1">
           <div class="card-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           </div>
           <h3 class="h-card">Installe le launcher</h3>
-          <p>Télécharge l'installer (5 MB), valide la mise en garde Windows une seule fois, c'est posé.
+          <p>Télécharge l'installer (~5 MB), valide la mise en garde Windows une seule fois, c'est posé.
           L'installation prend ~10 secondes.</p>
         </div>
 
-        <div class="card step reveal accent-purple" data-delay="2">
+        <div class="card step gold-step reveal accent-gold" data-delay="2">
           <div class="card-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>
           </div>
-          <h3 class="h-card">Connecte tes comptes</h3>
-          <p>Discord pour le crew, Microsoft pour Minecraft. OAuth standard, jamais de mot de passe demandé.
-          Les tokens vivent dans Windows Credential Manager.</p>
+          <h3 class="h-card">Connecte ton Discord</h3>
+          <p>OAuth Discord, jamais de mot de passe demandé. Au premier login tu rejoins automatiquement le
+          crew Simple Games — pas d'invitation à demander, pas de code à copier.</p>
         </div>
 
-        <div class="card step reveal accent-pink" data-delay="3">
+        <div class="card step gold-step reveal accent-gold" data-delay="3">
           <div class="card-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
           </div>
-          <h3 class="h-card">Clique LANCER</h3>
-          <p>Le launcher détecte les dépendances manquantes (VC++ runtimes, Java), les installe automatiquement
-          au premier launch, puis spawn le jeu. Auto-connect serveur si configuré.</p>
+          <h3 class="h-card">Lance, joue, partage</h3>
+          <p>Choisis un module, clic sur LANCER. Le crew voit que tu joues, peut rejoindre la session.
+          Achievements et heatmap se remplissent au fur et à mesure.</p>
         </div>
       </div>
     </div>
@@ -657,21 +902,18 @@
             </div>
             <div class="terminal-body">
 <span class="com"># Auto-update flow au lancement</span>
-<span class="pmt">[updater]</span> <span class="ok">Checking https://simplelaunche.web.app/launcher/latest.json</span>
-<span class="pmt">[updater]</span> Found <span class="nu">v26.05.03.6</span> (current: <span class="nu">v26.05.03.5</span>)
-<span class="pmt">[updater]</span> Downloading installer (<span class="str">"4.9 MB"</span>)…
+<span class="pmt">[updater]</span> <span class="ok">Checking https://simplelaunche.web.app/launcher/win/releases.win.json</span>
+<span class="pmt">[updater]</span> Found <span class="nu">v26.05.06.16</span> (current: <span class="nu">v26.05.06.15</span>)
+<span class="pmt">[updater]</span> Delta package detected (<span class="str">"3.2 MB"</span>) — skipping full
 <span class="pmt">[updater]</span> Verifying ed25519 signature… <span class="ok">OK</span>
-<span class="pmt">[updater]</span> Spawning installer with /SILENT
-<span class="pmt">[updater]</span> Restarting…
+<span class="pmt">[updater]</span> Applying update atomically + restart
+<span class="pmt">[updater]</span> <span class="ok">Done.</span>
 
-<span class="com"># Au premier lancement Minecraft</span>
-<span class="pmt">[runtime-deps]</span> check: <span class="nu">2</span> missing of <span class="nu">3</span> known
-<span class="pmt">[runtime-deps]</span> Downloading VC++ 2012 (x64) from microsoft.com
-<span class="pmt">[runtime-deps]</span> Spawning installer (UAC prompt)
-<span class="pmt">[runtime-deps]</span> vc2012 installed (exit code <span class="nu">0</span>)
-<span class="pmt">[mc-launch]</span> Java: Eclipse Adoptium <span class="nu">21.0.11</span>
-<span class="pmt">[mc-launch]</span> Spawning javaw with <span class="nu">4096 MB</span> heap
-<span class="ok">→ Minecraft running.</span>
+<span class="com"># Connexion Discord → crew Simple Games</span>
+<span class="pmt">[auth]</span> Discord OAuth → loopback <span class="str">"http://localhost:14257/callback"</span>
+<span class="pmt">[auth]</span> Custom token signed by Cloud Function <span class="str">"discordAuth"</span>
+<span class="pmt">[crews]</span> Adding user to master crew <span class="str">"Simple Games"</span>… <span class="ok">OK</span>
+<span class="ok">→ Bienvenue dans le crew.</span>
             </div>
           </div>
         </div>
@@ -695,14 +937,14 @@
               <p>UI moderne avec Framer Motion pour les transitions, Zustand pour l'état, GSAP/tsParticles pour
               les particules. Tout le frontend est code-splitté (lazy routes).</p>
             </div>
-            <div class="card accent-pink">
+            <div class="card accent-gold">
               <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
-                <span class="tag">Cloud</span>
-                <strong>Firebase</strong>
+                <span class="tag tag-gold">Cloud</span>
+                <strong>Firebase + Velopack</strong>
               </div>
-              <p>Firestore pour les modules + comptes utilisateurs, Storage pour les assets de modules, Hosting
-              CDN pour les installeurs et le manifest auto-update. Cloud Functions pour les achievements et
-              webhooks Discord.</p>
+              <p>Firestore pour les modules, profils, achievements et le crew. Storage pour les assets,
+              Hosting CDN pour l'auto-update Velopack (delta packages ~3-5 MB / release au lieu de full).
+              Cloud Functions pour Discord OAuth et webhooks Ko-fi.</p>
             </div>
           </div>
         </div>
@@ -719,6 +961,38 @@
       </div>
 
       <div class="faq">
+        <details class="qa qa-gold reveal">
+          <summary>★ C'est quoi <strong>Simple Games</strong> exactement ?</summary>
+          <div class="qa-body">
+            <p>
+              <strong>Simple Games</strong> c'est le crew (la communauté) qui vit à l'intérieur de Simple Launcher.
+              Techniquement c'est un <em>master crew</em> dans le launcher — un clan Discord-style auquel
+              <strong>tous les utilisateurs sont auto-membres</strong> dès leur premier login. Tu n'as rien
+              à faire pour le rejoindre, et tu ne peux pas le quitter.
+            </p>
+            <p>
+              C'est l'endroit où on parle des modpacks, où on annonce les events, où on partage des screenshots,
+              où on fait des sondages. Comme un Discord serveur principal, sauf que c'est intégré au launcher
+              donc pas besoin de jongler entre 2 apps.
+            </p>
+          </div>
+        </details>
+
+        <details class="qa qa-gold reveal">
+          <summary>★ Je peux créer mon propre crew, séparé de Simple Games ?</summary>
+          <div class="qa-body">
+            <p>
+              Oui — tout utilisateur ayant un <strong>tier Soutien / VIP / Légende</strong> (via Ko-fi)
+              peut créer ses propres crews privés ou publics. Tu choisis emblème, couleur, channels,
+              rôles custom, code d'invitation. Simple Games reste accessible en parallèle, c'est pas l'un ou l'autre.
+            </p>
+            <p>
+              Les crews publics sont listés dans la section "Découvrir" — n'importe qui peut les rejoindre.
+              Les privés se rejoignent uniquement via code d'invitation que tu partages.
+            </p>
+          </div>
+        </details>
+
         <details class="qa reveal">
           <summary>Pourquoi Windows me dit "Cette application n'est pas reconnue" ?</summary>
           <div class="qa-body">
@@ -789,7 +1063,8 @@
           <summary>C'est open-source ? Comment je contribue ?</summary>
           <div class="qa-body">
             <p>Le projet est <strong>privé</strong> à ce stade — pas de repo public ni de mécanisme de PR pour
-            l'instant. Si t'es intéressé pour bosser dessus ou rapporter un bug, contacte le crew via Discord.</p>
+            l'instant. Si t'es intéressé pour bosser dessus ou rapporter un bug, contacte le crew directement
+            depuis les channels Simple Games dans le launcher.</p>
           </div>
         </details>
 
@@ -810,8 +1085,8 @@
   <section class="section">
     <div class="container">
       <div class="cta-band reveal">
-        <h2>Prêt à lancer ton premier module ?</h2>
-        <p>Installer signé, ~5 MB, Windows 10/11. Auto-update activé après install. Désinstallable proprement à tout moment.</p>
+        <h2>Prêt à <span class="gold-grad">rejoindre le crew</span> ?</h2>
+        <p>Installer signé, ~5 MB, Windows 10/11. Tu rejoins Simple Games automatiquement à ton premier login Discord. Auto-update activé. Désinstallable proprement à tout moment.</p>
         <a class="btn btn-primary" href="/download/SimpleLauncher-Setup.exe" download>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Télécharger Simple Launcher
@@ -828,16 +1103,20 @@
     <div class="container">
       <div class="footer-grid">
         <div class="footer-brand">
-          <a href="/" class="nav-brand">
+          <a href="/" class="nav-brand-twin">
             <img src="/logo.png" alt="" />
-            <span>SIMPLE LAUNCHER</span>
+            <span class="nav-brand-stack">
+              <span>SIMPLE LAUNCHER</span>
+              <span class="nav-brand-sub">★ Simple Games</span>
+            </span>
           </a>
-          <p>Le launcher PC pour ton crew. Construit avec Rust et React. Pas de pub, pas de tracking, pas
+          <p>L'outil de la communauté Simple Games. Construit avec Rust et React. Pas de pub, pas de tracking, pas
           d'abonnement.</p>
         </div>
         <div class="footer-col">
           <h4>Produit</h4>
           <ul>
+            <li><a href="#community">La communauté</a></li>
             <li><a href="#features">Fonctionnalités</a></li>
             <li><a href="#how">Comment ça marche</a></li>
             <li><a href="#tech">Sous le capot</a></li>
@@ -855,7 +1134,7 @@
         </div>
       </div>
       <div class="footer-bar">
-        <span>&copy; 2026 Simple Launcher · Privé</span>
+        <span>&copy; 2026 Simple Games · Privé</span>
         <span>Construit avec Tauri, Rust, React et beaucoup de café</span>
       </div>
     </div>
@@ -883,7 +1162,6 @@
         }
 
         if (!data.platforms || !data.platforms["windows-x86_64"]) {
-          document.getElementById("status-pill").textContent = "Bientôt";
           document.getElementById("download").setAttribute("aria-disabled", "true");
         } else {
           // Probe HEAD for size
