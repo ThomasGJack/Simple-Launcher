@@ -158,7 +158,7 @@ export function DiagnosticModal({ open, onClose }: { open: boolean; onClose: () 
                       value={
                         snapshot.gpus.length > 0
                           ? snapshot.gpus.join(" · ")
-                          : "(non détecté — wmic indisponible ?)"
+                          : "(non détecté)"
                       }
                       warn={snapshot.gpus.length === 0}
                     />

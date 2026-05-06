@@ -67,31 +67,80 @@ pub struct VcRedistSummary {
     pub url: String,
 }
 
-/// Returns names of installed video controllers via `wmic`. Falls back
-/// to an empty list when `wmic` isn't available (it's deprecated in
-/// recent Windows but still ships up to Win 11 23H2). For a future
-/// migration to PowerShell `Get-CimInstance Win32_VideoController`,
-/// keep the same fallback semantics.
+/// Returns names of installed video controllers. Tries `wmic` first
+/// (fastest, ~50 ms on Win 10 / Win 11 ≤ 23H2) — but Microsoft
+/// removed it in Windows 11 24H2 (kernel 26100+) so we fall back to
+/// PowerShell + Get-CimInstance. The PowerShell path is slower
+/// (~700 ms cold start) but works on every modern Windows.
+///
+/// Both paths return the same shape : a `Vec<String>` of GPU names,
+/// or empty if no GPU is detected / both queries error.
 async fn detect_gpus() -> Vec<String> {
-    let result = Command::new("wmic")
+    if let Some(list) = detect_gpus_wmic().await {
+        if !list.is_empty() {
+            return list;
+        }
+    }
+    detect_gpus_powershell().await.unwrap_or_default()
+}
+
+/// Legacy `wmic` path — fast but only works on Windows ≤ 11 23H2.
+/// Returns `None` if `wmic` itself can't be spawned (binary
+/// missing), or if it succeeds but returns no usable lines.
+async fn detect_gpus_wmic() -> Option<Vec<String>> {
+    let output = Command::new("wmic")
         .args(["path", "win32_VideoController", "get", "Name", "/value"])
         .output()
-        .await;
-    let Ok(output) = result else {
-        return Vec::new();
-    };
+        .await
+        .ok()?;
     if !output.status.success() {
-        return Vec::new();
+        return None;
     }
     let stdout = String::from_utf8_lossy(&output.stdout);
-    stdout
+    let names: Vec<String> = stdout
         .lines()
         .filter_map(|line| {
-            let line = line.trim();
-            line.strip_prefix("Name=").map(|s| s.trim().to_string())
+            line.trim()
+                .strip_prefix("Name=")
+                .map(|s| s.trim().to_string())
         })
         .filter(|s| !s.is_empty())
-        .collect()
+        .collect();
+    Some(names)
+}
+
+/// Modern PowerShell path — works on every Windows since Vista
+/// (Get-CimInstance is the supported successor to Get-WmiObject).
+/// We pass `-NoProfile` to skip the user's PowerShell profile (some
+/// users have heavy profiles that add seconds to cold start) and
+/// `-Command` with a one-liner that emits each GPU name on its own
+/// line.
+async fn detect_gpus_powershell() -> Option<Vec<String>> {
+    // `Format-List` would add label prefixes ; we just want the
+    // raw names, one per line. `Out-String -Stream` ensures the
+    // output is line-buffered so the parser below works.
+    let output = Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            "Get-CimInstance Win32_VideoController | ForEach-Object { $_.Name }",
+        ])
+        .output()
+        .await
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let names: Vec<String> = stdout
+        .lines()
+        .map(|line| line.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+    Some(names)
 }
 
 #[tauri::command]
