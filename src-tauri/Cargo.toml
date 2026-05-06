@@ -1,6 +1,6 @@
 [package]
 name = "simple-launcher"
-version = "26.506.2"
+version = "26.506.4"
 description = "Simple Launcher — multi-game launcher"
 authors = ["goule"]
 edition = "2021"
@@ -17,7 +17,14 @@ tauri-build = { version = "2", features = [] }
 # and `image-png` so we can decode the embedded logo for the tray icon.
 tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-plugin-opener = "2"
-tauri-plugin-updater = "2"
+# Auto-updater : Velopack remplace tauri-plugin-updater à partir de
+# la v27. Velopack apporte les delta updates (~3-5 MB par release au
+# lieu de ~80 MB), un installer custom (plus de dialog NSIS), et la
+# robustesse atomique (rollback si install échoue). Le crate expose
+# `VelopackApp` (à appeler AVANT Tauri pour intercepter les hooks
+# d'install/update) et `UpdateManager` (pour check/download/apply
+# depuis l'app).
+velopack = "0.0.1589-ga2c5a97"
 tauri-plugin-process = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-notification = "2"

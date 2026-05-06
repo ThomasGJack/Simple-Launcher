@@ -1,7 +1,7 @@
 {
   "name": "simple-launcher",
   "private": true,
-  "version": "26.506.2",
+  "version": "26.506.4",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -24,7 +24,6 @@
     "@tauri-apps/plugin-notification": "^2.3.3",
     "@tauri-apps/plugin-opener": "^2",
     "@tauri-apps/plugin-process": "^2.3.1",
-    "@tauri-apps/plugin-updater": "^2.10.1",
     "@tsparticles/engine": "^3.9.1",
     "@tsparticles/react": "^3.0.0",
     "@tsparticles/slim": "^3.9.1",
@@ -59,6 +58,7 @@
     "sharp": "^0.34.5",
     "tailwindcss": "^4.2.4",
     "typescript": "~5.8.3",
+    "velopack": "^0.0.1589-ga2c5a97",
     "vite": "^7.0.4"
   }
 }

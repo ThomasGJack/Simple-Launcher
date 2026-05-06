@@ -21,6 +21,7 @@ mod rcon;
 #[cfg(windows)]
 mod single_instance;
 mod tray;
+mod velo_updater;
 
 use tauri::{Emitter, Manager};
 
@@ -54,7 +55,10 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
+        // tauri-plugin-updater retiré au profit de Velopack — voir
+        // src/velo_updater.rs pour les commands check/download/apply.
+        // Velopack apporte les delta updates et un installer qui
+        // remplace NSIS sans ses dialogs Windows-classiques.
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
@@ -70,6 +74,7 @@ pub fn run() {
         .manage(log_file::LogFileState::new())
         .manage(mc_auth::McAuthState::new())
         .manage(overlay::OverlayState::new())
+        .manage(velo_updater::VeloState::new())
         .on_window_event(|window, event| {
             // Intercept the main-window close request: instead of exiting
             // the app, hide the window and let the tray icon stay alive.
@@ -200,6 +205,12 @@ pub fn run() {
             overlay::overlay_toggle,
             overlay::overlay_show,
             overlay::overlay_hide,
+            // Velopack auto-updater commands (replaces tauri-plugin-updater)
+            velo_updater::velo_check,
+            velo_updater::velo_download,
+            velo_updater::velo_apply,
+            velo_updater::velo_current_version,
+            velo_updater::velo_is_installed,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

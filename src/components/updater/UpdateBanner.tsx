@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { check, type Update } from "@tauri-apps/plugin-updater";
-import { relaunch } from "@tauri-apps/plugin-process";
-import { getVersion } from "@tauri-apps/api/app";
+import {
+  veloApply,
+  veloCheck,
+  veloCurrentVersion,
+  veloDownload,
+  type VeloUpdateSummary,
+} from "@/lib/veloUpdater";
 import { listen } from "@tauri-apps/api/event";
 import {
   AlertTriangle,
@@ -24,7 +28,7 @@ import { cn } from "@/lib/cn";
 
 type Status =
   | { kind: "idle" }
-  | { kind: "available"; update: Update } // mid-session detection only
+  | { kind: "available"; summary: VeloUpdateSummary } // mid-session detection only
   | {
       kind: "downloading";
       progress: number;
@@ -84,12 +88,12 @@ export function UpdateBanner() {
   const [dismissed, setDismissed] = useState(false);
   /** Mid-session arrival modal — only shown when an update lands AFTER the
    *  startup grace window. On startup, we skip the modal entirely and
-   *  auto-install. */
+   *  auto-install. The Velopack UpdateInfo lives on the Rust side ; we
+   *  only carry the user-facing summary here. */
   const [freshArrival, setFreshArrival] = useState<{
     version: string;
-    date?: string;
     notes?: string;
-    update: Update;
+    summary: VeloUpdateSummary;
   } | null>(null);
   /** "You just updated to version X" modal shown on the FIRST boot of a
    *  freshly-installed version — purely informational, no install buttons. */
@@ -111,7 +115,7 @@ export function UpdateBanner() {
     let cancelled = false;
     (async () => {
       try {
-        const currentVer = await getVersion();
+        const currentVer = await veloCurrentVersion();
         if (cancelled) return;
         const lastSeen = localStorage.getItem(LS_LAST_SEEN_VERSION);
         const pendingVer = localStorage.getItem(LS_PENDING_VERSION);
@@ -154,13 +158,13 @@ export function UpdateBanner() {
 
     const tick = async () => {
       try {
-        const update = await check();
+        const summary = await veloCheck();
         if (cancelled) return;
-        if (!update) return;
+        if (!summary) return;
 
         // Don't re-process the same pending version.
-        if (seenVersion.current === update.version) return;
-        seenVersion.current = update.version;
+        if (seenVersion.current === summary.version) return;
+        seenVersion.current = summary.version;
 
         const elapsedSinceStart = Date.now() - startedAt.current;
         const isStartupWindow = elapsedSinceStart < STARTUP_GRACE_MS;
@@ -168,17 +172,16 @@ export function UpdateBanner() {
         if (isStartupWindow) {
           // Auto-install path: stash the changelog so the post-update modal
           // can show it after relaunch, then download+install silently.
-          localStorage.setItem(LS_PENDING_VERSION, update.version);
-          localStorage.setItem(LS_PENDING_NOTES, update.body ?? "");
+          localStorage.setItem(LS_PENDING_VERSION, summary.version);
+          localStorage.setItem(LS_PENDING_NOTES, summary.notes ?? "");
           sounds.notification();
-          await runInstall(update, true);
+          await runInstall(summary, true);
         } else {
           // Mid-session: ask the user (no surprise restarts while playing).
           setFreshArrival({
-            version: update.version,
-            date: update.date,
-            notes: update.body,
-            update,
+            version: summary.version,
+            notes: summary.notes,
+            summary,
           });
           sounds.updateArrived();
         }
@@ -212,12 +215,12 @@ export function UpdateBanner() {
       setStatus({ kind: "manual-checking" });
       sounds.click();
       try {
-        const update = await check();
+        const summary = await veloCheck();
         if (cancelled) return;
-        if (!update) {
+        if (!summary) {
           // Already on the latest. Tiny success toast, auto-clears
           // after 3 seconds so it doesn't sit on the screen forever.
-          const currentVer = await getVersion();
+          const currentVer = await veloCurrentVersion();
           setStatus({ kind: "up-to-date", version: currentVer });
           setDismissed(false);
           window.setTimeout(() => {
@@ -227,12 +230,11 @@ export function UpdateBanner() {
         }
         // Update found — short-circuit the startup-grace check and just
         // ask the user (manual click ⇒ they're awake, surface the modal).
-        seenVersion.current = update.version;
+        seenVersion.current = summary.version;
         setFreshArrival({
-          version: update.version,
-          date: update.date,
-          notes: update.body,
-          update,
+          version: summary.version,
+          notes: summary.notes,
+          summary,
         });
         setStatus({ kind: "idle" });
         sounds.updateArrived();
@@ -264,9 +266,8 @@ export function UpdateBanner() {
     bytesPerSec: number;
   }>({ lastTickMs: 0, bytesPerSec: 0 });
 
-  const runInstall = async (update: Update, auto: boolean) => {
-    let downloaded = 0;
-    let total = 0;
+  const runInstall = async (summary: VeloUpdateSummary, auto: boolean) => {
+    const totalSize = summary.size; // known up-front from the manifest
     const startedAtMs = Date.now();
     downloadStatsRef.current = { lastTickMs: startedAtMs, bytesPerSec: 0 };
     setFreshArrival(null);
@@ -274,77 +275,64 @@ export function UpdateBanner() {
     setStatus({
       kind: "downloading",
       progress: 0,
-      total: 0,
+      total: totalSize,
       auto,
-      version: update.version,
+      version: summary.version,
       bytesPerSec: 0,
       startedAtMs,
     });
 
     try {
-      await update.downloadAndInstall((event) => {
-        switch (event.event) {
-          case "Started":
-            total = event.data.contentLength ?? 0;
-            setStatus({
-              kind: "downloading",
-              progress: 0,
-              total,
-              auto,
-              version: update.version,
-              bytesPerSec: 0,
-              startedAtMs,
-            });
-            break;
-          case "Progress": {
-            downloaded += event.data.chunkLength;
-            // EWMA on bytes-per-second over the time delta since the
-            // last chunk. α=0.3 means new measurement contributes 30 %,
-            // history 70 % — feels responsive without jittering.
-            const now = Date.now();
-            const last = downloadStatsRef.current;
-            const dt = Math.max(1, now - last.lastTickMs);
-            const instant = (event.data.chunkLength * 1000) / dt;
-            const smoothed =
-              last.bytesPerSec === 0
-                ? instant
-                : last.bytesPerSec * 0.7 + instant * 0.3;
-            downloadStatsRef.current = {
-              lastTickMs: now,
-              bytesPerSec: smoothed,
-            };
-            setStatus({
-              kind: "downloading",
-              progress: downloaded,
-              total,
-              auto,
-              version: update.version,
-              bytesPerSec: smoothed,
-              startedAtMs,
-            });
-            break;
-          }
-          case "Finished":
-            // Download done — flip into "installing" while Tauri runs
-            // the NSIS silent install. The Finished event fires before
-            // the install actually completes, so we get a clean
-            // "Téléchargement → Installation" transition for the user.
-            setStatus({ kind: "installing", version: update.version });
-            break;
-        }
+      // Velopack reports progress as 0-100 percent (one channel) instead
+      // of byte-deltas like tauri-plugin-updater. We back-derive the
+      // bytes from `pct * totalSize / 100` so the UI's existing speed
+      // + ETA computation keeps working without rewrites.
+      let lastPct = 0;
+      await veloDownload((pct) => {
+        const now = Date.now();
+        const downloaded = Math.round((pct / 100) * totalSize);
+        const last = downloadStatsRef.current;
+        const dt = Math.max(1, now - last.lastTickMs);
+        // Bytes-per-second instant estimate from the increment in
+        // percentage, scaled back to bytes via totalSize. EWMA smooths
+        // the displayed value.
+        const deltaBytes = Math.max(0, ((pct - lastPct) / 100) * totalSize);
+        const instant = (deltaBytes * 1000) / dt;
+        const smoothed =
+          last.bytesPerSec === 0
+            ? instant
+            : last.bytesPerSec * 0.7 + instant * 0.3;
+        downloadStatsRef.current = { lastTickMs: now, bytesPerSec: smoothed };
+        lastPct = pct;
+        setStatus({
+          kind: "downloading",
+          progress: downloaded,
+          total: totalSize,
+          auto,
+          version: summary.version,
+          bytesPerSec: smoothed,
+          startedAtMs,
+        });
       });
-      // downloadAndInstall resolves → install actually finished. Show
-      // a brief "Ready" state with countdown before relaunch.
-      setStatus({ kind: "ready", version: update.version });
-      // Update finished downloading + installing → unlock #40 "Up to
-      // date". The relaunch happens immediately after but we mark first
-      // because relaunch tears down localStorage write paths abruptly.
+
+      // Download done — flip to "installing" while Velopack stages the
+      // package. apply() will replace the binary and relaunch the
+      // process, so the JS side ends here on success.
+      setStatus({ kind: "installing", version: summary.version });
+
+      // Update finished downloading — unlock #40 "Up to date" before
+      // we lose the localStorage write path (Velopack apply will exit
+      // and relaunch the process abruptly).
       achievementFlags.markUpdateInstalled();
+
       // Brief pause so the "Ready / countdown" state has time to render
-      // before the relaunch tears the window down (~700 ms feels good
-      // — long enough to perceive, short enough not to feel sluggish).
+      // before the relaunch tears the window down.
+      setStatus({ kind: "ready", version: summary.version });
       await new Promise((r) => setTimeout(r, 700));
-      await relaunch();
+
+      // veloApply() never returns on success — process exits and
+      // relaunches via Velopack. If it DOES return, treat as error.
+      await veloApply();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setStatus({ kind: "error", message, canRetry: true });
@@ -366,14 +354,14 @@ export function UpdateBanner() {
     status.kind === "ready";
 
   // Latest update we attempted to install. Captured so the retry
-  // button on the error state can re-call runInstall without a
-  // fresh check() round-trip.
-  const lastUpdateRef = useRef<Update | null>(null);
+  // button on the error state can re-call runInstall without a fresh
+  // veloCheck() round-trip.
+  const lastUpdateRef = useRef<VeloUpdateSummary | null>(null);
   if (
-    freshArrival?.update &&
-    lastUpdateRef.current?.version !== freshArrival.update.version
+    freshArrival?.summary &&
+    lastUpdateRef.current?.version !== freshArrival.summary.version
   ) {
-    lastUpdateRef.current = freshArrival.update;
+    lastUpdateRef.current = freshArrival.summary;
   }
 
   return (
@@ -456,9 +444,8 @@ export function UpdateBanner() {
         {freshArrival && (
           <FreshArrivalModal
             version={freshArrival.version}
-            date={freshArrival.date}
             notes={freshArrival.notes}
-            onInstall={() => void runInstall(freshArrival.update, false)}
+            onInstall={() => void runInstall(freshArrival.summary, false)}
             onLater={() => setFreshArrival(null)}
           />
         )}

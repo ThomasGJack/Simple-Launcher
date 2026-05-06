@@ -18,6 +18,35 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.05.06.5] - 2026-05-06  · semver `26.506.4`
+
+
+
+
+### Corrigé
+
+- **URL endpoint Velopack** ([src-tauri/src/velo_updater.rs](src-tauri/src/velo_updater.rs)) — l'URL `UPDATE_URL` pointait sur `/launcher/` (héritage de la config tauri-plugin-updater) au lieu de `/launcher/win/` où Velopack publie les manifests par channel. Sans le segment `/win/`, Velopack n'aurait pas trouvé le `releases.win.json` et l'auto-update aurait silencieusement échoué côté client.
+- **Headers Firebase pour Velopack** ([firebase.json](firebase.json)) — ajout des `.nupkg` aux fichiers cacheables long-terme, et règle `no-cache` explicite sur le fichier `RELEASES` (texte plat sans extension) pour que les clients ne récupèrent pas un manifeste obsolète depuis le CDN.
+## [v26.05.06.4] - 2026-05-06  · semver `26.506.3`
+
+
+### Ajouté
+
+- **Migration complète vers Velopack** ([src-tauri/src/velo_updater.rs](src-tauri/src/velo_updater.rs) + [src-tauri/src/main.rs](src-tauri/src/main.rs) + [src/lib/veloUpdater.ts](src/lib/veloUpdater.ts) + [scripts/release-launcher.mjs](scripts/release-launcher.mjs)) — refonte complète du système d'install / d'auto-update. Velopack remplace NSIS (plus aucune boîte de dialogue Windows-classique) et tauri-plugin-updater. Apporte trois bénéfices majeurs : (1) **Delta updates** — le launcher ne télécharge plus que ce qui a changé entre deux versions (~3-5 MB au lieu de ~80 MB pour un changement React typique). (2) **Install silencieux** — le `Setup.exe` Velopack n'affiche aucune boîte de dialogue NSIS ; il extrait, configure et lance directement le launcher dont la `WelcomeModal` premium fait office d'expérience d'install. (3) **Atomic upgrades** — rollback automatique si l'install échoue, plus de risque de launcher "à moitié installé". Velopack est l'engine utilisé par Discord, GitHub Desktop, Slack — battle-tested sur des millions d'utilisateurs.
+
+### Changé
+
+- **Pipeline release Velopack** ([scripts/release-launcher.mjs](scripts/release-launcher.mjs)) — refonte du script pour invoquer `vpk pack` au lieu du bundling NSIS. La pipeline : (1) build frontend Vite, (2) cargo build --release pour produire le raw simple-launcher.exe, (3) staging des binaires, (4) vpk pack qui génère Setup.exe + .nupkg full + .nupkg delta + RELEASES manifest dans `hosting/launcher/win/`. Le hosting Firebase change de structure : plus de `latest.json` ni de `.exe.sig` au format Tauri, à la place le format Velopack standard.
+- **HUD update sur APIs Velopack** ([src/components/updater/UpdateBanner.tsx](src/components/updater/UpdateBanner.tsx) + [src/lib/veloUpdater.ts](src/lib/veloUpdater.ts)) — le HUD premium existant (stepper 4 étapes, vitesse temps-réel, ETA, shimmer, animations) est conservé tel quel mais branché sur les nouvelles commands Tauri Rust (`velo_check` / `velo_download` / `velo_apply`) qui wrappent le crate velopack. La progression arrive via l'event Tauri `velo:progress` (0-100 %) au lieu des byte-deltas du plugin updater. La conversion vers bytes/s + ETA se fait côté React à partir du `summary.size` retourné par `velo_check`.
+
+### Supprimé
+
+- **NSIS bundler retiré** ([src-tauri/tauri.conf.json](src-tauri/tauri.conf.json)) — `bundle.active` passé à `false`, plus de `targets: ["nsis"]`, plus de section `windows.nsis`. Le `cargo build --release` produit maintenant juste le raw `simple-launcher.exe` que Velopack package ensuite. Les BMPs `installer/header.bmp` + `installer/sidebar.bmp` + `installer/hooks.nsh` restent au dépôt pour l'historique mais ne sont plus utilisés. La dépendance `tauri-plugin-updater` (Rust) + `@tauri-apps/plugin-updater` (npm) sont retirées du projet.
+- **Permission `updater:default`** retirée de `src-tauri/capabilities/default.json` — le plugin updater n'existe plus, sa permission n'a plus lieu d'être.
+
+### Sécurité
+
+- **Code signing Velopack** — Velopack supporte la signature Authenticode standard via `--signParams` ou `--azureTrustedSignFile` mais n'est pas activé sur cette release (pas de cert disponible côté dev). À ré-activer quand un cert EV sera disponible. Sans signature, Windows SmartScreen affichera le warning "Cette application n'est pas reconnue" au premier lancement, comme actuellement avec NSIS.
 ## [v26.05.06.3] - 2026-05-06  · semver `26.506.2`
 
 
