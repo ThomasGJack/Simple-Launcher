@@ -1,4 +1,4 @@
-import { memo, useMemo, useState } from "react";
+import { memo, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Users, Copy, Check, Gamepad2, ExternalLink, MessageCircle } from "lucide-react";
 import { useAuthStore } from "@/store/auth";
@@ -13,6 +13,7 @@ import { TierName } from "@/components/tier/TierName";
 import { TierBannerOverlay } from "@/components/tier/TierBanner";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
+import { useScrollMemory } from "@/hooks/useScrollMemory";
 
 const INVITE_URL = "https://simplelaunche.web.app";
 const INVITE_MESSAGE = `Salut ! Télécharge Simple Launcher pour qu'on joue ensemble : ${INVITE_URL}\n\nTu te connectes avec Discord, et on se voit en ligne dans le launcher 🎮`;
@@ -39,8 +40,11 @@ export function CommunityPage() {
 
   const onlineCount = sorted.filter((s) => s.status === "online").length;
 
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  useScrollMemory(scrollRef, "community");
+
   return (
-    <div className="scroll-y-only relative h-full p-12">
+    <div ref={scrollRef} className="scroll-y-only relative h-full p-12">
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-10">
         <p className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-accent">
           <Users className="size-3" /> Communauté

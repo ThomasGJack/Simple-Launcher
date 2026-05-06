@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { ScrollMemoryRoot } from "@/hooks/ScrollMemoryRoot";
 import { motion } from "framer-motion";
 import { ArrowLeft, Filter, Lock, Sparkles, Trophy } from "lucide-react";
 import { useUIStore } from "@/store/ui";
@@ -148,7 +149,7 @@ export function AchievementsPage() {
   }, [unlockedById, ctx]);
 
   return (
-    <div className="scroll-y-only relative h-full p-12">
+    <ScrollMemoryRoot routeKey="achievements" className="p-12">
       <button
         onClick={() => {
           sounds.click();
@@ -261,7 +262,7 @@ export function AchievementsPage() {
           ))}
         </div>
       )}
-    </div>
+    </ScrollMemoryRoot>
   );
 }
 

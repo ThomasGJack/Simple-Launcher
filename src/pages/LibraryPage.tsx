@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Library as LibraryIcon, Loader2, Plus } from "lucide-react";
 import { ModuleCard } from "@/components/library/ModuleCard";
@@ -11,6 +11,7 @@ import { watchUserCustomMinecraft } from "@/firebase/customMinecraft";
 import { useAuthStore } from "@/store/auth";
 import { sounds } from "@/lib/sounds";
 import type { CustomMinecraftModule, LauncherModule } from "@/types/module";
+import { useScrollMemory } from "@/hooks/useScrollMemory";
 
 export function LibraryPage() {
   const user = useAuthStore((s) => s.user);
@@ -67,9 +68,12 @@ export function LibraryPage() {
     [customMc],
   );
 
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  useScrollMemory(scrollRef, "library");
+
   return (
     <>
-      <div className="scroll-y-only relative h-full p-12">
+      <div ref={scrollRef} className="scroll-y-only relative h-full p-12">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
