@@ -301,23 +301,21 @@ export function MembersList({
     }
   };
 
-  // Live online count for the crew. Used in the footer stats.
-  const onlineCount = useMemo(() => {
+  // Live online + in-game counts for the crew footer. Both go through
+  // the `usersByUid` map (already built above) instead of doing a
+  // linear `allUsers.find` per member — drops the worst case from
+  // O(n²) to O(n) on master crews with 60+ members.
+  const { onlineCount, inGameCount } = useMemo(() => {
     const now = Date.now();
-    return sortedMembers.filter((m) => {
-      const live = allUsers.find((u) => u.uid === m.uid);
-      return live?.lastSeen && now - live.lastSeen < 60_000;
-    }).length;
-  }, [sortedMembers, allUsers]);
-  // Active in-game count. Lets us surface "3 membres jouent en ce
-  // moment" as a kind of live community pulse.
-  const inGameCount = useMemo(
-    () =>
-      sortedMembers.filter(
-        (m) => allUsers.find((u) => u.uid === m.uid)?.currentActivity,
-      ).length,
-    [sortedMembers, allUsers],
-  );
+    let online = 0;
+    let inGame = 0;
+    for (const m of sortedMembers) {
+      const live = usersByUid.get(m.uid);
+      if (live?.lastSeen && now - live.lastSeen < 60_000) online++;
+      if (live?.currentActivity) inGame++;
+    }
+    return { onlineCount: online, inGameCount: inGame };
+  }, [sortedMembers, usersByUid]);
 
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-l border-white/[0.06] bg-bg-soft/30 lg:flex">

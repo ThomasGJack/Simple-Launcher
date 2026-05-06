@@ -24,6 +24,7 @@ import {
   renderMessageMarkdown,
   splitMessageMentions,
 } from "@/lib/crewMessageFormat";
+import { handleExternalLinkClick } from "@/lib/linkUtils";
 import { useUsers } from "@/store/firebaseStores";
 import { TierAvatar } from "@/components/tier/TierAvatar";
 import { TierName } from "@/components/tier/TierName";
@@ -462,7 +463,10 @@ function MessageBody({
 }) {
   const tokens = splitMessageMentions(text);
   return (
-    <div className="break-words text-sm leading-relaxed text-fg-muted [&_a]:text-accent [&_a]:underline [&_code]:rounded [&_code]:bg-bg-base/60 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[12px] [&_code]:text-fg-primary [&_pre]:rounded-lg [&_pre]:bg-bg-base/60 [&_pre]:p-2 [&_pre]:text-xs [&_blockquote]:border-l-2 [&_blockquote]:border-accent/40 [&_blockquote]:pl-3 [&_blockquote]:text-fg-muted [&_strong]:text-fg-primary">
+    <div
+      onClick={handleExternalLinkClick}
+      className="break-words text-sm leading-relaxed text-fg-muted [&_a]:cursor-pointer [&_a]:text-accent [&_a]:underline [&_a]:underline-offset-2 [&_a]:decoration-accent/40 [&_a]:transition-colors hover:[&_a]:decoration-accent [&_code]:rounded [&_code]:bg-bg-base/60 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[12px] [&_code]:text-fg-primary [&_pre]:rounded-lg [&_pre]:bg-bg-base/60 [&_pre]:p-2 [&_pre]:text-xs [&_blockquote]:border-l-2 [&_blockquote]:border-accent/40 [&_blockquote]:pl-3 [&_blockquote]:text-fg-muted [&_strong]:text-fg-primary"
+    >
       {tokens.map((t, i) =>
         t.kind === "text" ? (
           <span

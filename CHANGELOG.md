@@ -18,6 +18,17 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.05.06.12] - 2026-05-06  · semver `26.506.11`
+
+
+### Ajouté
+
+- **Liens cliquables partout** ([src/lib/linkUtils.ts](src/lib/linkUtils.ts) + [src/components/crews/MessageItem.tsx](src/components/crews/MessageItem.tsx) + [src/pages/MessagesPage.tsx](src/pages/MessagesPage.tsx) + [src/lib/crewMessageFormat.ts](src/lib/crewMessageFormat.ts)) — auto-linkification des URLs en clair étendue aux messages de **crew chat** et aux **DMs privés**. Le helper `preprocessAutolinks` + `handleExternalLinkClick` (auparavant inlinés dans NewsCard) est extrait dans `lib/linkUtils.ts` et partagé. Les DMs qui rendaient juste `{message.text}` en plain text passent maintenant par `renderMessageMarkdown` (auto-link + bold/italic/code) pour cohérence avec les crews. Tous les liens http(s) ouvrent dans le navigateur OS via `tauri-plugin-opener`.
+- **Aperçu des sons dans Settings** ([src/pages/SettingsPage.tsx](src/pages/SettingsPage.tsx) `SoundPreviewCard`) — nouvelle carte sous le toggle "Sons d'interface" avec 8 boutons (Clic, Lancement, Succès, Erreur, Notification, Message, Maj. arrivée, Achievement Or) qui jouent chaque son à la demande. Permet d'entendre les sons en isolation avant de les rencontrer en contexte. Boutons grisés quand le master toggle est off.
+
+### Changé
+
+- **Phase 2 perf — MembersList O(n²) → O(n)** ([src/components/crews/MembersList.tsx](src/components/crews/MembersList.tsx)) — les compteurs `onlineCount` + `inGameCount` du footer faisaient un `allUsers.find(u => u.uid === ...)` linéaire par membre, soit O(n²) sur master crew avec 60+ users. Refactor pour passer par le `usersByUid` Map déjà construit ailleurs dans le component → un seul pass O(n) qui calcule les deux compteurs en même temps. Gain typique : ~50 ms → < 5 ms par render sur master crew.
 ## [v26.05.06.11] - 2026-05-06  · semver `26.506.10`
 
 

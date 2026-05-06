@@ -22,6 +22,13 @@ import {
   Layers,
   Keyboard,
   Bell,
+  Play,
+  MousePointer2,
+  Rocket,
+  CheckCircle2,
+  XCircle,
+  MessageSquare,
+  Trophy,
 } from "lucide-react";
 import { getVersion } from "@tauri-apps/api/app";
 import { useSettingsStore } from "@/store/settings";
@@ -110,6 +117,7 @@ export function SettingsPage() {
             }
           }}
         />
+        <SoundPreviewCard enabled={soundsEnabled} />
         <ApparenceCard />
         <NotificationsCard />
         <OverlayCard />
@@ -1585,5 +1593,84 @@ function UiToastsSubSection() {
         ))}
       </div>
     </div>
+  );
+}
+
+// ─── Sound preview card ──────────────────────────────────────────────
+//
+// Lets the user click each sound effect to hear it. Useful when the
+// "Sons d'interface" toggle is on and you want to know what each
+// notification sounds like before encountering it in context.
+//
+// Disabled visually when the master toggle is off — the buttons stay
+// rendered (so the panel doesn't shift up) but they don't play and
+// look dimmed.
+
+const PREVIEW_SOUNDS: {
+  label: string;
+  icon: typeof MousePointer2;
+  play: () => void;
+}[] = [
+  { label: "Clic", icon: MousePointer2, play: () => sounds.click() },
+  { label: "Lancement", icon: Rocket, play: () => sounds.launch() },
+  { label: "Succès", icon: CheckCircle2, play: () => sounds.success() },
+  { label: "Erreur", icon: XCircle, play: () => sounds.error() },
+  { label: "Notification", icon: Bell, play: () => sounds.notification() },
+  { label: "Message", icon: MessageSquare, play: () => sounds.messageReceived() },
+  { label: "Maj. arrivée", icon: RefreshCw, play: () => sounds.updateArrived() },
+  { label: "Achievement Or", icon: Trophy, play: () => sounds.achievementGold() },
+];
+
+function SoundPreviewCard({ enabled }: { enabled: boolean }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={cn(
+        "rounded-2xl bg-white/[0.02] p-4 ring-1 ring-white/[0.04] transition-opacity",
+        !enabled && "opacity-50",
+      )}
+    >
+      <div className="mb-3 flex items-center gap-2">
+        <div className="grid size-8 place-items-center rounded-lg bg-accent/10 text-accent ring-1 ring-accent/20">
+          <Play className="size-3.5" strokeWidth={2.4} />
+        </div>
+        <div className="flex-1">
+          <div className="text-sm font-medium text-fg-primary">
+            Aperçu des sons
+          </div>
+          <div className="text-[11px] text-fg-muted">
+            {enabled
+              ? "Clique sur un son pour l'entendre."
+              : "Active les sons d'interface ci-dessus pour pouvoir les écouter."}
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {PREVIEW_SOUNDS.map((s) => {
+          const Icon = s.icon;
+          return (
+            <button
+              key={s.label}
+              type="button"
+              disabled={!enabled}
+              onClick={() => {
+                if (!enabled) return;
+                s.play();
+              }}
+              className={cn(
+                "no-drag inline-flex items-center gap-2 rounded-xl bg-bg-base/30 px-3 py-2 text-xs font-medium text-fg-muted ring-1 ring-white/[0.04] transition-all",
+                enabled
+                  ? "cursor-pointer hover:bg-bg-base/60 hover:text-fg-primary hover:ring-accent/30 active:scale-[0.97]"
+                  : "cursor-not-allowed",
+              )}
+            >
+              <Icon className="size-3.5 shrink-0" strokeWidth={2} />
+              <span className="truncate">{s.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </motion.div>
   );
 }

@@ -19,6 +19,8 @@ import {
 import { TierAvatar } from "@/components/tier/TierAvatar";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
+import { renderMessageMarkdown } from "@/lib/crewMessageFormat";
+import { handleExternalLinkClick } from "@/lib/linkUtils";
 
 /**
  * Two-pane chat page:
@@ -419,13 +421,21 @@ function Bubble({
             className={cn(
               "rounded-2xl px-3.5 py-2 text-sm leading-relaxed shadow-sm",
               isMine
-                ? "bg-accent text-bg-base shadow-[0_0_14px_var(--color-accent-soft)] rounded-br-md"
-                : "bg-bg-soft/80 text-fg-primary ring-1 ring-white/[0.06] rounded-bl-md",
+                ? "bg-accent text-bg-base shadow-[0_0_14px_var(--color-accent-soft)] rounded-br-md [&_a]:!text-bg-base [&_a]:!underline [&_a]:cursor-pointer"
+                : "bg-bg-soft/80 text-fg-primary ring-1 ring-white/[0.06] rounded-bl-md [&_a]:text-accent [&_a]:underline [&_a]:cursor-pointer",
             )}
             style={{ wordBreak: "break-word" }}
-          >
-            {message.text}
-          </div>
+            onClick={handleExternalLinkClick}
+            dangerouslySetInnerHTML={{
+              __html: renderMessageMarkdown(message.text),
+            }}
+          />
+          {/* Note : the message bubble previously rendered the raw
+              text as a child. We swapped to dangerouslySetInnerHTML
+              with the markdown renderer so URLs become clickable
+              (auto-linkification + system browser open via the
+              external-link click interceptor). The output is
+              DOMPurify-sanitised — no XSS surface. */}
         </div>
       </motion.div>
     </AnimatePresence>

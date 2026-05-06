@@ -1,5 +1,6 @@
 import { marked } from "marked";
 import DOMPurify from "dompurify";
+import { preprocessAutolinks } from "@/lib/linkUtils";
 
 /**
  * Parse a crew message's body into safe HTML. Supports a tight subset
@@ -40,16 +41,38 @@ marked.use({
 
 export function renderMessageMarkdown(text: string): string {
   if (!text) return "";
+  // Auto-linkify bare URLs (e.g. "tiens regarde https://x.com")
+  // before passing to marked, so users don't have to know markdown
+  // link syntax to share a URL.
+  const withAutolinks = preprocessAutolinks(text);
   // marked is sync when given a string — cast away the union with
   // Promise to keep the call site simple.
-  const raw = marked.parse(text, { async: false }) as string;
-  return DOMPurify.sanitize(raw, {
+  const raw = marked.parse(withAutolinks, { async: false }) as string;
+  const clean = DOMPurify.sanitize(raw, {
     ALLOWED_TAGS: [...ALLOWED_TAGS],
     ALLOWED_ATTR: [...ALLOWED_ATTR],
     // Add target=_blank + rel for outbound links; the launcher's
-    // Tauri webview picks them up via `tauri-plugin-opener`.
+    // click interceptor (handleExternalLinkClick) routes them to
+    // the OS browser via tauri-plugin-opener anyway, but the
+    // attributes are defense-in-depth.
     ADD_ATTR: ["target", "rel"],
   });
+  // Post-process : ensure every <a> with http(s) href has
+  // target=_blank rel=... in case the markdown source omitted it.
+  // Done client-side via a simple string replacement to keep this
+  // dependency-light (no DOM parser).
+  return clean.replace(
+    /<a\s+([^>]*?)href="(https?:\/\/[^"]+)"([^>]*?)>/gi,
+    (_m, pre, href, post) => {
+      const merged = `${pre} ${post}`.toLowerCase();
+      const hasTarget = /\btarget=/.test(merged);
+      const hasRel = /\brel=/.test(merged);
+      const extra =
+        (hasTarget ? "" : ' target="_blank"') +
+        (hasRel ? "" : ' rel="noopener noreferrer"');
+      return `<a ${pre}href="${href}"${post}${extra}>`;
+    },
+  );
 }
 
 // ─── Mentions ────────────────────────────────────────────────────────

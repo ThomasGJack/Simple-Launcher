@@ -1,5 +1,12 @@
 [
   {
+    "version": "26.506.11",
+    "displayVersion": "v26.05.06.12",
+    "notes": "### Ajouté\n\n- **Liens cliquables partout** ([src/lib/linkUtils.ts](src/lib/linkUtils.ts) + [src/components/crews/MessageItem.tsx](src/components/crews/MessageItem.tsx) + [src/pages/MessagesPage.tsx](src/pages/MessagesPage.tsx) + [src/lib/crewMessageFormat.ts](src/lib/crewMessageFormat.ts)) — auto-linkification des URLs en clair étendue aux messages de **crew chat** et aux **DMs privés**. Le helper `preprocessAutolinks` + `handleExternalLinkClick` (auparavant inlinés dans NewsCard) est extrait dans `lib/linkUtils.ts` et partagé. Les DMs qui rendaient juste `{message.text}` en plain text passent maintenant par `renderMessageMarkdown` (auto-link + bold/italic/code) pour cohérence avec les crews. Tous les liens http(s) ouvrent dans le navigateur OS via `tauri-plugin-opener`.\n\n### Changé\n\n- **Phase 2 perf — MembersList O(n²) → O(n)** ([src/components/crews/MembersList.tsx](src/components/crews/MembersList.tsx)) — les compteurs `onlineCount` + `inGameCount` du footer faisaient un `allUsers.find(u => u.uid === ...)` linéaire par membre, soit O(n²) sur master crew avec 60+ users. Refactor pour passer par le `usersByUid` Map déjà construit ailleurs dans le component → un seul pass O(n) qui calcule les deux compteurs en même temps. Gain typique : ~50 ms → < 5 ms par render sur master crew.",
+    "pub_date": "2026-05-06T17:48:24.398Z",
+    "channel": "win"
+  },
+  {
     "version": "26.506.10",
     "displayVersion": "v26.05.06.11",
     "notes": "### Ajouté\n\n- **Modal de détail pour les news** ([src/components/home/NewsCard.tsx](src/components/home/NewsCard.tsx)) — chaque news compacte dans la liste scrollable est désormais cliquable et ouvre une **modal plein écran** avec la news en pleine taille (body intégral non tronqué, réactions, sondage). La modal a un backdrop dimmed + blur, un bouton **Fermer** en haut à droite, ferme à l'Escape ou au click sur le backdrop, et est scrollable si la news est très longue. Les compactes ont aussi un petit chevron animé qui apparaît au survol pour suggérer la cliquabilité, plus un effet hover (ring accent + lift d'ombre).\n- **Bouton \"Voir la news complète\"** ([src/components/home/NewsCard.tsx](src/components/home/NewsCard.tsx)) — quand la news featured (en haut) a un body long (> 280 chars OU contient une structure markdown comme heading/list/code block), un bouton coloré apparaît sous le body pour ouvrir la même modal. Permet d'accéder à un rendu plus aéré sans casser la lisibilité du widget HomePage.",
