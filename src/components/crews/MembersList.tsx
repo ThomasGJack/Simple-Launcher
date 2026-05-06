@@ -30,6 +30,7 @@ import { TierName } from "@/components/tier/TierName";
 import { TierBannerOverlay } from "@/components/tier/TierBanner";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
+import { isAdminUid } from "@/lib/admin";
 
 /**
  * Right-side panel listing every member of the selected crew. Each row
@@ -161,17 +162,27 @@ export function MembersList({
       members: DisplayedMember[];
     };
 
-    // Extract the owner first — they're always pinned at the very top
-    // of the list, regardless of custom role grouping. Identified by
-    // role === "owner" OR uid match on crew.ownerUid (the latter
-    // catches the implicit owner of master-crews where a member doc
-    // may not exist yet).
-    const ownerMember = sortedMembers.find(
-      (m) => m.role === "owner" || m.uid === crew.ownerUid,
-    );
-    const remaining = ownerMember
-      ? sortedMembers.filter((m) => m.uid !== ownerMember.uid)
-      : sortedMembers;
+    // Extract the owners first — they're always pinned at the very
+    // top of the list, regardless of custom role grouping. We
+    // collect ALL members who qualify as "owner" so the section can
+    // hold multiple if needed (rare for user crews but possible on
+    // master crews with multiple launcher admins).
+    //
+    // A member counts as owner when ANY of the following holds :
+    //   - their role is explicitly "owner"
+    //   - their uid matches crew.ownerUid (covers the case where the
+    //     owner has no member doc yet on a fresh crew)
+    //   - the crew is a master crew AND they're a launcher admin
+    //     (legacy master crews created before ownerUid was wired up
+    //     have an empty ownerUid string ; the launcher admin is the
+    //     de-facto owner of every master crew anyway)
+    const isOwnerOf = (m: DisplayedMember) =>
+      m.role === "owner" ||
+      (!!crew.ownerUid && m.uid === crew.ownerUid) ||
+      (crew.isMaster && isAdminUid(m.uid));
+    const ownerMembers = sortedMembers.filter(isOwnerOf);
+    const ownerUidSet = new Set(ownerMembers.map((m) => m.uid));
+    const remaining = sortedMembers.filter((m) => !ownerUidSet.has(m.uid));
 
     const byRole = new Map<string | null, DisplayedMember[]>();
     for (const m of remaining) {
@@ -188,21 +199,19 @@ export function MembersList({
     }
     const sections: Section[] = [];
 
-    // Owner section at the very top. The label uses their custom
-    // role name + colour if any so the role identity isn't lost ;
-    // otherwise we show a generic "Propriétaire" with the amber
-    // crown tone consistent with the inline Crown icon.
-    if (ownerMember) {
-      const ownerRole =
-        ownerMember.customRoleId &&
-        customRolesById.get(ownerMember.customRoleId);
+    // Owner section at the very top. The header label is always
+    // "Propriétaire" in amber (matches the Crown glyph) regardless
+    // of any custom role any owner might also have — keeps the
+    // hierarchy unambiguous : "this is the owner section, top of
+    // the list, period". Any custom role colouring still flows
+    // through to each row's name via the per-member memberRole
+    // resolution below.
+    if (ownerMembers.length > 0) {
       sections.push({
         key: "__owner__",
-        label: ownerRole ? ownerRole.name : "Propriétaire",
-        // Amber matches the Crown glyph rendered next to the name —
-        // visually consistent with the existing owner cue.
-        color: ownerRole ? ownerRole.color : "#fcd34d",
-        members: [ownerMember],
+        label: "Propriétaire",
+        color: "#fcd34d",
+        members: ownerMembers,
       });
     }
 
@@ -229,7 +238,13 @@ export function MembersList({
       });
     }
     return sections;
-  }, [sortedMembers, customRoles, customRolesById, crew.ownerUid]);
+  }, [
+    sortedMembers,
+    customRoles,
+    customRolesById,
+    crew.ownerUid,
+    crew.isMaster,
+  ]);
 
   const handlePromote = async (target: DisplayedMember) => {
     if (busyUid) return;
@@ -363,7 +378,15 @@ export function MembersList({
                     customRoleName={memberRole?.name ?? null}
                     myUid={myUid}
                     amOwnerOrAdmin={amOwnerOrAdmin}
-                    isOwnerOfCrew={crew.ownerUid === m.uid}
+                    // Drive the Crown glyph from the section the
+                    // member sits in : if they're in the synthetic
+                    // owner section (which already factored in
+                    // launcher-admin override on master crews), they
+                    // get the crown. Falls back to crew.ownerUid for
+                    // safety when the owner section isn't present.
+                    isOwnerOfCrew={
+                      section.key === "__owner__" || crew.ownerUid === m.uid
+                    }
                     busy={busyUid === m.uid}
                     myActivity={myActivity}
                     onPromote={() => handlePromote(m)}
