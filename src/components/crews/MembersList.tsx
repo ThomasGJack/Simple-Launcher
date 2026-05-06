@@ -16,6 +16,7 @@ import {
   type Crew,
   type CrewMember,
   type CrewRole,
+  type CustomRole,
 } from "@/firebase/crews";
 import { useUsers } from "@/store/firebaseStores";
 import { sendGameInvitation } from "@/firebase/invitations";
@@ -48,11 +49,16 @@ import { cn } from "@/lib/cn";
 export function MembersList({
   crew,
   members,
+  customRoles,
   myUid,
   myRole,
 }: {
   crew: Crew;
   members: CrewMember[];
+  /** Custom roles defined for this crew (VIP, Citoyen, etc). Used
+   *  to colour each member's name and group the list Discord-style.
+   *  Empty array when none defined → single "Membres" section. */
+  customRoles: CustomRole[];
   myUid: string;
   myRole: CrewRole | null;
 }) {
@@ -104,6 +110,7 @@ export function MembersList({
           lastSeen: u.lastSeen ?? null,
           status: statusFromLastSeen(u.lastSeen, now),
           currentActivity: u.currentActivity ?? null,
+          customRoleId: m?.customRoleId ?? null,
         };
       });
     } else {
@@ -119,6 +126,7 @@ export function MembersList({
           lastSeen: live?.lastSeen ?? null,
           status: statusFromLastSeen(live?.lastSeen ?? null, now),
           currentActivity: live?.currentActivity ?? null,
+          customRoleId: m.customRoleId ?? null,
         };
       });
     }
@@ -132,6 +140,64 @@ export function MembersList({
       return a.displayName.localeCompare(b.displayName);
     });
   }, [crew.isMaster, members, allUsers, usersByUid, now]);
+
+  // ── Discord-style grouping ──────────────────────────────────────
+  // For each custom role used by at least one member, build a section
+  // with the role name + colour as header. Members without a custom
+  // role land in a fallback "Membres" section. Sections are ordered
+  // by `position` (ascending = higher in the list, Discord
+  // convention) ; the "Membres" fallback is always last.
+  const customRolesById = useMemo(() => {
+    const map = new Map<string, CustomRole>();
+    for (const r of customRoles) map.set(r.id, r);
+    return map;
+  }, [customRoles]);
+
+  const groupedMembers = useMemo(() => {
+    type Section = {
+      key: string;
+      label: string;
+      color: string | null;
+      members: DisplayedMember[];
+    };
+    const byRole = new Map<string | null, DisplayedMember[]>();
+    for (const m of sortedMembers) {
+      // A customRoleId is only "real" if it points to an existing
+      // role doc. Stale ids (deleted role) collapse into the
+      // fallback group rather than rendering an orphan section.
+      const roleId =
+        m.customRoleId && customRolesById.has(m.customRoleId)
+          ? m.customRoleId
+          : null;
+      const list = byRole.get(roleId) ?? [];
+      list.push(m);
+      byRole.set(roleId, list);
+    }
+    const sections: Section[] = [];
+    // Custom-role sections first, ordered by position.
+    const usedRoles = customRoles
+      .filter((r) => byRole.has(r.id))
+      .sort((a, b) => a.position - b.position);
+    for (const role of usedRoles) {
+      sections.push({
+        key: role.id,
+        label: role.name,
+        color: role.color,
+        members: byRole.get(role.id) ?? [],
+      });
+    }
+    // Fallback group for roleless members. Skip when empty.
+    const fallback = byRole.get(null);
+    if (fallback && fallback.length > 0) {
+      sections.push({
+        key: "__none__",
+        label: "Membres",
+        color: null,
+        members: fallback,
+      });
+    }
+    return sections;
+  }, [sortedMembers, customRoles, customRolesById]);
 
   const handlePromote = async (target: DisplayedMember) => {
     if (busyUid) return;
@@ -223,23 +289,51 @@ export function MembersList({
             Aucun membre pour l'instant.
           </div>
         ) : (
-          sortedMembers.map((m) => (
-            <MemberRow
-              key={m.uid}
-              member={m}
-              myUid={myUid}
-              amOwnerOrAdmin={amOwnerOrAdmin}
-              isOwnerOfCrew={crew.ownerUid === m.uid}
-              busy={busyUid === m.uid}
-              myActivity={myActivity}
-              onPromote={() => handlePromote(m)}
-              onDemote={() => handleDemote(m)}
-              onKick={() => handleKick(m)}
-              onInvite={() => handleInviteToPlay(m)}
-              onOpenProfile={() =>
-                navigate({ name: "user-profile", uid: m.uid })
-              }
-            />
+          groupedMembers.map((section) => (
+            <div key={section.key} className="mb-2">
+              {/* Discord-style section header : role name in role
+                  colour + member count. Hidden for the fallback
+                  "Membres" group when it's the only section, to
+                  avoid noise on crews with no custom roles at all. */}
+              {!(
+                groupedMembers.length === 1 && section.key === "__none__"
+              ) && (
+                <div
+                  className="flex items-center gap-1.5 px-2 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider"
+                  style={{
+                    color: section.color ?? "var(--color-fg-muted)",
+                  }}
+                >
+                  <span className="truncate">{section.label}</span>
+                  <span
+                    className="ml-auto font-mono text-[10px] tabular-nums opacity-70"
+                    style={{ color: "var(--color-fg-dim)" }}
+                  >
+                    {section.members.length}
+                  </span>
+                </div>
+              )}
+              {section.members.map((m) => (
+                <MemberRow
+                  key={m.uid}
+                  member={m}
+                  customRoleColor={section.color}
+                  customRoleName={section.color ? section.label : null}
+                  myUid={myUid}
+                  amOwnerOrAdmin={amOwnerOrAdmin}
+                  isOwnerOfCrew={crew.ownerUid === m.uid}
+                  busy={busyUid === m.uid}
+                  myActivity={myActivity}
+                  onPromote={() => handlePromote(m)}
+                  onDemote={() => handleDemote(m)}
+                  onKick={() => handleKick(m)}
+                  onInvite={() => handleInviteToPlay(m)}
+                  onOpenProfile={() =>
+                    navigate({ name: "user-profile", uid: m.uid })
+                  }
+                />
+              ))}
+            </div>
           ))
         )}
       </div>
@@ -322,6 +416,10 @@ type DisplayedMember = {
   currentActivity:
     | { moduleId: string; moduleName: string; startedAt: number }
     | null;
+  /** Custom role id assigned to this member, if any. Resolved against
+   *  the crew's `customRoles` list to render the colored name + the
+   *  Discord-style section header. */
+  customRoleId: string | null;
 };
 
 /**
@@ -337,6 +435,8 @@ type DisplayedMember = {
  */
 const MemberRow = memo(function MemberRow({
   member,
+  customRoleColor,
+  customRoleName,
   myUid,
   amOwnerOrAdmin,
   isOwnerOfCrew,
@@ -349,6 +449,14 @@ const MemberRow = memo(function MemberRow({
   onOpenProfile,
 }: {
   member: DisplayedMember;
+  /** Hex colour from the member's custom role, or null when none.
+   *  When set, overrides the tier-based name colour so the role
+   *  identity wins (Discord behaviour). */
+  customRoleColor: string | null;
+  /** Human-readable role label — shown in the row tooltip + as a
+   *  small dot next to the avatar so a non-zero glance still
+   *  conveys role membership inside a long section. */
+  customRoleName: string | null;
   myUid: string;
   amOwnerOrAdmin: boolean;
   isOwnerOfCrew: boolean;
@@ -365,7 +473,10 @@ const MemberRow = memo(function MemberRow({
   const isMine = member.uid === myUid;
 
   return (
-    <div className="group relative">
+    <div
+      className="group relative"
+      title={customRoleName ?? undefined}
+    >
       <TierBannerOverlay tier={member.tier} rounded="lg" />
       <button
         type="button"
@@ -393,11 +504,25 @@ const MemberRow = memo(function MemberRow({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 truncate text-sm">
-            <TierName
-              tier={member.tier}
-              name={member.displayName}
-              className="truncate text-fg-primary"
-            />
+            {customRoleColor ? (
+              // Custom role wins over tier coloring : the displayName
+              // is rendered in the role's hex color (Discord-style).
+              // We bypass TierName entirely so there's a single
+              // authoritative color source. Keep the truncation
+              // behaviour identical though.
+              <span
+                className="truncate"
+                style={{ color: customRoleColor }}
+              >
+                {member.displayName}
+              </span>
+            ) : (
+              <TierName
+                tier={member.tier}
+                name={member.displayName}
+                className="truncate text-fg-primary"
+              />
+            )}
             {member.role === "owner" || isOwnerOfCrew ? (
               <Crown className="size-3 shrink-0 text-amber-300" />
             ) : member.role === "admin" ? (
@@ -486,8 +611,11 @@ const MemberRow = memo(function MemberRow({
     prev.member.displayName === next.member.displayName &&
     prev.member.avatarUrl === next.member.avatarUrl &&
     prev.member.lastSeen === next.member.lastSeen &&
+    prev.member.customRoleId === next.member.customRoleId &&
     prev.member.currentActivity?.moduleId === next.member.currentActivity?.moduleId &&
     prev.member.currentActivity?.moduleName === next.member.currentActivity?.moduleName &&
+    prev.customRoleColor === next.customRoleColor &&
+    prev.customRoleName === next.customRoleName &&
     prev.amOwnerOrAdmin === next.amOwnerOrAdmin &&
     prev.isOwnerOfCrew === next.isOwnerOfCrew &&
     prev.busy === next.busy &&

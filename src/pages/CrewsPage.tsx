@@ -16,11 +16,13 @@ import {
   leaveCrew,
   watchCrews,
   watchCrewChannels,
+  watchCrewCustomRoles,
   watchCrewMembers,
   watchMyCrewIds,
   type Crew,
   type CrewChannel,
   type CrewMember,
+  type CustomRole,
 } from "@/firebase/crews";
 import { ChannelView } from "@/components/crews/ChannelView";
 import { MembersList } from "@/components/crews/MembersList";
@@ -65,6 +67,7 @@ export function CrewsPage() {
   const [myCrewIds, setMyCrewIds] = useState<Set<string>>(new Set());
   const [channels, setChannels] = useState<CrewChannel[]>([]);
   const [members, setMembers] = useState<CrewMember[]>([]);
+  const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [browseOpen, setBrowseOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
@@ -123,6 +126,18 @@ export function CrewsPage() {
       return;
     }
     return watchCrewMembers(selectedCrewId, setMembers);
+  }, [selectedCrewId]);
+
+  // Watch custom roles for the current crew so MembersList can render
+  // members in their role color + group them Discord-style. Empty
+  // when no roles are defined (most crews) — the list falls back to
+  // a single "Membres" group.
+  useEffect(() => {
+    if (!selectedCrewId) {
+      setCustomRoles([]);
+      return;
+    }
+    return watchCrewCustomRoles(selectedCrewId, setCustomRoles);
   }, [selectedCrewId]);
 
   const myMember = useMemo(
@@ -439,6 +454,7 @@ export function CrewsPage() {
         <MembersList
           crew={selectedCrew}
           members={members}
+          customRoles={customRoles}
           myUid={me?.uid ?? ""}
           myRole={myMember?.role ?? null}
         />
