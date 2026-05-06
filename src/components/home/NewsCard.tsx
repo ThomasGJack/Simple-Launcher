@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Megaphone, Pin, ChevronRight } from "lucide-react";
 import { watchNews, type News } from "@/firebase/news";
@@ -19,6 +19,54 @@ import { sanitizeHtml } from "@/lib/sanitizeHtml";
 import { sounds } from "@/lib/sounds";
 import { marked } from "marked";
 import { cn } from "@/lib/cn";
+
+/**
+ * Auto-linkify bare URLs in markdown source. Marked's GFM mode does
+ * detect URLs but only at very specific positions — anything tucked
+ * mid-sentence (e.g. "blah blah https://x.com blah") often slips
+ * through. We pre-process by matching http(s) URLs that are NOT
+ * already inside a markdown link `[..](..)` or an HTML <a> tag, and
+ * wrap them in `<...>` (markdown autolink syntax) so marked turns
+ * them into clickable anchors deterministically.
+ */
+const URL_AUTOLINK_RE = /(?<!\]\(|<|\]:?\s)(https?:\/\/[^\s<>()]+[^\s<>().,!?:;])/g;
+
+function preprocessAutolinks(src: string): string {
+  return src.replace(URL_AUTOLINK_RE, "<$1>");
+}
+
+/**
+ * Click handler installed on the news body container. Tauri 2's
+ * default behaviour for `<a href="https://...">` clicks is to
+ * navigate the launcher's webview itself — which silently fails
+ * because the launcher's window security blocks external
+ * navigation, leaving the user with "rien ne se passe / ça bug".
+ *
+ * We intercept clicks bubbling up from any anchor inside news
+ * content, prevent the default navigation, and forward the URL to
+ * the OS via tauri-plugin-opener (which spawns the system browser).
+ *
+ * The plugin module is imported dynamically the first time a link
+ * is clicked, to keep it out of the initial bundle.
+ */
+function handleNewsClick(e: ReactMouseEvent<HTMLDivElement>) {
+  const target = (e.target as HTMLElement | null)?.closest?.("a");
+  if (!target) return;
+  const href = target.getAttribute("href");
+  if (!href) return;
+  if (!/^https?:\/\//i.test(href)) return;
+  e.preventDefault();
+  e.stopPropagation();
+  sounds.click();
+  void (async () => {
+    try {
+      const { openUrl } = await import("@tauri-apps/plugin-opener");
+      await openUrl(href);
+    } catch (err) {
+      console.warn("[news] failed to open link in system browser:", err);
+    }
+  })();
+}
 
 /**
  * Live newsfeed card on the home page. Displays the top item (pinned first,
@@ -87,7 +135,12 @@ function NewsItem({
   onToggle?: () => void;
 }) {
   const accent = item.accent ?? "var(--color-accent)";
-  const body = item.body ? marked.parse(item.body, { async: false }) : "";
+  // Pre-process body to auto-linkify bare URLs, then run through
+  // marked. The output is sanitized via DOMPurify (allows <a> with
+  // safe href) before being injected into the DOM.
+  const body = item.body
+    ? marked.parse(preprocessAutolinks(item.body), { async: false, gfm: true })
+    : "";
   const html = typeof body === "string" ? sanitizeHtml(body) : "";
 
   return (
@@ -144,10 +197,13 @@ function NewsItem({
           </h3>
           {html && (
             <div
-              className={
-                "prose prose-invert max-w-none mt-1.5 text-sm text-fg-muted " +
-                (compact ? "line-clamp-2" : "")
-              }
+              className={cn(
+                "prose prose-invert max-w-none mt-1.5 text-sm text-fg-muted",
+                "[&_a]:text-accent [&_a]:underline [&_a]:underline-offset-2 [&_a]:decoration-accent/40 [&_a]:transition-colors hover:[&_a]:decoration-accent",
+                "[&_a]:no-drag [&_a]:cursor-pointer",
+                compact && "line-clamp-2",
+              )}
+              onClick={handleNewsClick}
               dangerouslySetInnerHTML={{ __html: html }}
             />
           )}

@@ -18,6 +18,12 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.05.06.9] - 2026-05-06  · semver `26.506.8`
+
+
+### Ajouté
+
+- **Liens cliquables dans les news** ([src/components/home/NewsCard.tsx](src/components/home/NewsCard.tsx) + [src/lib/sanitizeHtml.ts](src/lib/sanitizeHtml.ts)) — refonte du rendu des news pour rendre les URLs vraiment cliquables. Trois améliorations combinées : (1) **Auto-linkification** des URLs en clair — taper `https://exemple.com` dans le corps de la news fait apparaître un lien sans avoir à utiliser la syntaxe markdown `[texte](url)`. Le pre-processing détecte les URLs http(s) qui ne sont pas déjà à l'intérieur d'un lien markdown et les wrappe en autolinks. (2) **Click interceptor** sur le conteneur des news qui intercepte les clics sur `<a>` et les route via `tauri-plugin-opener` vers le navigateur système — sans ça, Tauri 2 essayait de naviguer dans la webview du launcher et le clic n'avait aucun effet visible. (3) **Sécurité défense-en-profondeur** : le sanitizer DOMPurify ajoute désormais `target="_blank" rel="noopener noreferrer"` à chaque `<a>` http(s), pour que même si l'interceptor échoue, on évite tout détournement de navigation. Le style des liens dans les news est maintenant cohérent (couleur accent + underline subtil + cursor pointer).
 ## [v26.05.06.8] - 2026-05-06  · semver `26.506.7`
 
 

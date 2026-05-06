@@ -40,6 +40,22 @@ function ensureHooks() {
       }
     }
   });
+
+  // Ensure every <a> with an http(s) href opens in a new context and
+  // can't be hijacked via window.opener. Defense-in-depth on top of
+  // the in-app click interceptor that routes through tauri-plugin-
+  // opener — if that interceptor ever fails, the browser at least
+  // can't be navigated away from the launcher UI.
+  DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+    if ((node as HTMLElement).tagName === "A") {
+      const a = node as HTMLAnchorElement;
+      const href = a.getAttribute("href") ?? "";
+      if (/^https?:\/\//i.test(href)) {
+        a.setAttribute("target", "_blank");
+        a.setAttribute("rel", "noopener noreferrer");
+      }
+    }
+  });
 }
 
 export function sanitizeHtml(dirty: string): string {
