@@ -547,13 +547,19 @@ export function PublicProfilePage() {
 
         {/* Play heatmap — when does this user typically play ?
             Visible to everyone with a launcher account. Useful to
-            spot good times to ping a friend for a session. */}
+            spot good times to ping a friend for a session.
+            `col-span-12` is critical : without it, this div lands
+            in the 12-column grid as a default 1-col item, which
+            squeezes the heatmap into a tall narrow column with
+            text mono-wrapping each word. With col-span-12 it
+            takes the full grid row underneath the stats / top
+            played section. */}
         {targetUid && (
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.25 }}
-            className="mt-6"
+            className="col-span-12 mt-2"
           >
             <PlayHeatmap
               uid={targetUid}
