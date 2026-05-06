@@ -14,6 +14,7 @@ import {
 import { deleteCrew, leaveCrew, type Crew, type CrewRole } from "@/firebase/crews";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/auth";
+import { useUsers } from "@/store/firebaseStores";
 import { isAdmin as isLauncherAdmin } from "@/lib/admin";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
@@ -60,6 +61,17 @@ export function CrewContextMenu({
   const me = useAuthStore((s) => s.user);
   const isLauncherOwner = isLauncherAdmin(me);
   const isOwner = isLauncherOwner || crew.ownerUid === myUid;
+
+  // Member count : on master crew, everyone in the launcher is an
+  // implicit member, so use the live useUsers() length. On user
+  // crews, fall back to the persisted memberCount but treat 0 as
+  // "unknown" (denormalized field can lag).
+  const allUsers = useUsers();
+  const memberCount = crew.isMaster
+    ? allUsers.length
+    : (crew.memberCount && crew.memberCount > 0
+        ? crew.memberCount
+        : null);
 
   // Outside-click + Escape dismiss
   useEffect(() => {
@@ -189,8 +201,13 @@ export function CrewContextMenu({
               "Membre"
             )}
             {" · "}
-            {crew.memberCount ?? "—"} membre
-            {(crew.memberCount ?? 0) > 1 ? "s" : ""}
+            {memberCount === null ? (
+              "—"
+            ) : (
+              <>
+                {memberCount} membre{memberCount > 1 ? "s" : ""}
+              </>
+            )}
           </div>
         </div>
         <button
