@@ -13,7 +13,9 @@
     "release:launcher": "node scripts/release-launcher.mjs",
     "installer:art": "node scripts/build-installer-art.mjs",
     "bump": "node scripts/bump-version.mjs",
-    "cleanup:prism": "node scripts/cleanup-prism-fields.mjs"
+    "cleanup:prism": "node scripts/cleanup-prism-fields.mjs",
+    "dev:site": "vite --config site/vite.config.ts",
+    "build:site": "tsc -p site/tsconfig.json && vite build --config site/vite.config.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -1,0 +1,241 @@
+@import "tailwindcss";
+
+/* ─────────────────────────────────────────────────────────────────────
+ * Tokens — DUPLIQUÉS depuis src/index.css (le launcher) avec ajout de
+ * la palette OR pour Simple Games (la communauté), et reset adapté
+ * pour un site web (overflow auto, user-select text). On ne peut PAS
+ * importer src/index.css du launcher car il a `html { overflow: hidden;
+ * user-select: none }` — incompatible avec un site qui scrolle.
+ * ───────────────────────────────────────────────────────────────────── */
+
+@theme {
+  --color-bg-base: #07090d;
+  --color-bg-soft: #0d1117;
+  --color-bg-elevated: #141a23;
+  --color-bg-overlay: rgba(7, 9, 13, 0.72);
+
+  --color-fg-primary: #f5f7fa;
+  --color-fg-muted: #97a3b6;
+  --color-fg-dim: #5c6878;
+
+  --color-accent: #00d4ff;
+  --color-accent-soft: #00d4ff33;
+  --color-accent-glow: #00d4ff80;
+  --color-on-accent: #0a0d12;
+
+  /* Or — accent communauté Simple Games. Cohérent avec l'icône Castle
+     du master crew dans l'app (cf. OnboardingTour.tsx → "#fcd34d"). */
+  --color-gold: #fcd34d;
+  --color-gold-strong: #fbbf24;
+  --color-gold-soft: rgba(252, 211, 77, 0.18);
+  --color-gold-glow: rgba(252, 211, 77, 0.45);
+
+  --color-danger: #ff4d6d;
+  --color-success: #4ade80;
+
+  --font-sans: "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Audiowide", "Orbitron", "Inter", sans-serif;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+}
+
+/* ── Reset adapté SITE (vs reset launcher) ────────────────────────────
+ * Diff :
+ *  - html: overflow auto + scroll-behavior smooth (page scrollable)
+ *  - body: user-select text (lecture / copy normaux)
+ *  - #root: pas de flex (le site coule en flow vertical)
+ */
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100vh;
+}
+
+html {
+  background: var(--color-bg-base);
+  color: var(--color-fg-primary);
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  scroll-behavior: smooth;
+}
+
+body {
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 0%, rgba(0, 212, 255, 0.08), transparent 60%),
+    radial-gradient(ellipse 60% 50% at 80% 100%, rgba(252, 211, 77, 0.06), transparent 60%),
+    var(--color-bg-base);
+  overflow-x: hidden;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: inherit;
+}
+
+input,
+textarea {
+  font-family: inherit;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 212, 255, 0.3);
+  background-clip: padding-box;
+}
+
+/* ── Animations partagées avec le launcher ────────────────────────── */
+@keyframes glow-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 24px var(--color-accent-soft), 0 0 0 1px var(--color-accent-soft);
+  }
+  50% {
+    box-shadow: 0 0 36px var(--color-accent-glow), 0 0 0 1px var(--color-accent-glow);
+  }
+}
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes float-y {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+/* ── Helpers ────────────────────────────────────────────────────────── */
+.glass {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.glass-strong {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.text-glow-accent {
+  text-shadow: 0 0 24px var(--color-accent-glow);
+}
+.text-glow-gold {
+  text-shadow: 0 0 28px var(--color-gold-glow);
+}
+
+/* no-drag/drag : utilisés par PlayButton du launcher (Tauri window
+   region). No-op sur le site mais on les déclare pour ne pas casser
+   le rendu. */
+.no-drag,
+.drag {
+}
+
+/* Section helper — padding vertical généreux pour un single-page long */
+.section {
+  position: relative;
+  padding: 120px 0;
+}
+.section--hero {
+  padding: 64px 0 96px;
+}
+@media (max-width: 768px) {
+  .section {
+    padding: 80px 0;
+  }
+  .section--hero {
+    padding: 48px 0 64px;
+  }
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+.container-narrow {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* Eyebrow — petit chip au-dessus des titres de section */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.25em;
+  color: var(--color-accent);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+.eyebrow-gold {
+  color: var(--color-gold);
+  border-color: color-mix(in srgb, var(--color-gold) 22%, transparent);
+  background: var(--color-gold-soft);
+}
+.eyebrow-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+  animation: pulse-dot 1.6s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
