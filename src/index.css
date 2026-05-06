@@ -13,6 +13,12 @@
   --color-accent: #00d4ff;
   --color-accent-soft: #00d4ff33;
   --color-accent-glow: #00d4ff80;
+  /* Foreground color used on accent-painted surfaces (button text on
+   * a JOUER button, Toggle thumb, etc.). Default targets the default
+   * cyan accent (#00d4ff is light → use dark fg). When the user
+   * picks a custom accent in Settings, App.tsx recomputes via
+   * pickContrastColor() and sets the right value at runtime. */
+  --color-on-accent: #0a0d12;
 
   --color-danger: #ff4d6d;
   --color-success: #4ade80;

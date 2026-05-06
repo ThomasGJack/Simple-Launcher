@@ -82,6 +82,27 @@ void (async () => {
   logger.info("App boot", { source: "App" });
 })();
 
+/**
+ * Compute a contrast-safe foreground color for text painted on top
+ * of the given hex accent color. Uses the WCAG-style relative
+ * luminance formula : if the accent is dark (< 0.5), the foreground
+ * should be near-white ; otherwise near-black.
+ *
+ * Used to keep JOUER button labels / Toggle thumbs / accent-colored
+ * surfaces readable regardless of which accent the user picked
+ * (cyan, amber, purple, etc.).
+ */
+function pickContrastColor(hex: string): string {
+  // hex format: #RRGGBB
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const lin = (c: number) =>
+    c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  const lum = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  return lum > 0.5 ? "#0a0d12" : "#f5f7fa";
+}
+
 function App() {
   const setUser = useAuthStore((s) => s.setUser);
   const setOfflineUser = useAuthStore((s) => s.setOfflineUser);
@@ -537,10 +558,17 @@ function App() {
       // channel works on hex.
       root.style.setProperty("--color-accent-soft", `${accentColor}33`);
       root.style.setProperty("--color-accent-glow", `${accentColor}80`);
+      // Compute a contrast-safe "on-accent" color so text painted on
+      // an accent-colored background (e.g. the JOUER button label,
+      // Toggle thumbs) stays readable. If the chosen accent is dark
+      // (luminance < 0.5), use light text ; otherwise dark.
+      const onAccent = pickContrastColor(accentColor);
+      root.style.setProperty("--color-on-accent", onAccent);
     } else {
       root.style.removeProperty("--color-accent");
       root.style.removeProperty("--color-accent-soft");
       root.style.removeProperty("--color-accent-glow");
+      root.style.removeProperty("--color-on-accent");
     }
   }, [accentColor]);
 

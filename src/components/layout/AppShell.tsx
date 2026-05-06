@@ -68,10 +68,7 @@ export function AppShell() {
           <AnimatePresence mode="wait">
             <motion.div
               key={routeKey(route)}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+              {...routeTransition(route.name)}
               className="relative h-full"
             >
               <ErrorBoundary scope={`route:${route.name}`}>
@@ -92,6 +89,43 @@ function routeKey(route: Route): string {
   if (route.name === "admin-builder") return `admin-builder:${route.moduleId}`;
   if (route.name === "crew-config") return `crew-config:${route.crewId}`;
   return route.name;
+}
+
+/**
+ * Per-route Framer Motion transition variants. Most pages use a
+ * gentle fade + small Y shift, but the "drill-down" routes (module
+ * detail, crew-config, admin-builder, user-profile) get a slide-from-
+ * right effect that visually communicates "you went deeper" — and
+ * mirrors the back button taking you in the reverse direction.
+ *
+ * The drill-down routes are a fixed allowlist : we don't try to
+ * detect navigation direction at runtime (would require a route
+ * history stack), just hardcode which pages are "sub-pages".
+ */
+const DRILL_DOWN_ROUTES = new Set<string>([
+  "module",
+  "admin-builder",
+  "crew-config",
+  "user-profile",
+  "achievements",
+]);
+
+function routeTransition(name: string) {
+  const isDrill = DRILL_DOWN_ROUTES.has(name);
+  if (isDrill) {
+    return {
+      initial: { opacity: 0, x: 24 },
+      animate: { opacity: 1, x: 0 },
+      exit: { opacity: 0, x: -16 },
+      transition: { duration: 0.32, ease: [0.22, 1, 0.36, 1] as const },
+    } as const;
+  }
+  return {
+    initial: { opacity: 0, y: 12 },
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: -8 },
+    transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] as const },
+  } as const;
 }
 
 function renderRoute(name: string) {
