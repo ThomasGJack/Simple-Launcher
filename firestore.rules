@@ -196,17 +196,31 @@ service cloud.firestore {
 
       match /members/{memberUid} {
         allow read: if isCrewMember();
-        // A user can write their own member doc (join). The role
-        // field is verified client-side to be "member" — owner is set
-        // by createUserCrew which writes the doc atomically.
-        allow create: if request.auth != null &&
-          memberUid == request.auth.uid &&
-          (isPublicCrew() || crewData().ownerUid == request.auth.uid ||
-           // Code-based join goes through this rule too — there's no
-           // way to verify the user typed the right code, but the
-           // crew id used in the path is only known if the lookup
-           // succeeded, so the code itself acts as the gate.
-           true);
+        // Two valid create paths:
+        //
+        //  1. Self-join — user writes their own member doc with
+        //     role "member" (or "owner" via createUserCrew which
+        //     writes atomically alongside the crew create).
+        //  2. Admin / owner can create a member doc *for someone
+        //     else* with role "member" — this is needed when
+        //     assigning a custom role on a master crew where every
+        //     user is an *implicit* member with no Firestore doc.
+        //     The setMemberCustomRole helper goes through this
+        //     branch when no doc exists yet. Locked to role
+        //     "member" so an admin can't sneakily promote anyone
+        //     to owner via this path.
+        allow create: if request.auth != null && (
+          (memberUid == request.auth.uid &&
+            (isPublicCrew() || crewData().ownerUid == request.auth.uid ||
+             // Code-based join goes through this rule too — there's no
+             // way to verify the user typed the right code, but the
+             // crew id used in the path is only known if the lookup
+             // succeeded, so the code itself acts as the gate.
+             true))
+          ||
+          (isCrewAdminOrOwner() &&
+            request.resource.data.role == "member")
+        );
         // Update : owner can set the structural role (member ↔
         // admin). Owner OR admin can also assign / clear custom
         // roles on any member (custom roles are purely

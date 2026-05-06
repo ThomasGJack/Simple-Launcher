@@ -272,6 +272,11 @@ export function watchCrewMembers(
           joinedAt: tsToMs(data.joinedAt) ?? 0,
           displayName: typeof data.displayName === "string" ? data.displayName : null,
           avatarUrl: typeof data.avatarUrl === "string" ? data.avatarUrl : null,
+          // Custom role is optional — only present when an admin /
+          // owner has assigned one via setMemberCustomRole. The
+          // CrewConfigPage uses this to render the colored badge.
+          customRoleId:
+            typeof data.customRoleId === "string" ? data.customRoleId : null,
         };
       });
       // Owner first, then admins, then members; alphabetical inside each tier.
@@ -1110,6 +1115,22 @@ export async function deleteCustomRole(crewId: string, roleId: string): Promise<
 /**
  * Set / clear the custom role of a member. Owner / admin can call
  * this on any member. Pass `null` to clear an existing assignment.
+ *
+ * Two cases:
+ *  - Member doc already exists (joined a regular crew, or already
+ *    posted in a master crew). Just merge the customRoleId field.
+ *  - Member doc doesn't exist yet. This happens on master crews where
+ *    every authed user is an *implicit* member — there's no Firestore
+ *    doc until something forces one (sending a message, getting a
+ *    custom role assigned…). We create a full member doc with `role:
+ *    "member"` so the rules' create-branch is satisfied. Without the
+ *    full doc the rules reject a partial `{customRoleId}` write
+ *    because the create rule expects a real membership shape.
+ *
+ * Resolution of displayName / avatarUrl is left to the caller — for
+ * the master-crew case we don't try to resolve from /users/{uid}
+ * here (would require an extra read + isn't strictly needed since
+ * the UI already merges presence data on top).
  */
 export async function setMemberCustomRole(
   crewId: string,
@@ -1118,11 +1139,24 @@ export async function setMemberCustomRole(
 ): Promise<void> {
   const fb = getFirebase();
   if (!fb) throw new Error("Firebase not configured");
-  await setDoc(
-    doc(fb.db, "crews", crewId, "members", memberUid),
-    { customRoleId },
-    { merge: true },
-  );
+  const ref = doc(fb.db, "crews", crewId, "members", memberUid);
+  const snap = await getDoc(ref);
+  if (snap.exists()) {
+    await setDoc(ref, { customRoleId }, { merge: true });
+    return;
+  }
+  // No-doc case → write a complete member shape. The Firestore rules
+  // gate create on isCrewAdminOrOwner() (see rules update for this
+  // feature) so this fails for non-privileged callers — exactly the
+  // intended behaviour, since assigning a custom role is an admin op.
+  await setDoc(ref, {
+    uid: memberUid,
+    role: "member",
+    customRoleId,
+    joinedAt: serverTimestamp(),
+    displayName: null,
+    avatarUrl: null,
+  });
 }
 
 /** Read a single crew doc one-shot (for the join-by-code lookup +

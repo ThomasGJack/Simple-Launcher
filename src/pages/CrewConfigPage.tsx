@@ -157,6 +157,10 @@ export function CrewConfigPage() {
         joinedAt: m?.joinedAt ?? 0,
         displayName: m?.displayName ?? u.displayName ?? u.username ?? "Anonyme",
         avatarUrl: m?.avatarUrl ?? u.avatarUrl ?? null,
+        // Propagate customRoleId from the real member doc if any,
+        // so the badge renders correctly. Otherwise null so the
+        // CustomRolePicker stays at its placeholder.
+        customRoleId: m?.customRoleId ?? null,
       };
     });
   }, [crew, members, allUsers]);
