@@ -365,7 +365,7 @@ export function CrewsPage() {
               )}
             </div>
           </div>
-          {selectedCrew && !selectedCrew.isMaster && (
+          {selectedCrew && (!selectedCrew.isMaster || isAdmin(me)) && (
             <button
               type="button"
               onClick={() =>

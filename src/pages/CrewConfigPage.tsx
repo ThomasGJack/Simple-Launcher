@@ -39,6 +39,7 @@ import {
 } from "@/firebase/crews";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/auth";
+import { isAdmin as isLauncherAdmin } from "@/lib/admin";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
 
@@ -101,7 +102,11 @@ export function CrewConfigPage() {
     [members, me?.uid],
   );
   const myRole = myMember?.role ?? null;
-  const isOwner = !!me && crew?.ownerUid === me.uid;
+  // Launcher-wide admin owns every crew including master — can
+  // configure / channel-CRUD / delete user crews. Regular ownership
+  // is the per-crew "I created this" check.
+  const isLauncherOwner = isLauncherAdmin(me);
+  const isOwner = isLauncherOwner || (!!me && crew?.ownerUid === me.uid);
   const isAdmin = isOwner || myRole === "admin";
 
   const setTab = (next: Tab) => {

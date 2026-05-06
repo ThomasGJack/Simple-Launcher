@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { deleteCrew, leaveCrew, type Crew, type CrewRole } from "@/firebase/crews";
 import { useUIStore } from "@/store/ui";
+import { useAuthStore } from "@/store/auth";
+import { isAdmin as isLauncherAdmin } from "@/lib/admin";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
 
@@ -52,7 +54,12 @@ export function CrewContextMenu({
   const [error, setError] = useState<string | null>(null);
   const [codeCopied, setCodeCopied] = useState(false);
 
-  const isOwner = crew.ownerUid === myUid;
+  // Launcher-wide admin bypasses every gate — they own the master
+  // crew + can configure / delete any user crew. Regular ownership
+  // is the normal "I created this user crew" check.
+  const me = useAuthStore((s) => s.user);
+  const isLauncherOwner = isLauncherAdmin(me);
+  const isOwner = isLauncherOwner || crew.ownerUid === myUid;
 
   // Outside-click + Escape dismiss
   useEffect(() => {
@@ -211,10 +218,9 @@ export function CrewContextMenu({
       ) : (
         <>
           {/* Configuration — accessible to admin / owner. Members
-              can still open it (read-only / leave button), so we
-              keep it visible for everyone except crews with no
-              special config (master crew). */}
-          {!crew.isMaster && (
+              can still open it (read-only / leave button). Master
+              crew is configurable only by the launcher admin. */}
+          {(!crew.isMaster || isLauncherOwner) && (
             <Item
               icon={<Settings className="size-4" />}
               label="Configuration"
@@ -223,7 +229,8 @@ export function CrewContextMenu({
             />
           )}
 
-          {/* Copy invite code (members + admin + owner) */}
+          {/* Copy invite code (members + admin + owner) — master
+              crew has no invite code (everyone is auto-joined). */}
           {crew.joinCode && !crew.isMaster && (
             <Item
               icon={<ClipboardCopy className="size-4" />}
@@ -236,7 +243,9 @@ export function CrewContextMenu({
 
           {/* Leave (members + admin, NOT owner — owner must delete
               or transfer ownership first ; the second isn't
-              implemented yet so for now owner sees Supprimer). */}
+              implemented yet so for now owner sees Supprimer). The
+              master crew can never be left (auto-rejoined at boot
+              via ensureMasterMemberships). */}
           {!crew.isMaster && !isOwner && (
             <Item
               icon={<LogOut className="size-4" />}
@@ -247,8 +256,13 @@ export function CrewContextMenu({
             />
           )}
 
-          {/* Delete (owner only) */}
-          {isOwner && (
+          {/* Delete — owner of a user crew, OR launcher admin (can
+              delete user crews + master via the rules' isAdmin()
+              gate). Master crew deletion is intentionally still
+              behind the launcher-admin check, never the regular
+              owner check (since master crews don't really have a
+              regular owner). */}
+          {isOwner && !crew.isMaster && (
             <Item
               icon={<Trash2 className="size-4" />}
               label="Supprimer le crew"
@@ -258,8 +272,10 @@ export function CrewContextMenu({
             />
           )}
 
-          {/* Master crew note */}
-          {crew.isMaster && (
+          {/* Master crew note — only for non-launcher-admin viewers.
+              The launcher admin sees the same actions as on a user
+              crew. */}
+          {crew.isMaster && !isLauncherOwner && (
             <div className="rounded-lg bg-amber-500/[0.06] p-2.5 text-[11px] text-amber-300/80 ring-1 ring-amber-500/20">
               <div className="mb-0.5 flex items-center gap-1.5 font-medium text-amber-300">
                 <Crown className="size-3" /> Crew maître
