@@ -12,6 +12,7 @@ export type Route =
   | { name: "community" }
   | { name: "vip" }
   | { name: "crews"; crewId?: string; channelId?: string }
+  | { name: "crew-config"; crewId: string; tab?: "general" | "channels" | "roles" | "invite" | "danger" }
   | { name: "messages"; conversationId?: string }
   | { name: "user-profile"; uid: string }
   | { name: "login" };

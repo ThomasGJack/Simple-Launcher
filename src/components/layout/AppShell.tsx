@@ -45,6 +45,9 @@ const PublicProfilePage = lazy(() =>
 const CrewsPage = lazy(() =>
   import("@/pages/CrewsPage").then((m) => ({ default: m.CrewsPage })),
 );
+const CrewConfigPage = lazy(() =>
+  import("@/pages/CrewConfigPage").then((m) => ({ default: m.CrewConfigPage })),
+);
 const VipPage = lazy(() =>
   import("@/pages/VipPage").then((m) => ({ default: m.VipPage })),
 );
@@ -87,6 +90,7 @@ export function AppShell() {
 function routeKey(route: Route): string {
   if (route.name === "module") return `module:${route.moduleId}`;
   if (route.name === "admin-builder") return `admin-builder:${route.moduleId}`;
+  if (route.name === "crew-config") return `crew-config:${route.crewId}`;
   return route.name;
 }
 
@@ -112,6 +116,8 @@ function renderRoute(name: string) {
       return <CommunityPage />;
     case "crews":
       return <CrewsPage />;
+    case "crew-config":
+      return <CrewConfigPage />;
     case "vip":
       return <VipPage />;
     case "messages":

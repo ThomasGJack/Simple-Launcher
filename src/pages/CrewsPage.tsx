@@ -26,6 +26,7 @@ import {
 import { ChannelView } from "@/components/crews/ChannelView";
 import { MembersList } from "@/components/crews/MembersList";
 import { CrewSettingsModal } from "@/components/crews/CrewSettingsModal";
+import { CrewContextMenuWrapper } from "@/components/crews/CrewContextMenu";
 import { hasAnyTier } from "@/lib/supporterTier";
 import { isAdmin } from "@/lib/admin";
 import { sounds } from "@/lib/sounds";
@@ -70,6 +71,13 @@ export function CrewsPage() {
   const [browseOpen, setBrowseOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /** Right-click context menu state — when set, render
+   *  CrewContextMenu anchored at `position` for `crew`. Closed by
+   *  clicking outside / Escape / picking an action. */
+  const [ctxMenu, setCtxMenu] = useState<{
+    crew: Crew;
+    position: { x: number; y: number };
+  } | null>(null);
 
   useEffect(() => watchCrews(setAllCrews), []);
 
@@ -222,7 +230,15 @@ export function CrewsPage() {
                 key={c.id}
                 type="button"
                 onClick={() => navigate({ name: "crews", crewId: c.id })}
-                title={c.name}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  sounds.click();
+                  setCtxMenu({
+                    crew: c,
+                    position: { x: e.clientX + 8, y: e.clientY },
+                  });
+                }}
+                title={`${c.name} — clic droit pour les options`}
                 className={cn(
                   "no-drag relative grid size-12 place-items-center rounded-2xl text-xl transition-all",
                   active
@@ -349,18 +365,18 @@ export function CrewsPage() {
               )}
             </div>
           </div>
-          {selectedCrew &&
-            !selectedCrew.isMaster &&
-            selectedCrew.ownerUid === me?.uid && (
-              <button
-                type="button"
-                onClick={() => setSettingsOpen(true)}
-                title="Paramètres du crew"
-                className="grid size-8 place-items-center rounded-lg text-fg-dim transition-colors hover:bg-white/[0.06] hover:text-fg-primary"
-              >
-                <Settings className="size-4" />
-              </button>
-            )}
+          {selectedCrew && !selectedCrew.isMaster && (
+            <button
+              type="button"
+              onClick={() =>
+                navigate({ name: "crew-config", crewId: selectedCrew.id })
+              }
+              title="Configuration du crew (salons, rôles, code…)"
+              className="grid size-8 place-items-center rounded-lg text-fg-dim transition-colors hover:bg-white/[0.06] hover:text-fg-primary"
+            >
+              <Settings className="size-4" />
+            </button>
+          )}
           {selectedCrew && !selectedCrew.isMaster && (
             <button
               type="button"
@@ -459,6 +475,30 @@ export function CrewsPage() {
           onClose={() => setSettingsOpen(false)}
           crew={selectedCrew}
           onDeleted={() => navigate({ name: "crews" })}
+        />
+      )}
+      {/* Right-click context menu on a crew icon — anchored at the
+          click coordinates. Closed via outside-click / Esc / action.
+          Role is derived best-effort : if the right-clicked crew is
+          the currently selected one, we reuse the live members list ;
+          otherwise we fall back to "member" (still authed since
+          myCrewIds contains it) and let the Configuration page do
+          the precise lookup itself. The owner-vs-not distinction is
+          the only one that matters for action visibility. */}
+      {ctxMenu && me && (
+        <CrewContextMenuWrapper
+          open
+          crew={ctxMenu.crew}
+          myUid={me.uid}
+          myRole={
+            ctxMenu.crew.ownerUid === me.uid
+              ? "owner"
+              : ctxMenu.crew.id === selectedCrewId
+                ? (members.find((m) => m.uid === me.uid)?.role ?? "member")
+                : "member"
+          }
+          position={ctxMenu.position}
+          onClose={() => setCtxMenu(null)}
         />
       )}
     </div>
