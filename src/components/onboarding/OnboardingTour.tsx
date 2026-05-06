@@ -79,56 +79,92 @@ type Step = {
 };
 
 const STEPS_BASE: Step[] = [
+  // ── Library : 2 steps ─────────────────────────────────────────────
   {
-    id: "library",
+    id: "library-nav",
     route: { name: "library" },
     spotlight: '[data-tour-target="library"]',
     icon: Library,
     iconColor: "#00d4ff",
     glowColor: "rgba(0, 212, 255, 0.4)",
     title: "Ta bibliothèque",
-    body: "Tous tes jeux Simple Launcher (Minecraft, mods, jeux hosted) en un seul endroit. Lance-les en un clic, vois tes statistiques de temps de jeu, et garde tes saves locales.",
+    body: "Premier onglet de la sidebar : ta bibliothèque centralise tous les jeux Simple Launcher (Minecraft, mods, jeux hosted, scripts). Clique dessus pour y accéder à tout moment.",
   },
   {
-    id: "community",
+    id: "library-grid",
+    route: { name: "library" },
+    spotlight: '[data-tour-target="library-grid"]',
+    icon: Library,
+    iconColor: "#00d4ff",
+    glowColor: "rgba(0, 212, 255, 0.4)",
+    title: "Tes jeux installés",
+    body: "Chaque card affiche un jeu avec sa cover, son temps de jeu cumulé, et un bouton Jouer en hover. Clique sur la card pour ouvrir la page détaillée du jeu (description, captures, options de lancement).",
+  },
+  // ── Community : 2 steps ───────────────────────────────────────────
+  {
+    id: "community-nav",
     route: { name: "community" },
     spotlight: '[data-tour-target="community"]',
     icon: Users,
     iconColor: "#a855f7",
     glowColor: "rgba(168, 85, 247, 0.4)",
     title: "La communauté",
-    body: "Vois qui est en ligne, ce que tes amis jouent en ce moment, et envoie des invitations à des sessions. Présence live mise à jour toutes les 30 secondes.",
+    body: "Tous les utilisateurs de Simple Launcher au même endroit. Discord-OAuth obligatoire pour apparaître ici, donc tout le monde a un avatar et un pseudo reconnaissables.",
   },
   {
-    id: "crews",
+    id: "community-list",
+    route: { name: "community" },
+    spotlight: '[data-tour-target="community-list"]',
+    icon: Users,
+    iconColor: "#a855f7",
+    glowColor: "rgba(168, 85, 247, 0.4)",
+    title: "Présence live",
+    body: "Status temps réel : vert = en ligne, jaune = idle (5 min sans activité), gris = offline. Quand un user joue, son currentActivity affiche le jeu en cours. Click sur un user pour voir son profil public.",
+  },
+  // ── Crews : 1 step ────────────────────────────────────────────────
+  {
+    id: "crews-nav",
     route: { name: "crews" },
     spotlight: '[data-tour-target="crews"]',
     icon: Castle,
     iconColor: "#fcd34d",
     glowColor: "rgba(252, 211, 77, 0.4)",
     title: "Les crews",
-    body: "Channels Discord-style pour discuter avec ta team. Crews publics à rejoindre librement, ou crées le tien (réservé aux supporters Ko-fi). Overlay Shift+F9 pour chatter sans quitter le jeu.",
+    body: "Channels Discord-style pour discuter avec ta team. Master crew Simple Games visible par défaut (tout le monde y est). Tu peux créer ton propre crew si tu es supporter Ko-fi, ou en rejoindre via code d'invitation. Bonus : raccourci Shift+F9 pour ouvrir l'overlay in-game pendant que tu joues.",
   },
+  // ── Profile : 2 steps ─────────────────────────────────────────────
   {
-    id: "profile",
+    id: "profile-nav",
     route: { name: "profile" }, // overridden at runtime if user has a uid
     spotlight: '[data-tour-target="profile"]',
     icon: User,
     iconColor: "#4ade80",
     glowColor: "rgba(74, 222, 128, 0.4)",
     title: "Ton profil",
-    body: "Tes stats, achievements (50 à débloquer), heatmap d'heures de jeu, et un lien public partageable. Customisable via les tiers Soutien / VIP / Légende.",
+    body: "Avatar bas-gauche de la sidebar = ton profil public partageable. URL `simplelaunche.web.app/u/{discordId}` accessible aux non-launcher users. Customisable via les tiers Soutien / VIP / Légende (frame avatar animé, accent color, bannière, etc.).",
   },
   {
-    id: "settings",
+    id: "profile-heatmap",
+    route: { name: "profile" },
+    spotlight: '[data-tour-target="profile-heatmap"]',
+    icon: User,
+    iconColor: "#4ade80",
+    glowColor: "rgba(74, 222, 128, 0.4)",
+    title: "Heatmap des heures de jeu",
+    body: "Graphique 7×24 GitHub-style qui montre tes habitudes : plus c'est foncé, plus tu lances un jeu à cette heure / ce jour. Visible sur ton profil public pour que tes amis sachent quand tu es dispo. Mis à jour à chaque lancement de jeu.",
+  },
+  // ── Settings : 1 step ─────────────────────────────────────────────
+  {
+    id: "settings-nav",
     route: { name: "settings" },
     spotlight: '[data-tour-target="settings"]',
     icon: Settings,
     iconColor: "#94a3b8",
     glowColor: "rgba(148, 163, 184, 0.4)",
     title: "Paramètres & sons",
-    body: "Customize tout : couleur d'accent, animations, sons d'interface (avec preview), notifications natives Windows par type, raccourci global pour l'overlay in-game.",
+    body: "Customize tout : couleur d'accent (la teinte cyan partout dans le launcher), animations on/off, sons d'interface avec preview, notifications natives Windows par type, raccourci global pour l'overlay in-game, comptes Microsoft pour Minecraft, diagnostic système intégré.",
   },
+  // ── Done ──────────────────────────────────────────────────────────
   {
     id: "done",
     route: null,
@@ -137,7 +173,7 @@ const STEPS_BASE: Step[] = [
     iconColor: "#00d4ff",
     glowColor: "rgba(0, 212, 255, 0.5)",
     title: "Tu es prêt(e) à décoller !",
-    body: "Tu peux refaire ce tour à tout moment depuis Paramètres → \"Refaire le tour de présentation\". Bon jeu !",
+    body: "Tu peux refaire ce tour à tout moment depuis Paramètres → \"Refaire le tour de présentation\". Si tu as une question, le master crew Simple Games (icône château étoile) est ton point de contact direct. Bon jeu !",
   },
 ];
 
@@ -225,17 +261,29 @@ export function OnboardingTour({ onClose }: { onClose: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stepIdx]);
 
-  // Escape to skip / close.
+  // Keyboard shortcuts : Esc skips, Enter / ArrowRight advances,
+  // ArrowLeft goes back. Useful for power-users + accessibility.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         markOnboardingDone();
         onClose();
+      } else if (e.key === "Enter" || e.key === "ArrowRight") {
+        e.preventDefault();
+        if (isLast) {
+          markOnboardingDone();
+          onClose();
+        } else {
+          setStepIdx((i) => Math.min(i + 1, steps.length - 1));
+        }
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        setStepIdx((i) => Math.max(0, i - 1));
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, isLast, steps.length]);
 
   const handleNext = () => {
     sounds.click();
@@ -364,13 +412,13 @@ export function OnboardingTour({ onClose }: { onClose: () => void }) {
           }}
           exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.18 } }}
           className={cn(
-            "no-drag fixed z-[60]",
+            "no-drag pointer-events-auto fixed z-[60]",
             isLast
               ? "left-1/2 top-1/2 w-[28rem] max-w-[92vw] -translate-x-1/2 -translate-y-1/2"
               : "bottom-6 right-6 w-[26rem] max-w-[92vw]",
           )}
         >
-          <div className="relative overflow-hidden rounded-2xl glass-strong shadow-[0_30px_80px_rgba(0,0,0,0.6)] ring-1 ring-white/[0.08]">
+          <div className="relative overflow-hidden rounded-2xl glass-strong shadow-[0_30px_80px_rgba(0,0,0,0.7)] ring-1 ring-accent/30">
             {/* Accent glow halo */}
             <motion.div
               aria-hidden
@@ -379,14 +427,16 @@ export function OnboardingTour({ onClose }: { onClose: () => void }) {
               animate={{ opacity: [0.25, 0.55, 0.25] }}
               transition={{ duration: 3.6, repeat: Infinity, ease: "easeInOut" }}
             />
-            {/* Skip button */}
+            {/* Skip / close button — bigger hit area + visible
+                hover state. Sits ABOVE the halo blur so it stays
+                clickable (z-10 to be safe vs the halo). */}
             <button
               type="button"
               onClick={handleSkip}
-              className="no-drag absolute right-2 top-2 inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] text-fg-dim transition-colors hover:bg-white/[0.04] hover:text-fg-muted"
+              className="no-drag absolute right-3 top-3 z-10 inline-flex items-center gap-1.5 rounded-lg bg-bg-base/40 px-2.5 py-1.5 text-[11px] font-medium text-fg-muted ring-1 ring-white/[0.06] transition-all hover:bg-bg-base/80 hover:text-fg-primary hover:ring-white/[0.15]"
               aria-label="Passer le tour"
             >
-              Passer <X className="size-3" />
+              Passer <X className="size-3.5" strokeWidth={2.5} />
             </button>
 
             {/* Step indicator */}
@@ -443,39 +493,44 @@ export function OnboardingTour({ onClose }: { onClose: () => void }) {
               </div>
             </div>
 
-            {/* Footer — back / skip / next */}
+            {/* Footer — back + next. Buttons are pointer-events-auto
+                via the parent ; this row only contains visual styling.
+                The Next button is intentionally large + glowing so it's
+                impossible to miss (the previous version had a clipping
+                issue at narrow widths — this one stays visible). */}
             <div className="relative flex items-center gap-2 border-t border-white/[0.06] bg-bg-base/30 px-4 py-3">
               <button
                 type="button"
                 onClick={handleBack}
                 disabled={isFirst}
                 className={cn(
-                  "no-drag inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-all",
+                  "no-drag inline-flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-medium transition-all",
                   isFirst
                     ? "cursor-not-allowed text-fg-dim opacity-40"
                     : "text-fg-muted hover:bg-white/[0.04] hover:text-fg-primary",
                 )}
               >
-                <ArrowLeft className="size-3" /> Retour
+                <ArrowLeft className="size-3.5" /> Retour
               </button>
-              <div className="ml-auto flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleNext}
-                  className="no-drag inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-1.5 text-xs font-semibold shadow-[0_0_14px_var(--color-accent-soft)] transition-shadow hover:shadow-[0_0_22px_var(--color-accent-glow)]"
-                  style={{ color: "var(--color-on-accent)" }}
-                >
-                  {isLast ? (
-                    <>
-                      <CheckCircle2 className="size-3.5" /> Démarrer
-                    </>
-                  ) : (
-                    <>
-                      Suivant <ArrowRight className="size-3.5" />
-                    </>
-                  )}
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={handleNext}
+                className={cn(
+                  "no-drag ml-auto inline-flex items-center justify-center gap-2 rounded-xl bg-accent text-sm font-bold shadow-[0_0_18px_var(--color-accent-soft)] transition-all hover:scale-[1.03] hover:shadow-[0_0_28px_var(--color-accent-glow)] active:scale-[0.98]",
+                  isLast ? "px-6 py-2.5" : "px-5 py-2.5",
+                )}
+                style={{ color: "var(--color-on-accent)" }}
+              >
+                {isLast ? (
+                  <>
+                    <CheckCircle2 className="size-4" /> Démarrer
+                  </>
+                ) : (
+                  <>
+                    Suivant <ArrowRight className="size-4" strokeWidth={2.5} />
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </motion.div>

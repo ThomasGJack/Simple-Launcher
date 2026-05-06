@@ -119,7 +119,10 @@ export function LibraryPage() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-5 xl:grid-cols-4">
+          <div
+            className="grid grid-cols-3 gap-5 xl:grid-cols-4"
+            data-tour-target="library-grid"
+          >
             {all.map((m, i) => (
               <ModuleCard
                 key={m.id}

@@ -271,7 +271,7 @@ export function ProfilePage() {
 
       {/* Heatmap horaires de jeu — graphique 7×24 GitHub-style. */}
       {user && (
-        <div className="mt-6 max-w-2xl">
+        <div className="mt-6 max-w-2xl" data-tour-target="profile-heatmap">
           <PlayHeatmap
             uid={user.uid}
             title="Quand tu joues"

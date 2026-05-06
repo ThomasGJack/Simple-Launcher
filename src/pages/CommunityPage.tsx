@@ -63,6 +63,7 @@ export function CommunityPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
           className="col-span-12 lg:col-span-7"
+          data-tour-target="community-list"
         >
           {sorted.length === 0 ? (
             <div className="rounded-3xl glass p-10 text-center">

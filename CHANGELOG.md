@@ -18,6 +18,18 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.05.06.16] - 2026-05-06  · semver `26.506.15`
+
+
+### Ajouté
+
+- **Onboarding tour étoffé : 10 étapes au lieu de 6** ([src/components/onboarding/OnboardingTour.tsx](src/components/onboarding/OnboardingTour.tsx) + [src/pages/LibraryPage.tsx](src/pages/LibraryPage.tsx) + [src/pages/CommunityPage.tsx](src/pages/CommunityPage.tsx) + [src/pages/ProfilePage.tsx](src/pages/ProfilePage.tsx)) — chaque section majeure a désormais une étape "vue d'ensemble" (spotlight sur le bouton sidebar) PUIS une étape "détail" (spotlight sur un élément clé de la page). Library : grille des jeux + lancement. Community : liste users + status live. Profile : avatar + heatmap horaires. Crews + Settings restent en 1 step car déjà denses. Total : 10 steps. Nouveaux `data-tour-target` ajoutés sur la grille Library, le panneau users de Community, et la heatmap de Profile. Le tour navigue auto à chaque step et le spotlight bascule du bouton sidebar à l'élément interne de la page.
+- **Raccourcis clavier dans l'onboarding** ([src/components/onboarding/OnboardingTour.tsx](src/components/onboarding/OnboardingTour.tsx)) — `Esc` pour skip, `Enter` ou `→` pour avancer, `←` pour reculer. Accessibilité + power-user friendly.
+
+### Corrigé
+
+- **Bouton "Suivant" peu visible / clipped** ([src/components/onboarding/OnboardingTour.tsx](src/components/onboarding/OnboardingTour.tsx)) — le bouton Suivant était trop discret (text-xs px-3.5 py-1.5 weight semibold) et pouvait être clipped à largeur étroite. Refonte : text-sm font-bold, padding plus généreux (px-5 py-2.5), glow shadow plus prononcé, hover scale-up 1.03 + active scale-down 0.98 pour un feedback tactile clair. Impossible à manquer.
+- **Bouton "Passer" non cliquable** ([src/components/onboarding/OnboardingTour.tsx](src/components/onboarding/OnboardingTour.tsx)) — le bouton Passer (top-right) n'avait pas un hit area assez généreux + était potentiellement masqué par le halo blur en background. Ajout d'un `z-10` explicite, fond `bg-bg-base/40` au repos pour le rendre visible avant hover, ring + hover state plus marqués. `pointer-events-auto` explicite ajouté sur la card globale pour garantir la cliquabilité indépendamment du stacking ancestor.
 ## [v26.05.06.15] - 2026-05-06  · semver `26.506.14`
 
 
