@@ -9,6 +9,7 @@ import { useUIStore } from "@/store/ui";
 import { getFirebase } from "@/firebase/config";
 import { recordPlaytime } from "@/firebase/playtime";
 import { recordLaunchDay } from "@/firebase/launchDays";
+import { recordHeatmapHit } from "@/firebase/playHeatmap";
 import { ensureMasterMemberships } from "@/firebase/crews";
 import { pushHeartbeat, type CurrentActivity } from "@/firebase/presence";
 import { watchFavorites } from "@/firebase/favorites";
@@ -299,6 +300,9 @@ function App() {
       const { moduleId, moduleName, startedAt } = event.payload;
       currentActivityRef.current = { moduleId, moduleName, startedAt };
       pushHeartbeat(uid, currentActivityRef.current).catch(() => {});
+      // Increment the day×hour heatmap cell so the user can see
+      // their play patterns over time on the Profile page.
+      recordHeatmapHit(uid, startedAt).catch(() => {});
       logger.action("Module launched", {
         source: "App.module-launched",
         metadata: { moduleId, moduleName },

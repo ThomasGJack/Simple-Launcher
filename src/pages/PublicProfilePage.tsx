@@ -28,6 +28,7 @@ import {
 } from "@/store/firebaseStores";
 import { sendGameInvitation } from "@/firebase/invitations";
 import { saveProfileCustomization, uploadProfileBanner } from "@/firebase/userProfile";
+import { PlayHeatmap } from "@/components/profile/PlayHeatmap";
 import {
   PROFILE_THEME_LIST,
   profileThemeStyle,
@@ -543,6 +544,23 @@ export function PublicProfilePage() {
             </div>
           </div>
         </motion.div>
+
+        {/* Play heatmap — when does this user typically play ?
+            Visible to everyone with a launcher account. Useful to
+            spot good times to ping a friend for a session. */}
+        {targetUid && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+            className="mt-6"
+          >
+            <PlayHeatmap
+              uid={targetUid}
+              title={isMe ? "Quand tu joues" : "Quand iel joue"}
+            />
+          </motion.div>
+        )}
       </div>
       <AnimatePresence>
         {editing && profile && isMe && (

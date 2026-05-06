@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { LogOut, Calendar, Mail, Hash, Gamepad2, Clock, Rocket, Trophy, Sigma, Flame, ChevronDown, ChevronUp, Share2 } from "lucide-react";
 import { ShareProfileModal } from "@/components/profile/ShareProfileModal";
+import { PlayHeatmap } from "@/components/profile/PlayHeatmap";
 import { sounds } from "@/lib/sounds";
 import { useAuthStore } from "@/store/auth";
 import { useUIStore } from "@/store/ui";
@@ -267,6 +268,17 @@ export function ProfilePage() {
           </div>
         )}
       </motion.div>
+
+      {/* Heatmap horaires de jeu — graphique 7×24 GitHub-style. */}
+      {user && (
+        <div className="mt-6 max-w-2xl">
+          <PlayHeatmap
+            uid={user.uid}
+            title="Quand tu joues"
+            subtitle="Plus c'est foncé, plus tu lances tes jeux à cette heure / ce jour."
+          />
+        </div>
+      )}
 
       {discordId && (
         <ShareProfileModal

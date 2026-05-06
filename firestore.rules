@@ -88,6 +88,16 @@ service cloud.firestore {
         allow read: if request.auth != null;
         allow write: if request.auth != null && request.auth.uid == uid;
       }
+
+      // Per-user "when do you play" heatmap — single doc at
+      // `users/{uid}/playHeatmap/data` with a 7×24 cells map.
+      // Read open to any authed user so friends can see the
+      // heatmap on the public profile ; write owner-only so no
+      // one can poison your stats.
+      match /playHeatmap/{docId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null && request.auth.uid == uid;
+      }
     }
 
     // Global achievement rarity counters. Single doc at
