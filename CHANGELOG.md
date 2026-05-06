@@ -18,6 +18,16 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.05.06.10] - 2026-05-06  · semver `26.506.9`
+
+
+### Changé
+
+- **News widget : liste verticale scrollable** ([src/components/home/NewsCard.tsx](src/components/home/NewsCard.tsx)) — la news featured (épinglée ou plus récente) reste affichée en pleine taille en haut, mais en dessous la liste des news plus anciennes est désormais **toujours visible** sous forme compacte, avec au moins 2 items en permanence sans interaction. Au-delà, la liste scrolle verticalement (max-height 192 px, scrollbar fine type `info-scroll` qui tire un accent cyan au survol). Header `Plus de news` + compteur du nombre d'items archivés. Avant : il fallait cliquer "Voir les news plus anciennes" puis "Masquer" pour expand/collapse — nouveau comportement plus direct et plus discoverable, le scroll suffit.
+
+### Supprimé
+
+- **Bouton "Voir les news plus anciennes" / "Masquer"** ([src/components/home/NewsCard.tsx](src/components/home/NewsCard.tsx)) — remplacé par la liste compacte toujours visible en scroll vertical (cf. ci-dessus). L'expand/collapse animé n'a plus lieu d'être.
 ## [v26.05.06.9] - 2026-05-06  · semver `26.506.8`
 
 

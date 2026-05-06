@@ -1,5 +1,12 @@
 [
   {
+    "version": "26.506.9",
+    "displayVersion": "v26.05.06.10",
+    "notes": "### Changé\n\n- **News widget : liste verticale scrollable** ([src/components/home/NewsCard.tsx](src/components/home/NewsCard.tsx)) — la news featured (épinglée ou plus récente) reste affichée en pleine taille en haut, mais en dessous la liste des news plus anciennes est désormais **toujours visible** sous forme compacte, avec au moins 2 items en permanence sans interaction. Au-delà, la liste scrolle verticalement (max-height 192 px, scrollbar fine type `info-scroll` qui tire un accent cyan au survol). Header `Plus de news` + compteur du nombre d'items archivés. Avant : il fallait cliquer \"Voir les news plus anciennes\" puis \"Masquer\" pour expand/collapse — nouveau comportement plus direct et plus discoverable, le scroll suffit.\n\n### Supprimé\n\n- **Bouton \"Voir les news plus anciennes\" / \"Masquer\"** ([src/components/home/NewsCard.tsx](src/components/home/NewsCard.tsx)) — remplacé par la liste compacte toujours visible en scroll vertical (cf. ci-dessus). L'expand/collapse animé n'a plus lieu d'être.",
+    "pub_date": "2026-05-06T16:26:25.396Z",
+    "channel": "win"
+  },
+  {
     "version": "26.506.8",
     "displayVersion": "v26.05.06.9",
     "notes": "### Ajouté\n\n- **Liens cliquables dans les news** ([src/components/home/NewsCard.tsx](src/components/home/NewsCard.tsx) + [src/lib/sanitizeHtml.ts](src/lib/sanitizeHtml.ts)) — refonte du rendu des news pour rendre les URLs vraiment cliquables. Trois améliorations combinées : (1) **Auto-linkification** des URLs en clair — taper `https://exemple.com` dans le corps de la news fait apparaître un lien sans avoir à utiliser la syntaxe markdown `[texte](url)`. Le pre-processing détecte les URLs http(s) qui ne sont pas déjà à l'intérieur d'un lien markdown et les wrappe en autolinks. (2) **Click interceptor** sur le conteneur des news qui intercepte les clics sur `<a>` et les route via `tauri-plugin-opener` vers le navigateur système — sans ça, Tauri 2 essayait de naviguer dans la webview du launcher et le clic n'avait aucun effet visible. (3) **Sécurité défense-en-profondeur** : le sanitizer DOMPurify ajoute désormais `target=\"_blank\" rel=\"noopener noreferrer\"` à chaque `<a>` http(s), pour que même si l'interceptor échoue, on évite tout détournement de navigation. Le style des liens dans les news est maintenant cohérent (couleur accent + underline subtil + cursor pointer).",

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Megaphone, Pin, ChevronRight } from "lucide-react";
+import { Megaphone, Pin, Newspaper } from "lucide-react";
 import { watchNews, type News } from "@/firebase/news";
 import {
   REACTION_EMOJIS,
@@ -69,20 +69,36 @@ function handleNewsClick(e: ReactMouseEvent<HTMLDivElement>) {
 }
 
 /**
- * Live newsfeed card on the home page. Displays the top item (pinned first,
- * else most recently updated) with a soft pulse on transition. Updates in
- * real-time via Firestore onSnapshot — admin edits propagate to every
- * connected launcher without a relaunch.
+ * Live newsfeed widget on the home page.
+ *
+ * Layout :
+ *   - Top item rendered FULL size (pinned first, otherwise most recent).
+ *     Includes title, body, reactions, poll, and an accent stripe.
+ *   - Below, a scrollable list of the remaining news in COMPACT form
+ *     (~64 px per row), at least 2 visible without scrolling. Older
+ *     news disappear into the scroll. The container has a styled
+ *     vertical scrollbar (thin, accent-on-hover) so the user can
+ *     dig into the archive without leaving the home page.
+ *
+ * Updates propagate live via Firestore `onSnapshot` — admin edits
+ * appear on every connected launcher without relaunch.
  */
 export function NewsCard() {
   const [news, setNews] = useState<News[]>([]);
-  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => watchNews(setNews), []);
 
   const visible = news.filter((n) => !n.hidden);
   if (visible.length === 0) return null;
   const top = visible[0];
+  const rest = visible.slice(1);
+
+  // Approx height for ~2 compact items + a little breathing room :
+  //   each compact item is ~76px tall (p-3 + 2 lines + gap)
+  //   2 visible × 76 + 8px gap + 4px scroll margin ≈ 168px
+  // We give 192px so the third item peeks just below the fold,
+  // hinting at scrollability without being too generous.
+  const SCROLL_MAX_H = 192;
 
   return (
     <motion.div
@@ -92,31 +108,31 @@ export function NewsCard() {
       className="mb-4"
     >
       <AnimatePresence mode="wait">
-        <NewsItem
-          key={top.id + top.updatedAt}
-          item={top}
-          showMore={visible.length > 1}
-          expanded={expanded}
-          onToggle={() => setExpanded((v) => !v)}
-        />
+        <NewsItem key={top.id + top.updatedAt} item={top} />
       </AnimatePresence>
 
-      {/* Optional drawer with older news */}
-      <AnimatePresence>
-        {expanded && visible.length > 1 && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.3 }}
-            className="mt-2 space-y-2 overflow-hidden"
+      {rest.length > 0 && (
+        <div className="mt-3">
+          <div className="mb-2 flex items-center gap-2 px-1 text-[10px] uppercase tracking-[0.2em] text-fg-dim">
+            <Newspaper className="size-3" />
+            Plus de news
+            <span className="ml-auto rounded-full bg-bg-base/40 px-1.5 py-0.5 font-mono text-[9px] text-fg-muted">
+              {rest.length}
+            </span>
+          </div>
+          {/* Scrollable archive — at least 2 compact items always
+              visible, more accessible by scroll. The vertical scroll
+              uses the `info-scroll` flavour (thin, accent-on-hover). */}
+          <div
+            className="info-scroll space-y-2 overflow-y-auto pr-1"
+            style={{ maxHeight: `${SCROLL_MAX_H}px` }}
           >
-            {visible.slice(1).map((n) => (
+            {rest.map((n) => (
               <NewsItem key={n.id} item={n} compact />
             ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }
@@ -124,15 +140,9 @@ export function NewsCard() {
 function NewsItem({
   item,
   compact,
-  showMore,
-  expanded,
-  onToggle,
 }: {
   item: News;
   compact?: boolean;
-  showMore?: boolean;
-  expanded?: boolean;
-  onToggle?: () => void;
 }) {
   const accent = item.accent ?? "var(--color-accent)";
   // Pre-process body to auto-linkify bare URLs, then run through
@@ -214,16 +224,6 @@ function NewsItem({
           {!compact && <ReactionsRow newsId={item.id} />}
         </div>
       </div>
-      {showMore && onToggle && !compact && (
-        <button
-          type="button"
-          onClick={onToggle}
-          className="no-drag mt-3 inline-flex items-center gap-1 rounded-full bg-bg-base/40 px-3 py-1 text-[11px] text-fg-muted ring-1 ring-white/[0.06] transition-colors hover:bg-bg-base/60 hover:text-fg-primary"
-        >
-          <ChevronRight className={"size-3 transition-transform " + (expanded ? "rotate-90" : "")} />
-          {expanded ? "Masquer" : "Voir les news plus anciennes"}
-        </button>
-      )}
     </motion.div>
   );
 }
