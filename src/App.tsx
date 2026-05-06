@@ -28,6 +28,7 @@ import {
   incrementAchievementCount,
 } from "@/firebase/achievementStats";
 import { recordNotification } from "@/firebase/notifications";
+import { notify } from "@/lib/notifications";
 import {
   ACHIEVEMENTS,
   computeProgress,
@@ -340,6 +341,67 @@ function App() {
     [unlockedList],
   );
 
+  // ─── Native notification detectors ─────────────────────────────
+  //
+  // Watch the live presence list and fire OS-level toasts when a
+  // friend transitions offline → online, or null currentActivity →
+  // playing some game. The user controls per-kind opt-in in
+  // Settings ; defaults are OFF for these ambient signals (cf.
+  // notificationPrefs.ts) so the user has to flip them on.
+  //
+  // Snapshot-based dedup : we keep the previous status / activity
+  // in a ref and compare to the current one. The very first render
+  // primes the refs without firing (otherwise every booted user
+  // would trigger a notification at app start).
+  const lastFriendStatusRef = useRef<Map<string, "online" | "idle" | "offline">>(
+    new Map(),
+  );
+  const lastFriendActivityRef = useRef<Map<string, string | null>>(new Map());
+  useEffect(() => {
+    if (!user) {
+      lastFriendStatusRef.current.clear();
+      lastFriendActivityRef.current.clear();
+      return;
+    }
+    const lastStatus = lastFriendStatusRef.current;
+    const lastActivity = lastFriendActivityRef.current;
+    const isFirstStatus = lastStatus.size === 0;
+    const isFirstActivity = lastActivity.size === 0;
+    for (const u of allUsers) {
+      if (u.uid === user.uid) continue;
+      const now = Date.now();
+      const seenAgoMs = u.lastSeen ? now - u.lastSeen : Infinity;
+      const status =
+        seenAgoMs < 60_000
+          ? "online"
+          : seenAgoMs < 5 * 60_000
+            ? "idle"
+            : "offline";
+      const prev = lastStatus.get(u.uid);
+      if (!isFirstStatus && prev !== "online" && status === "online") {
+        notify({
+          title: u.displayName ?? u.username ?? "Anonyme",
+          body: "vient de passer en ligne",
+          kind: "friend-online",
+          metadata: { uid: u.uid },
+        }).catch(() => {});
+      }
+      lastStatus.set(u.uid, status);
+
+      const curActivity = u.currentActivity?.moduleName ?? null;
+      const prevActivity = lastActivity.get(u.uid) ?? null;
+      if (!isFirstActivity && prevActivity == null && curActivity != null) {
+        notify({
+          title: u.displayName ?? u.username ?? "Anonyme",
+          body: `joue à ${curActivity}`,
+          kind: "friend-launched",
+          metadata: { uid: u.uid, moduleName: curActivity },
+        }).catch(() => {});
+      }
+      lastActivity.set(u.uid, curActivity);
+    }
+  }, [allUsers, user]);
+
   // Track shortcut count locally for the shortcut-master achievement.
   // Subscribed at App-level so the value is fresh in the unlock loop.
   const [shortcutCount, setShortcutCount] = useState(0);
@@ -420,6 +482,15 @@ function App() {
           console.warn("[notifications] achievement notif failed:", err);
         });
         pushAchievementToast(ach.id);
+        // Native Windows notification — fires only when the launcher
+        // is not focused (skipIfFocused default true). The user
+        // controls per-kind opt-in via Settings → Notifications.
+        notify({
+          title: `🏆 ${ach.title}`,
+          body: ach.description,
+          kind: "achievement",
+          metadata: { achievementId: ach.id, tier: ach.tier },
+        }).catch(() => {});
         logger.action(`Achievement débloqué : ${ach.title}`, {
           source: "App.achievements",
           metadata: { achievementId: ach.id, tier: ach.tier },

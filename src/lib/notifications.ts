@@ -4,6 +4,7 @@ import {
   sendNotification as sendNative,
 } from "@tauri-apps/plugin-notification";
 import { logger } from "@/lib/logger";
+import { shouldFireNativeNotif, type NotifKind } from "@/lib/notificationPrefs";
 
 /**
  * Thin wrapper around `tauri-plugin-notification`. Handles:
@@ -61,10 +62,20 @@ export async function notify(opts: {
    *  visible. Defaults to true since OS notifs are most useful when the
    *  launcher is minimized / hidden / on another desktop. */
   skipIfFocused?: boolean;
+  /** Categorises the notification so the user can opt in/out per kind
+   *  in Settings. When omitted, no categorisation gate is applied
+   *  (legacy callers always fire). */
+  kind?: NotifKind;
   /** A bag of metadata logged alongside the notification — module ID,
    *  conversation ID, etc. */
   metadata?: Record<string, unknown>;
 }): Promise<void> {
+  // Per-kind opt-in gate : the user can disable categories of native
+  // notifications individually in Settings → Notifications. We
+  // never block legacy uncategorised callers (kind === undefined)
+  // so old code paths keep working without requiring updates.
+  if (opts.kind && !shouldFireNativeNotif(opts.kind)) return;
+
   const skipIfFocused = opts.skipIfFocused !== false;
   if (skipIfFocused && typeof document !== "undefined" && document.visibilityState === "visible" && document.hasFocus()) {
     return;
@@ -75,7 +86,7 @@ export async function notify(opts: {
     await sendNative({ title: opts.title, body: opts.body });
     logger.info(`Notif Windows envoyée : ${opts.title}`, {
       source: "notifications.notify",
-      metadata: { body: opts.body, ...opts.metadata },
+      metadata: { body: opts.body, kind: opts.kind, ...opts.metadata },
     });
   } catch (err) {
     // Plugin not available or platform doesn't support it — silent no-op.

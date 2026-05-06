@@ -21,6 +21,7 @@ import {
   Star,
   Layers,
   Keyboard,
+  Bell,
 } from "lucide-react";
 import { getVersion } from "@tauri-apps/api/app";
 import { useSettingsStore } from "@/store/settings";
@@ -61,6 +62,14 @@ import {
   TOAST_KIND_LABEL,
   type ToastKind,
 } from "@/lib/toasts";
+import {
+  getNativeNotifsEnabled,
+  getNativeNotifKind,
+  setNativeNotifsEnabled,
+  setNativeNotifKind,
+  NOTIF_KIND_LABEL,
+  type NotifKind,
+} from "@/lib/notificationPrefs";
 
 export function SettingsPage() {
   const { soundsEnabled, toggleSounds } = useSettingsStore();
@@ -94,6 +103,7 @@ export function SettingsPage() {
           }}
         />
         <ApparenceCard />
+        <NotificationsCard />
         <OverlayCard />
         <DownloadsCard />
         <LogsDiagnosticCard />
@@ -1398,5 +1408,87 @@ function ToastsSubSection() {
         </div>
       )}
     </div>
+  );
+}
+
+// ─── Notifications Windows natives ──────────────────────────────────────
+
+/**
+ * Settings card for OS-level (Windows toast) notifications. Master
+ * switch + 5 per-kind toggles (message / achievement / mention crew /
+ * ami online / ami lance jeu). Default-on for the meaningful ones,
+ * off for the ambient signals so the user has to opt in explicitly.
+ */
+function NotificationsCard() {
+  const [enabled, setEnabledState] = useState<boolean>(() =>
+    getNativeNotifsEnabled(),
+  );
+  const KINDS: NotifKind[] = [
+    "message",
+    "achievement",
+    "crew-mention",
+    "friend-online",
+    "friend-launched",
+  ];
+  const [kindsState, setKindsState] = useState<Record<NotifKind, boolean>>(
+    () =>
+      Object.fromEntries(KINDS.map((k) => [k, getNativeNotifKind(k)])) as Record<
+        NotifKind,
+        boolean
+      >,
+  );
+
+  const toggleEnabled = () => {
+    sounds.click();
+    const next = !enabled;
+    setEnabledState(next);
+    setNativeNotifsEnabled(next);
+  };
+
+  const toggleKind = (kind: NotifKind) => {
+    sounds.click();
+    const next = !kindsState[kind];
+    setKindsState((prev) => ({ ...prev, [kind]: next }));
+    setNativeNotifKind(kind, next);
+  };
+
+  return (
+    <motion.div whileHover={{ x: 4 }} className="no-drag rounded-2xl glass p-5">
+      <div className="flex items-start gap-4">
+        <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-accent/10 text-accent ring-1 ring-accent/20">
+          <Bell className="size-5" strokeWidth={2} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="font-medium text-fg-primary">
+            Notifications Windows
+          </div>
+          <div className="text-sm text-fg-muted">
+            Toasts système (bottom-right + Action Center) quand le launcher
+            n'est pas focus. Pas de toast si la fenêtre est active —
+            l'in-app gère.
+          </div>
+        </div>
+        <Toggle value={enabled} onToggle={toggleEnabled} />
+      </div>
+
+      {enabled && (
+        <div className="mt-4 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+          {KINDS.map((kind) => (
+            <label
+              key={kind}
+              className="flex cursor-pointer items-center gap-2 rounded-lg bg-bg-base/30 px-3 py-2 text-xs text-fg-muted ring-1 ring-white/[0.04] transition-colors hover:bg-bg-base/50 hover:text-fg-primary"
+            >
+              <input
+                type="checkbox"
+                checked={kindsState[kind]}
+                onChange={() => toggleKind(kind)}
+                className="size-3.5 accent-accent"
+              />
+              <span className="flex-1">{NOTIF_KIND_LABEL[kind]}</span>
+            </label>
+          ))}
+        </div>
+      )}
+    </motion.div>
   );
 }

@@ -87,7 +87,8 @@ export function Sidebar() {
         notify({
           title: peerName,
           body: newest.lastMessage.text,
-          metadata: { conversationId: newest.id, kind: "new-message" },
+          kind: "message",
+          metadata: { conversationId: newest.id },
         });
       }
     }
