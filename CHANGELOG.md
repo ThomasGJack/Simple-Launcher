@@ -18,6 +18,18 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.05.06.2] - 2026-05-06  · semver `26.506.1`
+
+
+### Ajouté
+
+- **HUD de mise à jour premium refonte complète** ([src/components/updater/UpdateBanner.tsx](src/components/updater/UpdateBanner.tsx)) — l'expérience de mise à jour passe à un autre niveau visuel. Le banner bottom-right utilise maintenant un stepper 4 étapes (Vérification → Téléchargement → Installation → Redémarrage) avec checkmarks animés au passage. Le panneau de download affiche : badge version, vitesse temps-réel (Mo/s ou Ko/s avec EWMA pour ne pas flicker), ETA calculée live, barre de progression avec shimmer interne + glow cyan, halo pulsant sur l'icône, sheen de fond qui balaye en boucle. Nouveaux états : "Installation en cours" (Tauri silent install) avec icône qui tourne, "Prêt" (avant relaunch) avec animation rocket spring + countdown, et "Échec" avec bouton Réessayer (réutilise la même Update sans re-fetch).
+- **Modal de bienvenue première installation** ([src/components/updater/UpdateBanner.tsx](src/components/updater/UpdateBanner.tsx) `WelcomeModal`) — sur le tout premier boot après une fresh install (détecté via `lastSeenVersion === null` en localStorage), une modale plein écran s'ouvre avec animation logo halo cyan, badge version, 4 highlights animés en cascade (Lance tes jeux, Crews & overlay, Achievements, Mises à jour live), et un seul CTA "Démarrer". One-shot — ne s'affiche jamais sur les boots suivants ni après un upgrade. Donne au launcher un côté "produit fini" type Steam / Discord à la première ouverture.
+- **Hooks NSIS post-install** ([src-tauri/installer/hooks.nsh](src-tauri/installer/hooks.nsh) + [src-tauri/tauri.conf.json](src-tauri/tauri.conf.json)) — `installerHooks` câblé via la config Tauri. Crée un marker `.fresh-install` dans `%APPDATA%/SimpleLauncher` après l'install pour de futures détections, nettoie les markers à la désinstallation. Pas de modification destructive sur les datas user (saves, screenshots, configs restent en place après uninstall).
+
+### Changé
+
+- **Artwork installeur (header.bmp + sidebar.bmp)** ([scripts/build-installer-art.mjs](scripts/build-installer-art.mjs)) — refonte complète des BMPs NSIS. Multi-couches gradient (panel → mid → deep), trois halos radiaux (cyan top, fuchsia bottom-right, violet bottom-left), texture subtle scan-lines, lignes de speed diagonales, neon rim, divider décoratif (bars + dot) sous le wordmark, taglines micro-typo. Les contraintes NSIS (150 × 57 et 164 × 314) sont respectées mais l'esthétique est passée d'un placeholder simple à une vraie identité de marque.
 ## [v26.05.06] - 2026-05-06  · semver `26.506.0`
 
 
