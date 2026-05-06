@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import { installOnlineDetection } from "@/lib/online";
 import { bootOverlayHotkey } from "@/lib/overlay";
+import { installContextMenuSuppression } from "@/lib/contextMenu";
 import "./index.css";
 
 // Boot the network reachability tracker before React mounts so the very
@@ -10,6 +11,14 @@ import "./index.css";
 // probe every 30 s and listens to native online/offline events, feeding
 // `useOnlineStore`.
 installOnlineDetection();
+
+// Kill the native right-click context menu (the Chromium/webview
+// "Reload / Inspect element / Save as…" popup) everywhere in the
+// launcher, except inputs/textareas where copy-paste must still
+// work. Components that want a custom popup attach their own
+// onContextMenu handler — that runs first, so we only suppress the
+// fallback. See lib/contextMenu.ts.
+installContextMenuSuppression();
 
 // Register the in-game overlay global hotkey on startup. Reads the
 // user's saved binding (default Ctrl+Shift+O) and asks Tauri's

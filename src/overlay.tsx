@@ -1,7 +1,10 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { OverlayApp } from "@/components/overlay/OverlayApp";
+import { installContextMenuSuppression } from "@/lib/contextMenu";
 import "./index.css";
+
+installContextMenuSuppression();
 
 /**
  * Entry point for the in-game overlay window. Loaded by `overlay.html`

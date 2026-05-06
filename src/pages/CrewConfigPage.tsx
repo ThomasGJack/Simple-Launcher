@@ -19,6 +19,7 @@ import {
   Smile,
   Trash2,
   Upload,
+  UserMinus,
   Users,
   X,
 } from "lucide-react";
@@ -26,7 +27,9 @@ import {
   createChannel,
   deleteChannel,
   deleteCrew,
+  kickCrewMember,
   rotateCrewJoinCode,
+  setCrewMemberRole,
   updateChannel,
   updateUserCrew,
   uploadCrewIcon,
@@ -287,6 +290,8 @@ export function CrewConfigPage() {
               members={displayedMembers}
               crew={crew}
               myUid={me?.uid ?? null}
+              canModerate={isAdmin}
+              isOwner={isOwner}
             />
           )}
           {tab === "invite" && (
@@ -854,18 +859,79 @@ function RolesTab({
   members,
   crew,
   myUid,
+  canModerate,
+  isOwner,
 }: {
   members: CrewMember[];
   crew: Crew;
   myUid: string | null;
+  /** True if the viewer can promote / demote / kick (admin or
+   *  launcher-admin or owner). */
+  canModerate: boolean;
+  /** True if the viewer is owner-level (regular owner OR launcher
+   *  admin). Owners can promote others to admin and demote admins,
+   *  whereas non-owner admins can only kick members and other admins. */
+  isOwner: boolean;
 }) {
-  void myUid;
   const sorted = useMemo(() => {
     const order: Record<string, number> = { owner: 0, admin: 1, member: 2 };
     return [...members].sort(
       (a, b) => (order[a.role] ?? 9) - (order[b.role] ?? 9),
     );
   }, [members]);
+  const [busyUid, setBusyUid] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handlePromote = async (uid: string) => {
+    if (busyUid) return;
+    setBusyUid(uid);
+    setError(null);
+    try {
+      await setCrewMemberRole(crew.id, uid, "admin");
+      sounds.success();
+    } catch (err) {
+      sounds.error();
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusyUid(null);
+    }
+  };
+
+  const handleDemote = async (uid: string) => {
+    if (busyUid) return;
+    setBusyUid(uid);
+    setError(null);
+    try {
+      await setCrewMemberRole(crew.id, uid, "member");
+      sounds.success();
+    } catch (err) {
+      sounds.error();
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusyUid(null);
+    }
+  };
+
+  const handleKick = async (uid: string, displayName: string | null) => {
+    if (busyUid) return;
+    if (
+      !confirm(
+        `Kick "${displayName ?? "ce membre"}" du crew ? Il pourra rejoindre à nouveau via le code d'invitation.`,
+      )
+    )
+      return;
+    setBusyUid(uid);
+    setError(null);
+    try {
+      await kickCrewMember(crew.id, uid);
+      sounds.success();
+    } catch (err) {
+      sounds.error();
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusyUid(null);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -892,11 +958,20 @@ function RolesTab({
             des invites de jeu, envoie des messages.
           </li>
         </ul>
-        <p className="mt-3 text-[11px] text-fg-dim">
-          Pour promouvoir / rétrograder / kick un membre, utilise les actions
-          au survol dans la liste des membres du crew.
-        </p>
+        {canModerate && (
+          <p className="mt-3 text-[11px] text-fg-dim">
+            Utilise les boutons à droite de chaque membre pour promouvoir
+            (Shield), rétrograder (Users) ou kick (UserMinus).
+          </p>
+        )}
       </div>
+
+      {error && (
+        <div className="flex items-start gap-2 rounded-xl bg-danger/10 p-3 text-sm ring-1 ring-danger/30">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-danger" />
+          <p className="text-fg-primary">{error}</p>
+        </div>
+      )}
 
       <div className="space-y-1.5">
         {sorted.length === 0 ? (
@@ -909,9 +984,37 @@ function RolesTab({
             // owner (their role got pre-set to "owner" in the parent's
             // displayedMembers compute). For user crews, only the
             // explicit `ownerUid` is the real owner.
-            const isOwner =
+            const isMemberOwner =
               m.uid === crew.ownerUid ||
               (crew.isMaster && isAdminUid(m.uid));
+            const effectiveRole: "owner" | "admin" | "member" = isMemberOwner
+              ? "owner"
+              : m.role;
+            const isMe = m.uid === myUid;
+            const busy = busyUid === m.uid;
+
+            // Action visibility rules :
+            //   - Can NEVER act on yourself or on an owner-level user
+            //   - Promote (member → admin) : owner-level only
+            //   - Demote (admin → member) : owner-level only
+            //   - Kick (any non-owner) : admin or higher, but admins
+            //     can only kick members (not other admins)
+            const canPromote =
+              canModerate &&
+              isOwner &&
+              !isMe &&
+              effectiveRole === "member";
+            const canDemote =
+              canModerate &&
+              isOwner &&
+              !isMe &&
+              effectiveRole === "admin";
+            const canKick =
+              canModerate &&
+              !isMe &&
+              effectiveRole !== "owner" &&
+              (isOwner || effectiveRole === "member");
+
             return (
               <div
                 key={m.uid}
@@ -931,14 +1034,86 @@ function RolesTab({
                 )}
                 <div className="min-w-0 flex-1 text-sm text-fg-primary">
                   {m.displayName ?? "Anonyme"}
+                  {isMe && (
+                    <span className="ml-2 text-[10px] text-fg-dim">(toi)</span>
+                  )}
                 </div>
-                <RoleBadge role={isOwner ? "owner" : m.role} />
+                <RoleBadge role={effectiveRole} />
+                {(canPromote || canDemote || canKick) && (
+                  <div className="flex items-center gap-1.5">
+                    {canPromote && (
+                      <ActionButton
+                        title="Promouvoir admin"
+                        onClick={() => handlePromote(m.uid)}
+                        busy={busy}
+                        accent="cyan"
+                      >
+                        <Shield className="size-3.5" />
+                      </ActionButton>
+                    )}
+                    {canDemote && (
+                      <ActionButton
+                        title="Rétrograder en membre"
+                        onClick={() => handleDemote(m.uid)}
+                        busy={busy}
+                        accent="amber"
+                      >
+                        <Users className="size-3.5" />
+                      </ActionButton>
+                    )}
+                    {canKick && (
+                      <ActionButton
+                        title="Kick du crew"
+                        onClick={() => handleKick(m.uid, m.displayName)}
+                        busy={busy}
+                        accent="danger"
+                      >
+                        <UserMinus className="size-3.5" />
+                      </ActionButton>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })
         )}
       </div>
     </div>
+  );
+}
+
+function ActionButton({
+  title,
+  onClick,
+  busy,
+  accent,
+  children,
+}: {
+  title: string;
+  onClick: () => void;
+  busy: boolean;
+  accent: "cyan" | "amber" | "danger";
+  children: React.ReactNode;
+}) {
+  const accentClasses =
+    accent === "cyan"
+      ? "text-cyan-300 ring-cyan-500/30 hover:bg-cyan-500/10"
+      : accent === "amber"
+        ? "text-amber-300 ring-amber-500/30 hover:bg-amber-500/10"
+        : "text-danger ring-danger/30 hover:bg-danger/10";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={busy}
+      title={title}
+      className={cn(
+        "no-drag grid size-7 shrink-0 place-items-center rounded-md bg-white/[0.02] ring-1 transition-colors disabled:opacity-50",
+        accentClasses,
+      )}
+    >
+      {busy ? <Loader2 className="size-3.5 animate-spin" /> : children}
+    </button>
   );
 }
 

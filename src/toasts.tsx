@@ -1,7 +1,10 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { ToastsApp } from "@/components/overlay/ToastsApp";
+import { installContextMenuSuppression } from "@/lib/contextMenu";
 import "./index.css";
+
+installContextMenuSuppression();
 
 /**
  * Entry point for the in-game toast notifications window. Loaded by
