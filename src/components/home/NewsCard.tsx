@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Megaphone, Pin, Newspaper } from "lucide-react";
+import { Megaphone, Pin, Newspaper, Maximize2, X, ChevronRight } from "lucide-react";
 import { watchNews, type News } from "@/firebase/news";
 import {
   REACTION_EMOJIS,
@@ -85,8 +85,22 @@ function handleNewsClick(e: ReactMouseEvent<HTMLDivElement>) {
  */
 export function NewsCard() {
   const [news, setNews] = useState<News[]>([]);
+  /** Currently-selected news shown in the detail modal. null = closed.
+   *  Any item — featured OR compact — can be promoted to the modal,
+   *  the modal just shows a full-size NewsItem inside a backdrop. */
+  const [selected, setSelected] = useState<News | null>(null);
 
   useEffect(() => watchNews(setNews), []);
+
+  // Close on Escape — a11y + matches the rest of the launcher's modals.
+  useEffect(() => {
+    if (!selected) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelected(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selected]);
 
   const visible = news.filter((n) => !n.hidden);
   if (visible.length === 0) return null;
@@ -101,38 +115,113 @@ export function NewsCard() {
   const SCROLL_MAX_H = 192;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.15, ease: "easeOut" }}
-      className="mb-4"
-    >
-      <AnimatePresence mode="wait">
-        <NewsItem key={top.id + top.updatedAt} item={top} />
-      </AnimatePresence>
+    <>
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.15, ease: "easeOut" }}
+        className="mb-4"
+      >
+        <AnimatePresence mode="wait">
+          <NewsItem
+            key={top.id + top.updatedAt}
+            item={top}
+            onOpen={() => setSelected(top)}
+          />
+        </AnimatePresence>
 
-      {rest.length > 0 && (
-        <div className="mt-3">
-          <div className="mb-2 flex items-center gap-2 px-1 text-[10px] uppercase tracking-[0.2em] text-fg-dim">
-            <Newspaper className="size-3" />
-            Plus de news
-            <span className="ml-auto rounded-full bg-bg-base/40 px-1.5 py-0.5 font-mono text-[9px] text-fg-muted">
-              {rest.length}
-            </span>
+        {rest.length > 0 && (
+          <div className="mt-3">
+            <div className="mb-2 flex items-center gap-2 px-1 text-[10px] uppercase tracking-[0.2em] text-fg-dim">
+              <Newspaper className="size-3" />
+              Plus de news
+              <span className="ml-auto rounded-full bg-bg-base/40 px-1.5 py-0.5 font-mono text-[9px] text-fg-muted">
+                {rest.length}
+              </span>
+            </div>
+            {/* Scrollable archive — at least 2 compact items always
+                visible, more accessible by scroll. The vertical scroll
+                uses the `info-scroll` flavour (thin, accent-on-hover).
+                Each compact item is clickable → opens the modal. */}
+            <div
+              className="info-scroll space-y-2 overflow-y-auto pr-1"
+              style={{ maxHeight: `${SCROLL_MAX_H}px` }}
+            >
+              {rest.map((n) => (
+                <NewsItem
+                  key={n.id}
+                  item={n}
+                  compact
+                  onOpen={() => setSelected(n)}
+                />
+              ))}
+            </div>
           </div>
-          {/* Scrollable archive — at least 2 compact items always
-              visible, more accessible by scroll. The vertical scroll
-              uses the `info-scroll` flavour (thin, accent-on-hover). */}
-          <div
-            className="info-scroll space-y-2 overflow-y-auto pr-1"
-            style={{ maxHeight: `${SCROLL_MAX_H}px` }}
-          >
-            {rest.map((n) => (
-              <NewsItem key={n.id} item={n} compact />
-            ))}
-          </div>
+        )}
+      </motion.div>
+
+      <AnimatePresence>
+        {selected && (
+          <NewsDetailModal item={selected} onClose={() => setSelected(null)} />
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
+/**
+ * Modal showing one news in full size on top of a dimmed backdrop.
+ * Re-uses the NewsItem component (without `compact`) so the visual
+ * is consistent with the featured news on HomePage. The full body
+ * is rendered (no line-clamp), reactions / poll work normally.
+ *
+ * Closes on : backdrop click, X button, or Escape key (handled by
+ * the parent NewsCard via a window keydown listener).
+ */
+function NewsDetailModal({
+  item,
+  onClose,
+}: {
+  item: News;
+  onClose: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="no-drag fixed inset-0 z-[60] grid place-items-center bg-bg-base/75 p-6 backdrop-blur-md"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.92, y: 24 }}
+        animate={{
+          opacity: 1,
+          scale: 1,
+          y: 0,
+          transition: { type: "spring", stiffness: 280, damping: 24 },
+        }}
+        exit={{ opacity: 0, scale: 0.95, y: 16, transition: { duration: 0.18 } }}
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-2xl"
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute -top-12 right-0 inline-flex items-center gap-1.5 rounded-full bg-bg-elevated/80 px-3 py-1.5 text-xs text-fg-muted ring-1 ring-white/[0.08] transition-colors hover:bg-bg-elevated hover:text-fg-primary"
+          aria-label="Fermer"
+        >
+          <X className="size-3.5" /> Fermer
+        </button>
+        {/* The full-size NewsItem inside the modal — same component
+            used on HomePage but with no clamping. We pass an explicit
+            isInModal flag so it can drop the "Voir +" button (we're
+            already in the modal — it'd be useless). */}
+        <div className="info-scroll max-h-[80vh] overflow-y-auto rounded-3xl">
+          <NewsItem item={item} isInModal />
         </div>
-      )}
+      </motion.div>
     </motion.div>
   );
 }
@@ -140,9 +229,19 @@ export function NewsCard() {
 function NewsItem({
   item,
   compact,
+  isInModal,
+  onOpen,
 }: {
   item: News;
   compact?: boolean;
+  /** True when this NewsItem is rendered inside the detail modal —
+   *  drops the "Voir +" button and avoids the clickable-card wrap
+   *  since the user is already viewing the full content. */
+  isInModal?: boolean;
+  /** Promote this news to the detail modal. Wired by the parent
+   *  NewsCard. Featured items get an explicit "Voir +" CTA when
+   *  their body is long ; compact items become clickable cards. */
+  onOpen?: () => void;
 }) {
   const accent = item.accent ?? "var(--color-accent)";
   // Pre-process body to auto-linkify bare URLs, then run through
@@ -153,16 +252,49 @@ function NewsItem({
     : "";
   const html = typeof body === "string" ? sanitizeHtml(body) : "";
 
+  // Heuristic for "long news that deserves a Voir + button" on the
+  // featured item : raw body > 280 chars OR contains a structural
+  // markdown element (headings, lists, code blocks). We don't need
+  // perfect detection — the worst case is a short news that has a
+  // useless "Voir +" button (which still works fine).
+  const isLongFeatured =
+    !compact &&
+    !isInModal &&
+    !!item.body &&
+    (item.body.length > 280 ||
+      /\n#{1,6}\s|^\s*[-*+]\s|^\s*\d+\.\s|```/m.test(item.body));
+
+  // Compact items are clickable cards. Featured items (top of HomePage
+  // feed) get the explicit "Voir +" button below the body instead, to
+  // avoid swallowing clicks on links / reactions / poll buttons. The
+  // modal version (`isInModal`) is never clickable / has no button.
+  const compactClickable = compact && !isInModal && !!onOpen;
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.98 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
-      className={
+      className={cn(
         compact
-          ? "rounded-2xl glass p-4 ring-1 ring-white/[0.06]"
-          : "relative overflow-hidden rounded-3xl glass-strong p-5 ring-1 ring-white/[0.06]"
+          ? "group relative rounded-2xl glass p-4 ring-1 ring-white/[0.06]"
+          : "relative overflow-hidden rounded-3xl glass-strong p-5 ring-1 ring-white/[0.06]",
+        compactClickable &&
+          "no-drag cursor-pointer transition-all hover:bg-white/[0.02] hover:ring-accent/30 hover:shadow-[0_4px_18px_rgba(0,0,0,0.25)]",
+      )}
+      onClick={compactClickable ? onOpen : undefined}
+      role={compactClickable ? "button" : undefined}
+      tabIndex={compactClickable ? 0 : undefined}
+      onKeyDown={
+        compactClickable
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onOpen?.();
+              }
+            }
+          : undefined
       }
     >
       {/* Accent stripe on the left edge */}
@@ -175,6 +307,17 @@ function NewsItem({
             boxShadow: `0 0 18px ${accent}80`,
           }}
         />
+      )}
+      {/* "Open in modal" hint chevron — only on clickable compact items.
+          Subtle by default, brightens on hover. */}
+      {compactClickable && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-fg-dim opacity-0 transition-all duration-200 group-hover:translate-x-0.5 group-hover:opacity-100"
+          style={{ color: accent }}
+        >
+          <ChevronRight className="size-4" />
+        </div>
       )}
       <div className="flex items-start gap-3">
         <div
@@ -219,6 +362,24 @@ function NewsItem({
           )}
           {item.authorName && !compact && (
             <div className="mt-2 text-[10px] text-fg-dim">— {item.authorName}</div>
+          )}
+          {/* Voir + button on the featured item when its body is long,
+              and we're not already inside the modal. Click stops
+              propagation so it doesn't accidentally trigger any
+              parent handler. */}
+          {isLongFeatured && onOpen && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpen();
+              }}
+              className="no-drag mt-3 inline-flex items-center gap-1.5 rounded-full bg-accent/10 px-3 py-1.5 text-[11px] font-medium text-accent ring-1 ring-accent/30 transition-all hover:bg-accent/20 hover:shadow-[0_0_14px_var(--color-accent-soft)]"
+              style={{ color: accent }}
+            >
+              <Maximize2 className="size-3" />
+              Voir la news complète
+            </button>
           )}
           {!compact && item.poll && <PollWidget newsId={item.id} poll={item.poll} accent={accent} />}
           {!compact && <ReactionsRow newsId={item.id} />}

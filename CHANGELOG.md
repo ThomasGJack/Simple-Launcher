@@ -18,6 +18,13 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.05.06.11] - 2026-05-06  · semver `26.506.10`
+
+
+### Ajouté
+
+- **Modal de détail pour les news** ([src/components/home/NewsCard.tsx](src/components/home/NewsCard.tsx)) — chaque news compacte dans la liste scrollable est désormais cliquable et ouvre une **modal plein écran** avec la news en pleine taille (body intégral non tronqué, réactions, sondage). La modal a un backdrop dimmed + blur, un bouton **Fermer** en haut à droite, ferme à l'Escape ou au click sur le backdrop, et est scrollable si la news est très longue. Les compactes ont aussi un petit chevron animé qui apparaît au survol pour suggérer la cliquabilité, plus un effet hover (ring accent + lift d'ombre).
+- **Bouton "Voir la news complète"** ([src/components/home/NewsCard.tsx](src/components/home/NewsCard.tsx)) — quand la news featured (en haut) a un body long (> 280 chars OU contient une structure markdown comme heading/list/code block), un bouton coloré apparaît sous le body pour ouvrir la même modal. Permet d'accéder à un rendu plus aéré sans casser la lisibilité du widget HomePage.
 ## [v26.05.06.10] - 2026-05-06  · semver `26.506.9`
 
 

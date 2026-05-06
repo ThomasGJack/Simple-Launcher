@@ -1,5 +1,12 @@
 [
   {
+    "version": "26.506.10",
+    "displayVersion": "v26.05.06.11",
+    "notes": "### Ajouté\n\n- **Modal de détail pour les news** ([src/components/home/NewsCard.tsx](src/components/home/NewsCard.tsx)) — chaque news compacte dans la liste scrollable est désormais cliquable et ouvre une **modal plein écran** avec la news en pleine taille (body intégral non tronqué, réactions, sondage). La modal a un backdrop dimmed + blur, un bouton **Fermer** en haut à droite, ferme à l'Escape ou au click sur le backdrop, et est scrollable si la news est très longue. Les compactes ont aussi un petit chevron animé qui apparaît au survol pour suggérer la cliquabilité, plus un effet hover (ring accent + lift d'ombre).\n- **Bouton \"Voir la news complète\"** ([src/components/home/NewsCard.tsx](src/components/home/NewsCard.tsx)) — quand la news featured (en haut) a un body long (> 280 chars OU contient une structure markdown comme heading/list/code block), un bouton coloré apparaît sous le body pour ouvrir la même modal. Permet d'accéder à un rendu plus aéré sans casser la lisibilité du widget HomePage.",
+    "pub_date": "2026-05-06T16:32:06.441Z",
+    "channel": "win"
+  },
+  {
     "version": "26.506.9",
     "displayVersion": "v26.05.06.10",
     "notes": "### Changé\n\n- **News widget : liste verticale scrollable** ([src/components/home/NewsCard.tsx](src/components/home/NewsCard.tsx)) — la news featured (épinglée ou plus récente) reste affichée en pleine taille en haut, mais en dessous la liste des news plus anciennes est désormais **toujours visible** sous forme compacte, avec au moins 2 items en permanence sans interaction. Au-delà, la liste scrolle verticalement (max-height 192 px, scrollbar fine type `info-scroll` qui tire un accent cyan au survol). Header `Plus de news` + compteur du nombre d'items archivés. Avant : il fallait cliquer \"Voir les news plus anciennes\" puis \"Masquer\" pour expand/collapse — nouveau comportement plus direct et plus discoverable, le scroll suffit.\n\n### Supprimé\n\n- **Bouton \"Voir les news plus anciennes\" / \"Masquer\"** ([src/components/home/NewsCard.tsx](src/components/home/NewsCard.tsx)) — remplacé par la liste compacte toujours visible en scroll vertical (cf. ci-dessus). L'expand/collapse animé n'a plus lieu d'être.",
