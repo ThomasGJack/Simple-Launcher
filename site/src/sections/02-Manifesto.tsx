@@ -84,8 +84,57 @@ export function Manifesto() {
             <CountUp key={stat.label} stat={stat} delay={i * 0.08} />
           ))}
         </motion.div>
+
+        {/* Mini-stats techniques — chiffres "fun" sous la grosse grille */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-50px" }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+          className="mx-auto mt-6 grid max-w-5xl grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6"
+        >
+          <MiniStat value="12 836" label="Lignes de Rust" />
+          <MiniStat value="48 723" label="Lignes de TS/TSX" />
+          <MiniStat value="22" label="Types de blocs" highlight />
+          <MiniStat value="39" label="Achievements" />
+          <MiniStat value="5 MB" label="Installer signé" />
+          <MiniStat value="< 8s" label="Boot launcher" highlight />
+        </motion.div>
       </div>
     </section>
+  );
+}
+
+function MiniStat({
+  value,
+  label,
+  highlight = false,
+}: {
+  value: string;
+  label: string;
+  highlight?: boolean;
+}) {
+  return (
+    <div
+      className={
+        "flex flex-col items-center justify-center rounded-xl px-3 py-3 text-center transition " +
+        (highlight
+          ? "bg-[color-mix(in_srgb,var(--color-gold)_5%,transparent)] ring-1 ring-[color-mix(in_srgb,var(--color-gold)_22%,transparent)]"
+          : "glass")
+      }
+    >
+      <div
+        className={
+          "font-display text-lg tabular-nums " +
+          (highlight ? "text-[var(--color-gold)]" : "text-fg-primary")
+        }
+      >
+        {value}
+      </div>
+      <div className="mt-1 text-[9px] uppercase tracking-[0.18em] text-fg-dim">
+        {label}
+      </div>
+    </div>
   );
 }
 

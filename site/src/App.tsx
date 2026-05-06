@@ -14,19 +14,23 @@ import { HowItWorks } from "./sections/09-HowItWorks";
 import { Faq } from "./sections/10-Faq";
 import { DownloadCta } from "./sections/11-DownloadCta";
 import { Footer } from "./sections/12-Footer";
+import { TerminalDemo } from "./sections/13-TerminalDemo";
+import { Vision } from "./sections/14-Vision";
 
 export default function App() {
   return (
     <main className="relative">
       <CrewHero />
       <Manifesto />
+      <LauncherMockup />
+      <TerminalDemo />
       <ProfileDemo />
       <LibraryDemo />
       <CommunityHeatmap />
       <AchievementsGallery />
       <TiersShowcase />
-      <LauncherMockup />
       <HowItWorks />
+      <Vision />
       <Faq />
       <DownloadCta />
       <Footer />
