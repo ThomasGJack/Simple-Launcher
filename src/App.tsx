@@ -46,6 +46,7 @@ import {
   pushMilestoneToast,
   AchievementUnlockToastHost,
 } from "@/components/achievements/AchievementUnlockToast";
+import { UiToastsHost } from "@/components/ui/UiToastsHost";
 import { InvitationPopupHost } from "@/components/invitations/InvitationPopup";
 import { LiveActivityToastHost } from "@/components/presence/LiveActivityToastHost";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
@@ -569,6 +570,7 @@ function App() {
       <ErrorBoundary scope="achievements-toast"><AchievementUnlockToastHost /></ErrorBoundary>
       <ErrorBoundary scope="invitation-popup"><InvitationPopupHost /></ErrorBoundary>
       <ErrorBoundary scope="live-activity-toast"><LiveActivityToastHost /></ErrorBoundary>
+      <ErrorBoundary scope="ui-toasts"><UiToastsHost /></ErrorBoundary>
     </>
   );
 }

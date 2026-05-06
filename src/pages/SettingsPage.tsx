@@ -71,6 +71,13 @@ import {
   NOTIF_KIND_LABEL,
   type NotifKind,
 } from "@/lib/notificationPrefs";
+import {
+  getUiToastsKindEnabled,
+  setUiToastsKindEnabled,
+  UI_TOAST_KIND_LABEL,
+  pushUiToast,
+  type UiToastKind,
+} from "@/lib/uiToasts";
 
 export function SettingsPage() {
   const { soundsEnabled, toggleSounds } = useSettingsStore();
@@ -1490,6 +1497,93 @@ function NotificationsCard() {
           ))}
         </div>
       )}
+
+      {/* In-app toasts (bottom-right of the launcher window). Different
+          from in-game toasts which are a separate Tauri window — these
+          fire when the launcher itself is in focus. */}
+      <UiToastsSubSection />
     </motion.div>
+  );
+}
+
+/**
+ * Settings sub-section listing the kinds of in-app UI toasts the
+ * user wants to see. Errors are always visible (we never want to
+ * swallow a fatal). Lives nested inside the Notifications card so
+ * the user has all toast / notif controls in one place.
+ */
+function UiToastsSubSection() {
+  const KINDS: UiToastKind[] = ["info", "success", "warning", "error"];
+  const [state, setState] = useState<Record<UiToastKind, boolean>>(() =>
+    Object.fromEntries(
+      KINDS.map((k) => [k, getUiToastsKindEnabled(k)]),
+    ) as Record<UiToastKind, boolean>,
+  );
+
+  const toggle = (kind: UiToastKind) => {
+    if (kind === "error") return; // never disable errors
+    sounds.click();
+    const next = !state[kind];
+    setState((prev) => ({ ...prev, [kind]: next }));
+    setUiToastsKindEnabled(kind, next);
+  };
+
+  const test = (kind: UiToastKind) => {
+    sounds.click();
+    const titles: Record<UiToastKind, string> = {
+      info: "Toast info",
+      success: "Toast succès",
+      warning: "Toast avertissement",
+      error: "Toast erreur",
+    };
+    pushUiToast({
+      kind,
+      title: titles[kind],
+      description: `Aperçu du style toast '${kind}'.`,
+    });
+  };
+
+  return (
+    <div className="mt-4 rounded-xl bg-bg-base/40 p-3 ring-1 ring-white/[0.04]">
+      <div className="mb-2 flex items-center justify-between">
+        <div>
+          <div className="text-sm text-fg-primary">Toasts in-app</div>
+          <p className="text-[11px] text-fg-muted">
+            Petites notifications bottom-right de la fenêtre. Différent des
+            toasts in-game (3e fenêtre).
+          </p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+        {KINDS.map((kind) => (
+          <div
+            key={kind}
+            className="flex items-center gap-2 rounded-lg bg-bg-base/30 px-3 py-2 text-xs text-fg-muted ring-1 ring-white/[0.04]"
+          >
+            <input
+              type="checkbox"
+              checked={state[kind]}
+              disabled={kind === "error"}
+              onChange={() => toggle(kind)}
+              className="size-3.5 accent-accent disabled:opacity-50"
+              title={
+                kind === "error"
+                  ? "Les toasts d'erreur ne peuvent pas être désactivés"
+                  : undefined
+              }
+            />
+            <span className="flex-1">{UI_TOAST_KIND_LABEL[kind]}</span>
+            <button
+              type="button"
+              onClick={() => test(kind)}
+              className="rounded-md bg-white/[0.04] px-2 py-0.5 text-[10px] text-fg-muted ring-1 ring-white/[0.06] hover:bg-white/[0.08] hover:text-fg-primary"
+              title="Affiche un exemple"
+            >
+              Test
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
