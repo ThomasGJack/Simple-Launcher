@@ -18,6 +18,14 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.05.06.3] - 2026-05-06  · semver `26.506.2`
+
+
+
+
+### Corrigé
+
+- **PlayHeatmap écrasée en colonne mono-mot dans PublicProfilePage** ([src/pages/PublicProfilePage.tsx](src/pages/PublicProfilePage.tsx)) — la `motion.div` qui wrappait la heatmap était à l'intérieur d'un `grid grid-cols-12` sans `col-span` explicite, donc elle prenait 1/12 de la largeur du grid (~80-140 px), forçant chaque mot à wrapper sur sa propre ligne. Mes deux fixes précédents (w-full sur la card, min-w-0 sur le titre) traitaient les symptômes au mauvais étage : la card remplissait BIEN sa largeur disponible, mais cette largeur était imposée par le parent grid à 1/12. Fix : `col-span-12` ajouté pour que la heatmap prenne la ligne complète sous les sections stats + top jeux.
 ## [v26.05.06.2] - 2026-05-06  · semver `26.506.1`
 
 
