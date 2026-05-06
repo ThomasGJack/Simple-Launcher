@@ -51,6 +51,9 @@ const CrewConfigPage = lazy(() =>
 const VipPage = lazy(() =>
   import("@/pages/VipPage").then((m) => ({ default: m.VipPage })),
 );
+const NotificationsPage = lazy(() =>
+  import("@/pages/NotificationsPage").then((m) => ({ default: m.NotificationsPage })),
+);
 
 export function AppShell() {
   const route = useUIStore((s) => s.route);
@@ -108,6 +111,7 @@ const DRILL_DOWN_ROUTES = new Set<string>([
   "crew-config",
   "user-profile",
   "achievements",
+  "notifications",
 ]);
 
 function routeTransition(name: string) {
@@ -158,6 +162,8 @@ function renderRoute(name: string) {
       return <MessagesPage />;
     case "user-profile":
       return <PublicProfilePage />;
+    case "notifications":
+      return <NotificationsPage />;
     case "login":
       return <LoginPage />;
     default:

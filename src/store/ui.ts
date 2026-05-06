@@ -15,6 +15,7 @@ export type Route =
   | { name: "crew-config"; crewId: string; tab?: "general" | "channels" | "roles" | "invite" | "danger" }
   | { name: "messages"; conversationId?: string }
   | { name: "user-profile"; uid: string }
+  | { name: "notifications" }
   | { name: "login" };
 
 type UIState = {

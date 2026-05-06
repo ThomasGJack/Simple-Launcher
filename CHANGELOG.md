@@ -18,6 +18,13 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.05.06.14] - 2026-05-06  · semver `26.506.13`
+
+
+### Ajouté
+
+- **Page Notifications complète** ([src/pages/NotificationsPage.tsx](src/pages/NotificationsPage.tsx) + [src/store/ui.ts](src/store/ui.ts) + [src/components/layout/AppShell.tsx](src/components/layout/AppShell.tsx) + [src/components/notifications/NotificationsCenter.tsx](src/components/notifications/NotificationsCenter.tsx)) — nouvelle route dédiée `notifications` qui affiche l'historique complet en grand format. Features : (1) **Filtres par type** — chips pour Achievements / Invitations / Amis / News / Mises à jour / Système, chaque chip avec son icône + couleur dédiée + compteur, désactivé si zéro item. (2) **Filtre lu/non lu** — bouton "Non lues" avec compteur, idéal pour le triage. (3) **Recherche full-text** sur titre + description, avec icône clear. (4) **Groupement par date** — Aujourd'hui / Hier / Cette semaine / Plus ancien, séparateurs avec compteurs. (5) **Cards plus larges** que le slide-over — body intégral non tronqué, badge type coloré, hint "Click → ouvre la page" pour les notifs avec un link. (6) **Bulk actions** — "Tout marquer lu" en header (cible toutes les non-lues), "Tout marquer lu (filtre)" qui apparaît quand un filtre est actif et cible uniquement la liste affichée. (7) **Bouton Paramètres** qui navigue vers les réglages des notifs natives par type. Lazy-loadée comme tous les autres pages, avec drill-down transition. ScrollMemoryRoot pour préserver la position en navigant ailleurs.
+- **Lien "Voir tout l'historique"** dans le slide-over Notifications ([src/components/notifications/NotificationsCenter.tsx](src/components/notifications/NotificationsCenter.tsx)) — footer du panel slide-over qui navigue vers la nouvelle page complète. Le slide-over reste pour les scans rapides ; la page sert au triage en profondeur.
 ## [v26.05.06.13] - 2026-05-06  · semver `26.506.12`
 
 

@@ -165,6 +165,21 @@ export function NotificationsCenter({
                 </div>
               )}
             </div>
+
+            {/* Footer — link to the full Notifications page (filters,
+                groups, search). The slide-over is for quick scans, the
+                page is for digging through history. */}
+            <button
+              type="button"
+              onClick={() => {
+                sounds.click();
+                navigate({ name: "notifications" });
+                onClose();
+              }}
+              className="no-drag flex items-center justify-center gap-2 border-t border-white/[0.06] bg-bg-base/30 px-5 py-3 text-xs font-medium text-accent transition-colors hover:bg-accent/[0.08]"
+            >
+              Voir tout l'historique → filtres · recherche · grouper par date
+            </button>
           </motion.aside>
         </>
       )}
