@@ -529,20 +529,14 @@ function Toggle({
   size?: "sm" | "md";
   ariaLabel?: string;
 }) {
-  const dims =
-    size === "sm"
-      ? {
-          track: "h-6 w-11",
-          thumbSize: "size-5",
-          thumbOff: "left-0.5",
-          thumbOn: "left-[calc(100%-1.375rem)]",
-        }
-      : {
-          track: "h-7 w-12",
-          thumbSize: "size-6",
-          thumbOff: "left-0.5",
-          thumbOn: "left-[calc(100%-1.625rem)]",
-        };
+  // Distance the thumb travels horizontally :
+  //   md : track w-12 (48 px) - thumb size-6 (24 px) - 2*0.5 inset = 20 px
+  //   sm : track w-11 (44 px) - thumb size-5 (20 px) - 2*0.5 inset = 20 px
+  // (same value for both, just different track/thumb sizes)
+  const trackClass = size === "sm" ? "h-6 w-11" : "h-7 w-12";
+  const thumbSizeClass = size === "sm" ? "size-5" : "size-6";
+  const thumbX = 20;
+
   return (
     <button
       onClick={onToggle}
@@ -552,21 +546,31 @@ function Toggle({
       aria-label={ariaLabel}
       className={cn(
         "relative shrink-0 rounded-full transition-colors duration-200 ring-1",
-        dims.track,
+        trackClass,
         value
           ? "bg-accent/30 ring-accent/40 shadow-[0_0_18px_var(--color-accent-soft)]"
           : "bg-white/[0.06] ring-white/[0.08]",
       )}
     >
+      {/* Use explicit `animate.x` instead of Framer's `layout` prop +
+       *  className-based left-X position. `layout` tracks bounding-box
+       *  changes between renders ; when the className changes from
+       *  `left-0.5` to `left-[calc(100%-…)]` (or vice versa), the layout
+       *  measurement happens AFTER React commits the new class, so the
+       *  spring sometimes overshoots / clips on the OFF→ON…ON→OFF cycle
+       *  (visible as a snap or rubber-band on deactivation). With a
+       *  static `left-0.5` base + animated `x`, the spring always
+       *  interpolates symmetrically between two stable values — same
+       *  feel both directions. */}
       <motion.span
-        layout
-        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+        animate={{ x: value ? thumbX : 0 }}
+        transition={{ type: "spring", stiffness: 500, damping: 32 }}
         className={cn(
-          "absolute top-0.5 rounded-full",
-          dims.thumbSize,
+          "absolute left-0.5 top-0.5 rounded-full transition-colors duration-150",
+          thumbSizeClass,
           value
-            ? `${dims.thumbOn} bg-accent shadow-[0_0_10px_var(--color-accent-glow)]`
-            : `${dims.thumbOff} bg-fg-muted`,
+            ? "bg-accent shadow-[0_0_10px_var(--color-accent-glow)]"
+            : "bg-fg-muted",
         )}
       />
     </button>
