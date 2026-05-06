@@ -18,6 +18,22 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.05.06.7] - 2026-05-06  · semver `26.506.6`
+
+
+
+
+### Corrigé
+
+- **Feature Cargo `custom-protocol` manquante** ([src-tauri/Cargo.toml](src-tauri/Cargo.toml)) — cause racine du bug d'install : la feature `custom-protocol` n'était pas déclarée dans le `Cargo.toml`. Tauri's `build.rs` utilise cette feature pour décider entre mode dev (load depuis `http://localhost:1420`) et mode release (load depuis le custom protocol vers les fichiers embedded). Sans la feature, même `tauri build` produisait un binaire en mode dev qui essayait de joindre le devUrl chez les users → ERR_CONNECTION_REFUSED. Fix : ajout de la feature `custom-protocol = ["tauri/custom-protocol"]` qui est forwardée auto par `tauri build`. La fix précédente (passer de `cargo build --release` à `tauri build --no-bundle`) était nécessaire mais pas suffisante — c'est cette feature qui débloque réellement le mode release.
+## [v26.05.06.6] - 2026-05-06  · semver `26.506.5`
+
+
+
+
+### Corrigé
+
+- **Build release-mode signalé correctement à Tauri** ([scripts/release-launcher.mjs](scripts/release-launcher.mjs)) — la première release Velopack v26.05.06.5 produisait un binaire qui essayait de charger l'UI depuis `http://localhost:1420` (le devUrl) au lieu d'utiliser les fichiers embedded du `frontendDist`. Cause : `cargo build --release` direct ne configure pas les env vars que `tauri-build` (build.rs de Tauri) attend pour switcher en mode release. Symptôme côté user : le launcher affiche une page Edge "ERR_CONNECTION_REFUSED" au lancement. Fix : remplacé par `npx tauri build --no-bundle` qui passe correctement par la CLI Tauri (set release env vars + run beforeBuildCommand) tout en skippant le bundle NSIS qu'on ne veut pas.
 ## [v26.05.06.5] - 2026-05-06  · semver `26.506.4`
 
 

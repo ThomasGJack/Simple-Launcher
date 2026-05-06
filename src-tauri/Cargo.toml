@@ -1,6 +1,6 @@
 [package]
 name = "simple-launcher"
-version = "26.506.4"
+version = "26.506.6"
 description = "Simple Launcher — multi-game launcher"
 authors = ["goule"]
 edition = "2021"
@@ -8,6 +8,20 @@ edition = "2021"
 [lib]
 name = "simple_launcher_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
+
+[features]
+# `custom-protocol` est CRITIQUE pour les builds release. La feature
+# active le custom protocol Tauri qui sert le frontend depuis les
+# fichiers embedded (frontendDist) au lieu de proxy vers le devUrl
+# (http://localhost:1420). Sans cette feature, le binaire compilé en
+# release loadera localhost et plantera chez les users qui n'ont pas
+# de Vite dev server tournant.
+#
+# Tauri CLI forwarde automatiquement `--features custom-protocol`
+# quand on appelle `tauri build`. Cargo n'utilise pas cette feature
+# pendant `cargo run` / `cargo build` (sans --release), donc le dev
+# loop continue de fonctionner via le devUrl normalement.
+custom-protocol = ["tauri/custom-protocol"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

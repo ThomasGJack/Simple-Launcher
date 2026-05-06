@@ -91,20 +91,21 @@ if (!unreleasedBody.trim()) {
   process.exit(1);
 }
 
-// ── 1. Build the raw .exe via cargo ───────────────────────────────────
+// ── 1. Build the raw .exe via tauri build --no-bundle ─────────────────
 //
-// We bypass `tauri build` because it'd want to produce an NSIS bundle ;
-// for Velopack we only need the raw simple-launcher.exe. The Tauri
-// frontend bundle is still produced via `npm run build` first, then
-// embedded by `cargo build --release` via tauri's build.rs.
-console.log("[1/4] Building frontend (vite)…");
-execSync("npm run build", { stdio: "inherit", cwd: root });
-
-console.log("[2/4] Building simple-launcher.exe (cargo --release)…");
-execSync("cargo build --release", {
-  stdio: "inherit",
-  cwd: join(root, "src-tauri"),
-});
+// `tauri build --no-bundle` gives us exactly what Velopack needs : the
+// raw simple-launcher.exe with the frontend assets embedded, but
+// without NSIS/MSI bundling. We can NOT use `cargo build --release`
+// directly because Tauri's `tauri-build` crate relies on env vars set
+// by the Tauri CLI to signal release mode (otherwise the binary tries
+// to load the frontend from `devUrl: http://localhost:1420` even in
+// release builds, which fails for users without a dev server).
+//
+// The `beforeBuildCommand: npm run build` from tauri.conf.json runs
+// automatically as part of `tauri build`, so we don't need to call
+// vite ourselves.
+console.log("[1/3] Building Tauri app (tauri build --no-bundle)…");
+execSync("npx tauri build --no-bundle", { stdio: "inherit", cwd: root });
 
 const targetExe = join(root, "src-tauri", "target", "release", "simple-launcher.exe");
 if (!existsSync(targetExe)) {
@@ -120,7 +121,7 @@ if (!existsSync(targetExe)) {
 // doesn't pick up unrelated cargo artefacts. The target name is
 // "simple-launcher.exe" — used both as the staged file and as
 // `--mainExe` so Velopack knows which exe to launch on first run.
-console.log("[3/4] Staging binaries for vpk pack…");
+console.log("[2/3] Staging binaries for vpk pack…");
 const stageDir = join(root, "src-tauri", "target", "velo-stage");
 if (existsSync(stageDir)) rmSync(stageDir, { recursive: true, force: true });
 mkdirSync(stageDir, { recursive: true });
@@ -139,7 +140,7 @@ writeFileSync(releaseNotesPath, unreleasedBody.trim() + "\n");
 //   - <PackId>-<ver>-full.nupkg                (full package)
 //   - <PackId>-<ver>-delta.nupkg               (delta from previous)
 //   - RELEASES                                 (manifest)
-console.log("[4/4] Running vpk pack…");
+console.log("[3/3] Running vpk pack…");
 const outputDir = join(root, "hosting", "launcher", CHANNEL);
 mkdirSync(outputDir, { recursive: true });
 const iconPath = join(root, "src-tauri", "icons", "icon.ico");
