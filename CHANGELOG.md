@@ -18,6 +18,16 @@ Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleas
 
 ### Sécurité
 
+## [v26.05.06.15] - 2026-05-06  · semver `26.506.14`
+
+
+### Changé
+
+- **Onboarding tour refonte coach-mark / spotlight** ([src/components/onboarding/OnboardingTour.tsx](src/components/onboarding/OnboardingTour.tsx) + [src/components/layout/Sidebar.tsx](src/components/layout/Sidebar.tsx)) — le tour de présentation passe d'une modal centrée plein écran à un pattern type "guided tour" : (1) **Card flottante** bottom-right de l'écran (~26 rem), pas de backdrop fullscreen qui bloque tout. (2) **Spotlight** : un overlay SVG dimme l'écran SAUF autour du bouton Sidebar correspondant à l'étape (Bibliothèque / Communauté / Crews / Profil / Paramètres), avec un anneau cyan animé qui pulse autour du target. (3) **Auto-navigation** : à chaque changement d'étape, le launcher navigue auto vers la page concernée — la card reste ouverte pendant la transition pour que l'utilisateur voie l'UI tout en lisant l'explication. (4) **Pointer-events transparents** sur le backdrop : tu peux cliquer sur le bouton Sidebar mis en évidence pendant que le tour est ouvert. (5) Final centered modal "Tu es prêt(e) !" pour conclure proprement. Les boutons Suivant / Retour / Passer sont compacts et clairement visibles dans la card. NavButton accepte un nouveau prop `tourTarget` qui se traduit en `data-tour-target` côté DOM, lu par le hook `useTargetRect` du tour pour mesurer la bbox via `getBoundingClientRect` + ResizeObserver/scroll listeners.
+
+### Corrigé
+
+- **Boutons Suivant clipped au bas de la modal d'onboarding** ([src/components/onboarding/OnboardingTour.tsx](src/components/onboarding/OnboardingTour.tsx)) — la previous implementation avait un footer `flex justify-between` avec [Retour] + [Voir la bibliothèque] + [Suivant], mais à largeur étroite le bouton Suivant débordait silencieusement. Refonte du footer : seul Retour + Suivant restent, le bouton "Voir [section]" est retiré (l'auto-navigation par étape le rend redondant).
 ## [v26.05.06.14] - 2026-05-06  · semver `26.506.13`
 
 

@@ -139,18 +139,21 @@ export function Sidebar() {
             icon={Library}
             label="Bibliothèque"
             active={isActive({ name: "library" })}
+            tourTarget="library"
             onClick={() => navigate({ name: "library" })}
           />
           <NavButton
             icon={Users}
             label="Communauté"
             active={isActive({ name: "community" })}
+            tourTarget="community"
             onClick={() => navigate({ name: "community" })}
           />
           <NavButton
             icon={Castle}
             label="Clans"
             active={isActive({ name: "crews" })}
+            tourTarget="crews"
             onClick={() => navigate({ name: "crews" })}
           />
           <NavButton
@@ -225,6 +228,7 @@ export function Sidebar() {
           icon={Settings}
           label="Paramètres"
           active={isActive({ name: "settings" })}
+          tourTarget="settings"
           onClick={() => navigate({ name: "settings" })}
         />
 
@@ -265,6 +269,7 @@ const NavButton = memo(function NavButton({
   active,
   badge,
   goldNeon,
+  tourTarget,
   onClick,
 }: {
   icon: typeof Library;
@@ -278,6 +283,10 @@ const NavButton = memo(function NavButton({
    *  uniformly-monochrome rest of the sidebar — supporters tier shouldn't
    *  feel like just another nav option. */
   goldNeon?: boolean;
+  /** Identifier consumed by the OnboardingTour spotlight to anchor on
+   *  this button at the right step. The tour reads `data-tour-target`
+   *  via document.querySelector to compute the highlight bbox. */
+  tourTarget?: string;
   onClick: () => void;
 }) {
   return (
@@ -287,6 +296,7 @@ const NavButton = memo(function NavButton({
         onClick();
       }}
       onMouseEnter={() => sounds.hover()}
+      data-tour-target={tourTarget}
       className={cn(
         "group relative grid size-12 place-items-center rounded-xl transition-colors",
         goldNeon
@@ -551,6 +561,7 @@ function AvatarButton({
         onClick();
       }}
       onMouseEnter={() => sounds.hover()}
+      data-tour-target="profile"
       className="group relative grid size-12 place-items-center rounded-xl"
     >
       {active && (
