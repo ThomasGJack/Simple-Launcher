@@ -8,7 +8,6 @@ import {
   Lock,
   LogOut,
   Plus,
-  Settings,
 } from "lucide-react";
 import { useAuthStore } from "@/store/auth";
 import { useUIStore } from "@/store/ui";
@@ -25,7 +24,6 @@ import {
 } from "@/firebase/crews";
 import { ChannelView } from "@/components/crews/ChannelView";
 import { MembersList } from "@/components/crews/MembersList";
-import { CrewSettingsModal } from "@/components/crews/CrewSettingsModal";
 import { CrewContextMenuWrapper } from "@/components/crews/CrewContextMenu";
 import { hasAnyTier } from "@/lib/supporterTier";
 import { isAdmin } from "@/lib/admin";
@@ -70,10 +68,12 @@ export function CrewsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [browseOpen, setBrowseOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   /** Right-click context menu state — when set, render
    *  CrewContextMenu anchored at `position` for `crew`. Closed by
-   *  clicking outside / Escape / picking an action. */
+   *  clicking outside / Escape / picking an action. The legacy
+   *  CrewSettingsModal flow has been retired ; configuration now
+   *  lives in the dedicated CrewConfigPage reachable via this
+   *  context menu's "Configuration" item. */
   const [ctxMenu, setCtxMenu] = useState<{
     crew: Crew;
     position: { x: number; y: number };
@@ -365,18 +365,10 @@ export function CrewsPage() {
               )}
             </div>
           </div>
-          {selectedCrew && (!selectedCrew.isMaster || isAdmin(me)) && (
-            <button
-              type="button"
-              onClick={() =>
-                navigate({ name: "crew-config", crewId: selectedCrew.id })
-              }
-              title="Configuration du crew (salons, rôles, code…)"
-              className="grid size-8 place-items-center rounded-lg text-fg-dim transition-colors hover:bg-white/[0.06] hover:text-fg-primary"
-            >
-              <Settings className="size-4" />
-            </button>
-          )}
+          {/* Settings gear retiré : accès via clic-droit sur
+              l'icône du crew dans le rail gauche → menu custom →
+              "Configuration". Garde l'UX cohérente avec le pattern
+              annoncé. */}
           {selectedCrew && !selectedCrew.isMaster && (
             <button
               type="button"
@@ -469,14 +461,6 @@ export function CrewsPage() {
         onClose={() => setCreateOpen(false)}
         onCreated={(id) => navigate({ name: "crews", crewId: id })}
       />
-      {selectedCrew && (
-        <CrewSettingsModal
-          open={settingsOpen}
-          onClose={() => setSettingsOpen(false)}
-          crew={selectedCrew}
-          onDeleted={() => navigate({ name: "crews" })}
-        />
-      )}
       {/* Right-click context menu on a crew icon — anchored at the
           click coordinates. Closed via outside-click / Esc / action.
           Role is derived best-effort : if the right-clicked crew is
