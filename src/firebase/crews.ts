@@ -159,6 +159,13 @@ export type CrewMessage = {
    * see perf Phase 2.3. Atomic via `arrayUnion` / `arrayRemove`.
    */
   reactions: Record<string, string[]>;
+  /**
+   * Sondage embarqué dans le message. Quand non null, le message rend
+   * un widget de vote (calque du sondage news) au lieu / en plus du
+   * texte. Les votes vivent dans une sous-collection
+   * `messages/{messageId}/votes/{uid}` — cf. `channelPollVotes.ts`.
+   */
+  poll: { question: string; options: string[] } | null;
 };
 
 /**
@@ -374,6 +381,21 @@ function parseMessage(d: { id: string; data: () => Record<string, unknown> }): C
       }
     }
   }
+  // Poll inline — calque du shape NewsPoll. Defensive parsing : on
+  // exige `question: string` + `options: string[]` non vide.
+  const rawPoll = data.poll;
+  const poll: CrewMessage["poll"] =
+    rawPoll &&
+    typeof rawPoll === "object" &&
+    typeof (rawPoll as { question?: unknown }).question === "string" &&
+    Array.isArray((rawPoll as { options?: unknown }).options)
+      ? {
+          question: (rawPoll as { question: string }).question,
+          options: ((rawPoll as { options: unknown[] }).options).filter(
+            (o): o is string => typeof o === "string",
+          ),
+        }
+      : null;
   return {
     id: d.id,
     text: typeof data.text === "string" ? data.text : "",
@@ -390,6 +412,7 @@ function parseMessage(d: { id: string; data: () => Record<string, unknown> }): C
     mentionedUids: mentions,
     imageUrl: typeof data.imageUrl === "string" ? data.imageUrl : null,
     reactions,
+    poll,
   };
 }
 
@@ -488,6 +511,10 @@ export type SendMessageOptions = {
   /** Public Storage URL of an image attached inline. Set when the
    *  composer uploaded a file before sending. */
   imageUrl?: string | null;
+  /** Sondage embarqué — quand fourni, le message rend un widget de
+   *  vote au lieu / en plus du texte. Les votes vivent dans une
+   *  sous-collection `messages/{messageId}/votes/{uid}`. */
+  poll?: { question: string; options: string[] } | null;
 };
 
 /**
@@ -598,6 +625,7 @@ export async function sendChannelMessage(
       replyToSenderName: options.replyTo?.senderName ?? null,
       mentionedUids: options.mentionedUids ?? [],
       imageUrl: options.imageUrl ?? null,
+      poll: options.poll ?? null,
     },
   );
   markCrewJoined();

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Megaphone, Pin, Newspaper, Maximize2, X, ChevronRight } from "lucide-react";
 import { watchNews, type News } from "@/firebase/news";
+import { CommentThread } from "@/components/news/CommentThread";
 import {
   REACTION_EMOJIS,
   toggleReaction,
@@ -170,9 +171,12 @@ function NewsDetailModal({
         {/* The full-size NewsItem inside the modal — same component
             used on HomePage but with no clamping. We pass an explicit
             isInModal flag so it can drop the "Voir +" button (we're
-            already in the modal — it'd be useless). */}
+            already in the modal — it'd be useless). Le thread de
+            commentaires est empilé en dessous, dans le même container
+            scrollable. */}
         <div className="info-scroll max-h-[80vh] overflow-y-auto rounded-3xl">
           <NewsItem item={item} isInModal />
+          <CommentThread newsId={item.id} />
         </div>
       </motion.div>
     </motion.div>

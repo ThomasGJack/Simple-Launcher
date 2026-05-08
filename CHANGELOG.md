@@ -28,6 +28,9 @@ dans ce fichier mais n'est pas envoyée.
 
 ### Nouveau
 
+- Commentaires sur les news, avec possibilité de répondre à un commentaire et de modifier ou supprimer les siens.
+- Sondages dans les salons des crews — bouton à côté du composer, comme dans les news.
+
 ### Amélioré
 
 ### Corrigé

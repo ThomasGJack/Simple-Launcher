@@ -288,6 +288,17 @@ service cloud.firestore {
               isCrewMember() &&
               reactionId.matches(request.auth.uid + '__.*');
           }
+
+          // Poll votes — when un message a un sondage embarqué, les
+          // votes vivent ici. Single-choice : un doc par utilisateur,
+          // re-tap la même option clear le vote, re-tap une autre
+          // remplace. Tout member peut lire/voter ; chacun ne touche
+          // qu'à son propre doc (uid == request.auth.uid).
+          match /votes/{uid} {
+            allow read: if isCrewMember();
+            allow create, update, delete:
+              if request.auth != null && request.auth.uid == uid && isCrewMember();
+          }
         }
       }
     }
@@ -313,6 +324,18 @@ service cloud.firestore {
         allow read: if request.auth != null;
         allow create, update, delete:
           if request.auth != null && request.auth.uid == uid;
+      }
+
+      // Comments — chaque comment est un doc auto-id (pas un per-user
+      // comme reactions/votes). Tout authed peut lire ; le create est
+      // gated sur authorUid == request.auth.uid (pour empêcher
+      // l'impersonification) ; update/delete owner-only.
+      match /comments/{commentId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null
+          && request.resource.data.authorUid == request.auth.uid;
+        allow update, delete: if request.auth != null
+          && resource.data.authorUid == request.auth.uid;
       }
     }
 
