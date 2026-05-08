@@ -54,6 +54,8 @@ import { useTickEvery } from "@/hooks/useTickEvery";
 import { DiagnosticModal } from "@/components/settings/DiagnosticModal";
 import { TwitchPanel } from "@/components/settings/TwitchPanel";
 import { ObsPanel } from "@/components/settings/ObsPanel";
+import { ShortcutsPanel } from "@/components/settings/ShortcutsPanel";
+import { SeasonalPanel } from "@/components/settings/SeasonalPanel";
 import { ScrollMemoryRoot } from "@/hooks/ScrollMemoryRoot";
 import {
   DEFAULT_OVERLAY_HOTKEY,
@@ -122,8 +124,10 @@ export function SettingsPage() {
         />
         <SoundPreviewCard enabled={soundsEnabled} />
         <ApparenceCard />
+        <SeasonalPanel />
         <NotificationsCard />
         <OverlayCard />
+        <ShortcutsPanel />
         <TwitchPanel />
         <ObsPanel />
         <DownloadsCard />

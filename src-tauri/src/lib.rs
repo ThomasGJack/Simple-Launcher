@@ -19,6 +19,7 @@ mod oauth;
 mod obs_ws;
 mod overlay;
 mod rcon;
+mod shortcuts;
 #[cfg(windows)]
 mod single_instance;
 mod tray;
@@ -78,6 +79,7 @@ pub fn run() {
         .manage(log_file::LogFileState::new())
         .manage(mc_auth::McAuthState::new())
         .manage(overlay::OverlayState::new())
+        .manage(shortcuts::ShortcutsState::new())
         .manage(velo_updater::VeloState::new())
         .on_window_event(|window, event| {
             // Intercept the main-window close request: instead of exiting
@@ -229,6 +231,12 @@ pub fn run() {
             obs_ws::obs_disconnect,
             obs_ws::obs_send_overlay_event,
             obs_ws::obs_get_config,
+            // Custom shortcuts — multi-binding global hotkeys gérés par
+            // le frontend (les actions sont définies côté React, le
+            // Rust ne fait que register/unregister + emit l'event).
+            shortcuts::shortcuts_register,
+            shortcuts::shortcuts_unregister,
+            shortcuts::shortcuts_unregister_all,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

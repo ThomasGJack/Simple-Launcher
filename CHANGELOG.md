@@ -32,6 +32,9 @@ dans ce fichier mais n'est pas envoyée.
 - Sondages dans les salons des crews — bouton à côté du composer, comme dans les news.
 - Connecte ton compte Twitch dans les Paramètres pour que le titre de ton stream change automatiquement quand tu lances un module.
 - Connexion à OBS Studio dans les Paramètres pour préparer un overlay activité du crew sur ton stream.
+- Raccourcis clavier customisables dans les Paramètres — capture d'écran, recherche, navigation modules.
+- Thèmes saisonniers Halloween et Noël — couleurs qui s'adaptent automatiquement à la période.
+- Cadres d'avatar débloquables — réservés aux soutiens, aux saisons, ou disponibles par défaut.
 
 ### Amélioré
 

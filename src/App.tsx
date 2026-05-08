@@ -17,6 +17,8 @@ import { useFavoritesStore } from "@/store/favorites";
 import { logger, installGlobalLoggerHandlers } from "@/lib/logger";
 import { restoreTwitchConfig } from "@/lib/twitchAuth";
 import { restoreObsConfig } from "@/lib/obsBridge";
+import { bootCustomShortcuts } from "@/lib/customShortcuts";
+import { bootSeasonalTheme } from "@/components/settings/SeasonalPanel";
 import {
   useUsers,
   useModules,
@@ -96,6 +98,21 @@ void (async () => {
   }
   try {
     await restoreObsConfig();
+  } catch {
+    /* silent */
+  }
+  // Custom shortcuts : applique les bindings localStorage et installe le
+  // dispatcher d'events `shortcut-triggered`. La cleanup unlisten est
+  // ignorée — on garde le listener pour toute la durée de la session.
+  try {
+    await bootCustomShortcuts();
+  } catch {
+    /* silent */
+  }
+  // Themes saisonniers : applique le mode persisté (auto / forcé / off).
+  // Synchrone — pas de Tauri command, juste des CSS vars sur <html>.
+  try {
+    bootSeasonalTheme();
   } catch {
     /* silent */
   }

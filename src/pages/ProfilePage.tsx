@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { LogOut, Calendar, Mail, Hash, Gamepad2, Clock, Rocket, Trophy, Sigma, Flame, ChevronDown, ChevronUp, Share2 } from "lucide-react";
 import { ShareProfileModal } from "@/components/profile/ShareProfileModal";
 import { PlayHeatmap } from "@/components/profile/PlayHeatmap";
+import { CosmeticsGallery } from "@/components/cosmetics/CosmeticsGallery";
 import { sounds } from "@/lib/sounds";
 import { useAuthStore } from "@/store/auth";
 import { useUIStore } from "@/store/ui";
@@ -277,6 +278,15 @@ export function ProfilePage() {
             title="Quand tu joues"
             subtitle="Plus c'est foncé, plus tu lances tes jeux à cette heure / ce jour."
           />
+        </div>
+      )}
+
+      {/* Galerie des cosmétiques (frames d'avatar). MVP : on passe
+          tier=null pour Phase C — l'integration avec le tier user
+          viendra plus tard (cf. POSTMVP_TODO.md). */}
+      {user && (
+        <div className="mt-6 max-w-2xl">
+          <CosmeticsGallery tier={null} currentEquipped={null} />
         </div>
       )}
 
