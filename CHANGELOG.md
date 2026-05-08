@@ -4,19 +4,49 @@ Toutes les modifications notables du launcher sont listées ici.
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versioning [SemVer](https://semver.org/lang/fr/).
 
 À chaque modification, ajoute une entrée sous `## [Unreleased]` dans la catégorie qui correspond.
-Quand on release, `npm run release:launcher` déplace automatiquement `[Unreleased]` vers `[X.Y.Z] - YYYY-MM-DD` et le contenu devient les notes affichées dans la popup de mise à jour côté client.
+
+**⚠ Style des entrées : voir [docs/CHANGELOG_STYLE.md](docs/CHANGELOG_STYLE.md).**
+Une phrase courte lisible par un user, pas du jargon technique. Les détails
+techniques (paths, refacto, perf) vont dans la section dédiée plus bas, qui
+est exclue des release notes envoyées au user.
+
+Quand on release, `npm run release:launcher` déplace `[Unreleased]` vers
+`[X.Y.Z] - YYYY-MM-DD`. Les sections **Nouveau / Amélioré / Corrigé /
+Supprimé / Sécurité** deviennent les notes user (popup d'update, page
+changelog, embed Discord). La section **Détails techniques** reste archivée
+dans ce fichier mais n'est pas envoyée.
 
 ## [Unreleased]
 
-### Ajouté
+<!--
+  Style guide : voir docs/CHANGELOG_STYLE.md
+  Une phrase courte, lisible par un user. Pas de chemin de fichier ni de
+  jargon. Le bénéfice user, pas la cause technique.
+  Si tu ajoutes X et que tu fix un bug de X dans le même cycle, garde
+  juste "Nouveau X" — le bug n'a jamais été en prod.
+-->
 
-### Changé
+### Nouveau
+
+### Amélioré
 
 ### Corrigé
 
 ### Supprimé
 
 ### Sécurité
+
+<!-- ──────────────────────────────────────────────────────────────────
+     DÉTAILS TECHNIQUES — Archive interne, NON affichée au user.
+     Le release script `scripts/release-launcher.mjs` exclut cette
+     section des release notes envoyées via Velopack et Discord.
+     Y mettre : paths de fichiers, refacto, perf debug, raisonnement
+     architectural — tout ce qui aide un futur dev (ou un futur Claude)
+     à comprendre le pourquoi d'un changement, mais qui n'a aucune
+     valeur pour un utilisateur final.
+     ────────────────────────────────────────────────────────────────── -->
+
+### Détails techniques
 
 ## [v26.05.06.16] - 2026-05-06  · semver `26.506.15`
 

@@ -11,6 +11,7 @@
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "release:launcher": "node scripts/release-launcher.mjs",
+    "release:notify": "node scripts/notify-discord.mjs",
     "installer:art": "node scripts/build-installer-art.mjs",
     "bump": "node scripts/bump-version.mjs",
     "cleanup:prism": "node scripts/cleanup-prism-fields.mjs",

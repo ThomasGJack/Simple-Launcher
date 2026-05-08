@@ -1,0 +1,240 @@
+================================================================================
+SIMPLE LAUNCHER — BRAINSTORM FEATURES (app desktop)
+================================================================================
+
+Date du brainstorm : 2026-05-08
+Légende : ★ = top picks à mes yeux
+
+Brainstorm de features potentielles pour le launcher (l'app desktop, pas le
+site web). Classé par catégorie pour pouvoir piocher. Aucune n'est validée
+pour implémentation — c'est un panier d'idées à arbitrer.
+
+
+================================================================================
+1. COMMUNAUTÉ / SOCIAL  (le crew sera content)
+================================================================================
+
+★ Voice chat intégré par crew/channel via WebRTC
+  Virer la dépendance à un Discord externe, vraiment posséder l'expérience.
+
+★ Calendrier partagé
+  Sessions multi planifiées, events ("samedi 21h Vault Hunters"), notifs J-1.
+
+★ Watch parties
+  Regarder un YouTube/Twitch ensemble dans une fenêtre side-by-side du
+  launcher.
+
+- Threads dans les channels (comme Discord)
+- Polls intégrés dans les channels (déjà partiel sur News, étendre aux
+  channels crew)
+- Stories éphémères 24h (mode Insta/WhatsApp) — un screenshot ou texte qui
+  disparaît
+- Stage / Live audio rooms (mode Twitter Spaces) pour les events crew
+- Cross-crew DM : messager des users d'autres crews
+- Mentions vocales ("@VoiceRoom" → auto-join un channel vocal)
+- Réactions custom (ajouter ses propres emojis crew)
+
+
+================================================================================
+2. MINECRAFT  (là où le crew passe sa vie)
+================================================================================
+
+★ Cloud saves
+  Sync world MC entre 2 machines via Firebase Storage. Bureau + laptop sans
+  perdre la progression.
+
+★ Modpack diff
+  "Ton modpack vs le mien — quels mods diffèrent" + bouton "appliquer la
+  diff" pour aligner.
+
+★ Server browser intégré au launcher
+  MOTD live, joueurs en ligne, ping, par module. Plus besoin de noter les IP.
+
+- Auto-update modpack push : admin pousse une nouvelle version → tous les
+  launchers détectent + propose l'update
+- Crash log AI analyzer : drag-drop ton crash → "ça vient de Sodium
+  incompatible avec X, vire ce mod"
+- Performance profiler in-game : FPS, RAM JVM, latency serveur, en overlay
+- Sandbox MC : test versions/mods en isolation totale, sans toucher ton
+  instance
+- Replay system (Replay Mod intégré) : enregistre les sessions, partage avec
+  le crew
+- Resourcepack/Shaderpack manager centralisé (toggle global, pas par world)
+- Mod presets par modpack : "Lite", "Performance", "Full" dans le même pack
+- Built-in server hosting : lancer un serveur MC depuis le launcher pour le
+  crew (RCON déjà là)
+
+
+================================================================================
+3. GAMIFICATION  (étirer la durée de vie)
+================================================================================
+
+★ Quests hebdo
+  "Joue 3 modules différents cette semaine", "Débloque 1 achievement gold"
+  → bonus rarity ou cosmétique exclusif.
+
+★ Daily login streaks
+  Avec récompenses cosmétiques (déjà partiel via achievements ?).
+
+- Leaderboards par modpack (heures jouées, achievements débloqués)
+- Achievements custom crew : owners de crews privés peuvent créer leurs
+  propres badges
+- XP / level system par module ou global, avec palier de cosmétiques
+- Trophy showcase sur le profil : épingler 3 trophées en avant
+- Time capsule : "il y a 1 an, tu jouais à X — replay ?"
+- Tournois intégrés avec brackets + chat dédié
+
+
+================================================================================
+4. UI / UX / PERSONNALISATION
+================================================================================
+
+★ Search globale Cmd+K
+  Modules, users, channels, achievements, news — barre unique avec recherche
+  fuzzy.
+
+★ Mode focus
+  Auto-mute notifs + Discord RPC custom quand un module tourne ("Don't
+  disturb"). Compatible avec une vraie session de jeu sans distractions.
+
+- Themes complets (pas juste l'accent) : fonts custom, soundpacks (chiptune,
+  retro, ambient), layouts (sidebar à droite, dense vs spacieux)
+- Multi-window : ouvrir le chat crew sur ton 2e écran pendant que tu joues
+- Picture-in-picture : mini-vue chat/heatmap qui flotte au-dessus du jeu
+- Light mode (actuellement dark-only)
+- Themes saisonniers : Halloween, Noël (déco temporaire de la sidebar/hero)
+- Mascot custom upload : ton propre PNG/SVG à la place du pingouin
+- Shortcuts custom keyboard
+- Layout dense vs aéré (préférence par-user)
+
+
+================================================================================
+5. INTÉGRATIONS EXTERNES
+================================================================================
+
+★ Steam library import
+  Auto-ajout de tous tes jeux Steam comme raccourcis. Le launcher devient
+  vraiment l'unique point d'entrée gaming.
+
+- Twitch Rich Presence : ton stream live affiché sur ton profil pendant que
+  tu joues
+- Spotify NowPlaying : "goule écoute Daft Punk" dans la sidebar
+- Last.fm scrobbler : ce que tu joues → scrobble auto sur Last.fm
+- OBS plugin : afficher l'activité crew live sur ton stream comme overlay
+- YouTube watch party (cité plus haut)
+- Discord webhook bidirectionnel : un crew channel ↔ un Discord externe
+- Twitter/Bluesky share : achievement débloqué → tweet auto (opt-in)
+- Epic Games / GOG / Battle.net / Riot library import
+
+
+================================================================================
+6. SMART / AI
+================================================================================
+
+★ Crash log AI analyzer
+  Drag-drop ton crash → analyse via Claude API → "ça vient de Sodium
+  incompatible avec X, vire ce mod". Peu de boulot, énorme ressenti UX.
+
+- Modpack search en langage naturel : "modpack tech avec automation pour
+  1.21" → résultats Modrinth filtrés
+- Auto-fix common issues : Java version mismatch, low RAM allocation,
+  missing VC++ → résout automatiquement
+- Smart RAM allocator : analyse le modpack et suggère X GiB optimal (pas
+  juste un slider)
+- Session summary AI : "tu as joué 2h sur X, débloqué Y, screenshots à
+  `path`" résumé auto en fin de session
+- Mod conflict predictor : prévenir avant install les conflits connus
+
+
+================================================================================
+7. PRODUCTIVITÉ  (les petits trucs qui changent la vie)
+================================================================================
+
+- Notes par module : block-notes local pour se rappeler builds, recettes,
+  coordonnées de monuments dans un world
+- Screenshot manager : capture intégrée (F2 ?) → organisé par module + share
+  au crew en 1 clic
+- Wiki crew collaboratif par modpack (Notion-lite intégré)
+- TODO list crew (tâches partagées : "construire la base", "farmer X")
+- Time tracker objectif : "objectif 5h cette semaine sur ce modpack" + mini
+  graphe progress
+
+
+================================================================================
+8. WORKFLOW MODDER / ADMIN
+================================================================================
+
+- Pre-release channel : tester un modpack avec 3 testeurs avant le push
+  public
+- Module versioning explicite : rollback à une ancienne version d'un modpack
+- Crew analytics dashboard : qui joue à quoi, peak hours, top channels —
+  pour les owners
+- Audit log complet (déjà partiel via les logs admin)
+- Crew JSON export/import (backup local d'un crew config)
+- Beta opt-in par module
+- Module deps explicites : "ce modpack nécessite ces resourcepacks"
+
+
+================================================================================
+9. TECH / SÉCURITÉ / PERFORMANCE
+================================================================================
+
+- Multi-account Discord (jongler entre comptes)
+- Multi-account MC (déjà là probablement, à vérifier/étendre)
+- Bandwidth limit sur les downloads (utile sur connexion partagée)
+- Schedule downloads ("télécharger ce modpack à 3h du mat")
+- P2P modpack share entre membres du crew (économise bande passante admin)
+- Mod whitelist signed by admin (sécurité accrue)
+- Sandboxing MC (run in restricted user)
+- Anti-cheat for crew (option pour les modpacks comp)
+- Crash report auto-share au crew (option, opt-in)
+
+
+================================================================================
+10. FEATURES "WHEN WE'RE BIG"
+================================================================================
+
+- Marketplace de modpacks créés par les members, validation admin
+- Reviews/ratings sur les modules
+- Comments sur les news
+- Profil enrichi : showcase de builds, screenshots gallery
+- Cosmetics débloquables (avatars, frames, banners)
+- AI assistant builder modpack : "je veux un modpack tech moderne pour
+  1.21" → suggestions + .mrpack généré
+
+
+================================================================================
+TOP 5 SI JE DEVAIS CODER CETTE SEMAINE
+================================================================================
+
+1. Crash log AI analyzer
+   Peu de boulot (envoyer le crash à Claude API), gros impact ressenti.
+
+2. Cloud saves Minecraft
+   Utile dès que t'as 2 machines. Firebase Storage est déjà là.
+
+3. Calendrier partagé crew
+   Change la dynamique sociale, faible complexité (un nouveau type de doc
+   Firestore + une page React).
+
+4. Search globale Cmd+K
+   UX énorme pour un coût modéré. Beaucoup de launchers/IDEs l'ont, c'est
+   devenu un standard.
+
+5. Voice chat intégré
+   Ambitieux (WebRTC + serveur signaling) mais c'est *the* feature qui
+   justifie d'avoir un launcher au lieu d'un Discord externe.
+
+
+================================================================================
+NOTES
+================================================================================
+
+- Brainstorm récolté lors d'une discussion avec le user le 2026-05-08
+  pendant la refonte du site web Simple Games / Simple Launcher.
+- Les ★ sont mes top picks personnels — à arbitrer selon la priorité du
+  crew.
+- Aucune feature n'est validée pour implémentation — c'est un panier
+  d'idées.
+- Pour ajouter une nouvelle feature à ce fichier : suivre le format
+  ★/(-) avec une ligne courte de description.

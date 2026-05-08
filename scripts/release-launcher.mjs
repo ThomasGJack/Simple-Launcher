@@ -80,14 +80,19 @@ function runVpk(args) {
   });
 }
 
-const { unreleasedBody, rewrittenChangelog } = extractAndRewriteChangelog(
+const { userBody, rewrittenChangelog } = extractAndRewriteChangelog(
   changelogPath,
   version,
   displayVersion,
 );
-if (!unreleasedBody.trim()) {
-  console.error("Refus de release : la section [Unreleased] de CHANGELOG.md est vide.");
-  console.error("Ajoute au moins une entrée avant de release.");
+if (!userBody.trim()) {
+  console.error("Refus de release : aucune entrée user-facing dans [Unreleased].");
+  console.error(
+    "Ajoute au moins une ligne sous Nouveau / Amélioré / Corrigé / Supprimé /\n" +
+      "Sécurité avant de release. La section « Détails techniques » seule ne suffit\n" +
+      "pas — une release doit avoir au moins quelque chose à dire à l'utilisateur.",
+  );
+  console.error("Convention : docs/CHANGELOG_STYLE.md");
   process.exit(1);
 }
 
@@ -129,7 +134,7 @@ copyFileSync(targetExe, join(stageDir, "simple-launcher.exe"));
 
 // Release notes file for vpk (markdown). Trim to keep the .nupkg lean.
 const releaseNotesPath = join(stageDir, "release-notes.md");
-writeFileSync(releaseNotesPath, unreleasedBody.trim() + "\n");
+writeFileSync(releaseNotesPath, userBody.trim() + "\n");
 
 // ── 3. vpk pack ──────────────────────────────────────────────────────
 //
@@ -190,7 +195,7 @@ const versionsPath = join(root, "hosting", "launcher", "versions.json");
 const manifestEntry = {
   version,
   displayVersion,
-  notes: unreleasedBody.trim(),
+  notes: userBody.trim(),
   pub_date: new Date().toISOString(),
   channel: CHANNEL,
 };
@@ -211,8 +216,9 @@ console.log("[+] Rewriting CHANGELOG.md…");
 writeFileSync(changelogPath, rewrittenChangelog);
 
 console.log(`\n✓ Release ${displayVersion} prête dans hosting/launcher/${CHANNEL}/`);
-console.log(`Étape suivante (à valider explicitement par l'utilisateur) :`);
-console.log(`    firebase deploy --only hosting\n`);
+console.log(`Étapes suivantes (à valider explicitement par l'utilisateur) :`);
+console.log(`    firebase deploy --only hosting       ← publie l'update sur le CDN`);
+console.log(`    npm run release:notify               ← envoie l'embed Discord\n`);
 
 // ---------------------------------------------------------------------------
 
@@ -273,17 +279,36 @@ function extractAndRewriteChangelog(path, releaseSemver, releaseDisplay) {
   const end = nextHeading === -1 ? lines.length : start + 1 + nextHeading;
 
   const block = lines.slice(start + 1, end);
-  const cleanedBlock = stripEmptyCategories(block);
-  const unreleasedBody = cleanedBlock.join("\n").trim();
+
+  // Le block est splitté en 2 :
+  //   - userBlock     : sections user-facing (Nouveau / Amélioré / Corrigé /
+  //                     Supprimé / Sécurité). Exclut « Détails techniques ».
+  //                     Utilisé pour release-notes.md (Velopack), versions.json
+  //                     (page changelog publique), embed Discord.
+  //   - archivalBlock : tout le contenu, y compris les détails techniques.
+  //                     Réinjecté dans CHANGELOG.md sous le header de version
+  //                     pour archive interne / contexte futur.
+  // Voir docs/CHANGELOG_STYLE.md pour la convention d'écriture.
+  const userBlock = stripEmptyCategories(stripTechnicalSection(block));
+  const archivalBlock = stripEmptyCategories(block);
+  const userBody = userBlock.join("\n").trim();
 
   const today = new Date().toISOString().slice(0, 10);
   const versionHeader = `## [${releaseDisplay}] - ${today}  · semver \`${releaseSemver}\``;
   const emptyUnreleased = [
     "## [Unreleased]",
     "",
-    "### Ajouté",
+    "<!--",
+    "  Style guide : voir docs/CHANGELOG_STYLE.md",
+    "  Une phrase courte, lisible par un user. Pas de chemin de fichier ni de",
+    "  jargon. Le bénéfice user, pas la cause technique.",
+    "  Si tu ajoutes X et que tu fix un bug de X dans le même cycle, garde",
+    '  juste "Nouveau X" — le bug n\'a jamais été en prod.',
+    "-->",
     "",
-    "### Changé",
+    "### Nouveau",
+    "",
+    "### Amélioré",
     "",
     "### Corrigé",
     "",
@@ -291,14 +316,46 @@ function extractAndRewriteChangelog(path, releaseSemver, releaseDisplay) {
     "",
     "### Sécurité",
     "",
+    "<!-- ──────────────────────────────────────────────────────────────────",
+    "     DÉTAILS TECHNIQUES — Archive interne, NON affichée au user.",
+    "     Le release script `scripts/release-launcher.mjs` exclut cette",
+    "     section des release notes envoyées via Velopack et Discord.",
+    "     ────────────────────────────────────────────────────────────────── -->",
+    "",
+    "### Détails techniques",
+    "",
   ];
 
   const before = lines.slice(0, start);
   const after = lines.slice(end);
-  const versionedBlock = [versionHeader, "", ...cleanedBlock];
+  const versionedBlock = [versionHeader, "", ...archivalBlock];
   const rewritten = [...before, ...emptyUnreleased, ...versionedBlock, ...after].join("\n");
 
-  return { unreleasedBody, rewrittenChangelog: rewritten };
+  return { userBody, rewrittenChangelog: rewritten };
+}
+
+/**
+ * Retire la sous-section "### Détails techniques" (et tout son contenu
+ * jusqu'au prochain "### " ou la fin du block) d'une liste de lignes.
+ * Utilisé pour séparer les notes user-facing de l'archive interne.
+ */
+function stripTechnicalSection(lines) {
+  const out = [];
+  let inTech = false;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    // Match "### Détails techniques" — accent insensible, casse insensible
+    if (/^###\s+d[eé]tails techniques\s*$/i.test(trimmed)) {
+      inTech = true;
+      continue;
+    }
+    // Une nouvelle section "### " sibling clôt le block tech
+    if (inTech && /^### /.test(trimmed)) {
+      inTech = false;
+    }
+    if (!inTech) out.push(line);
+  }
+  return out;
 }
 
 function stripEmptyCategories(lines) {
