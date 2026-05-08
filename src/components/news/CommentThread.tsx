@@ -115,7 +115,11 @@ export function CommentThread({ newsId }: { newsId: string }) {
                 : "Écris un commentaire — markdown léger supporté (**gras**, *italique*, [lien](url))…"
             }
             rows={3}
-            className="w-full resize-none rounded-lg bg-transparent text-sm text-fg-primary outline-none placeholder:text-fg-dim"
+            // px-1 + leading-relaxed : sans padding horizontal le texte
+            // s'aligne sur le coin arrondi (rounded-2xl du parent ≈ 16px)
+            // alors que le textarea n'a que 12px (p-3) → les premières
+            // lettres semblent grignotées par la courbe. 4px d'inset suffit.
+            className="w-full resize-none rounded-lg bg-transparent px-1 text-sm leading-relaxed text-fg-primary outline-none placeholder:text-fg-dim"
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();

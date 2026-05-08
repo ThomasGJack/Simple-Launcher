@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { TitleBar } from "@/components/window/TitleBar";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { AnimatedBackground } from "@/components/layout/AnimatedBackground";
+import { SeasonalDecorations } from "@/components/layout/SeasonalDecorations";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 import { PageSkeleton } from "@/components/ui/Skeleton";
 import { useUIStore, type Route } from "@/store/ui";
@@ -61,6 +62,11 @@ export function AppShell() {
   return (
     <div className="flex h-screen flex-col bg-bg-base text-fg-primary">
       <TitleBar />
+
+      {/* Couches saisonnières — par-dessus tout (sauf modals z-[60]+).
+          Pose data-season=halloween|christmas sur <html> pour activer.
+          Pointer-events-none dans le composant — ne vole pas les clics. */}
+      <SeasonalDecorations />
 
       <div className="relative flex flex-1 overflow-hidden">
         <Sidebar />

@@ -24,6 +24,7 @@ import {
   GitBranch,
   HelpCircle,
   Users,
+  Wand2,
 } from "lucide-react";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/auth";
@@ -32,6 +33,7 @@ import { CrewsManager } from "@/components/admin/CrewsManager";
 import { LogsManager } from "@/components/admin/LogsManager";
 import { AdminStatsPanel } from "@/components/admin/AdminStatsPanel";
 import { UsersManager } from "@/components/admin/UsersManager";
+import { SeasonalAdminPanel } from "@/components/admin/SeasonalAdminPanel";
 import { isAdmin } from "@/lib/admin";
 import {
   deleteHostedZip,
@@ -131,7 +133,7 @@ const EMPTY_FORM: FormState = {
 
 export function AdminPage() {
   const user = useAuthStore((s) => s.user);
-  const [activeTab, setActiveTab] = useState<"modules" | "news" | "crews" | "users" | "logs" | "stats">("modules");
+  const [activeTab, setActiveTab] = useState<"modules" | "news" | "crews" | "users" | "logs" | "stats" | "seasonal">("modules");
   const modules = useModules();
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [file, setFile] = useState<File | null>(null);
@@ -549,6 +551,14 @@ export function AdminPage() {
       description:
         "Lancements et temps de jeu cumulés sur tout le launcher, top modules, utilisateurs actifs. Données agrégées au moment de l'ouverture (refresh manuel).",
     },
+    {
+      id: "seasonal" as const,
+      label: "Saisons",
+      icon: Wand2,
+      title: "Thèmes saisonniers",
+      description:
+        "Pilote l'apparence saisonnière (Halloween / Noël) de TOUS les launchers. Mode auto par défaut basé sur la date — tu peux forcer un thème pour un event ou désactiver complètement.",
+    },
   ];
   const currentTab = tabs.find((t) => t.id === activeTab) ?? tabs[0];
 
@@ -656,6 +666,17 @@ export function AdminPage() {
           transition={{ duration: 0.35 }}
         >
           <AdminStatsPanel />
+        </motion.div>
+      )}
+
+      {activeTab === "seasonal" && (
+        <motion.div
+          key="tab-seasonal"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+        >
+          <SeasonalAdminPanel />
         </motion.div>
       )}
 

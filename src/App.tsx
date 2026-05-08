@@ -19,7 +19,8 @@ import { restoreTwitchConfig } from "@/lib/twitchAuth";
 import { restoreObsConfig } from "@/lib/obsBridge";
 import { bootCustomShortcuts, onShortcut } from "@/lib/customShortcuts";
 import { captureAndSave } from "@/lib/screenshot";
-import { bootSeasonalTheme } from "@/components/settings/SeasonalPanel";
+import { applySeasonalTheme, bootSeasonalTheme, resolveSeasonalTheme } from "@/lib/seasonal";
+import { watchSeasonalConfig } from "@/firebase/seasonalConfig";
 import { bootThemes } from "@/components/settings/ThemePanel";
 import {
   useUsers,
@@ -249,6 +250,20 @@ function App() {
       unsubscribe();
     };
   }, [setUser, setOfflineUser, setLoading]);
+
+  // Saisonniers — watch Firestore /config/seasonal pour appliquer les
+  // overrides admin (Halloween / Noël / off forcés). Boot a déjà
+  // appliqué "auto" sync, ce watcher prend le relais dès que l'auth
+  // résout (rules require authed read). Re-subscribe à chaque login /
+  // logout — Firestore SDK ne re-tente pas auto après une erreur de
+  // permission.
+  useEffect(() => {
+    if (!user) return;
+    const unsub = watchSeasonalConfig((config) => {
+      applySeasonalTheme(resolveSeasonalTheme(config.mode));
+    });
+    return unsub;
+  }, [user]);
 
   // Log every page navigation as an action — gives the admin a breadcrumb
   // trail of what the user did before any bug was reported.

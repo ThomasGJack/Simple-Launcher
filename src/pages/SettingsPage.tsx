@@ -30,6 +30,9 @@ import {
   MessageSquare,
   Trophy,
   Sparkles,
+  User,
+  Plug,
+  Wrench,
 } from "lucide-react";
 import { getVersion } from "@tauri-apps/api/app";
 import { useSettingsStore } from "@/store/settings";
@@ -55,7 +58,6 @@ import { DiagnosticModal } from "@/components/settings/DiagnosticModal";
 import { TwitchPanel } from "@/components/settings/TwitchPanel";
 import { ObsPanel } from "@/components/settings/ObsPanel";
 import { ShortcutsPanel } from "@/components/settings/ShortcutsPanel";
-import { SeasonalPanel } from "@/components/settings/SeasonalPanel";
 import { ThemePanel } from "@/components/settings/ThemePanel";
 import { BetaChannelPanel } from "@/components/settings/BetaChannelPanel";
 import { ScrollMemoryRoot } from "@/hooks/ScrollMemoryRoot";
@@ -93,10 +95,19 @@ import {
   type UiToastKind,
 } from "@/lib/uiToasts";
 
+type SettingsTab =
+  | "apparence"
+  | "compte"
+  | "notifications"
+  | "raccourcis"
+  | "integrations"
+  | "avance";
+
 export function SettingsPage() {
   const { soundsEnabled, toggleSounds } = useSettingsStore();
   const [versionDisplay, setVersionDisplay] = useState<string>("…");
   const [diagOpen, setDiagOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<SettingsTab>("apparence");
 
   useEffect(() => {
     getVersion()
@@ -104,78 +115,219 @@ export function SettingsPage() {
       .catch(() => setVersionDisplay("?"));
   }, []);
 
+  // Onglets — single source of truth pour le nav row + heading. Avant
+  // c'était une grosse liste plate qui faisait scroll-fatigue ; les
+  // catégories ci-dessous regroupent les options par usage. Ordre =
+  // fréquence d'accès attendue (apparence en 1er car "personnalisable
+  // souvent", avancé en dernier car "config rarement touchée").
+  const tabs: {
+    id: SettingsTab;
+    label: string;
+    icon: typeof Cog;
+    title: string;
+    description: string;
+  }[] = [
+    {
+      id: "apparence",
+      label: "Apparence",
+      icon: Palette,
+      title: "Apparence",
+      description:
+        "Couleur d'accent, animations, thème complet (couleurs + police + sons), aperçu des sons d'interface.",
+    },
+    {
+      id: "compte",
+      label: "Compte",
+      icon: User,
+      title: "Compte",
+      description:
+        "Comptes Minecraft connectés et infos identité. Le login Discord du launcher reste géré sur la page de connexion.",
+    },
+    {
+      id: "notifications",
+      label: "Notifications",
+      icon: Bell,
+      title: "Notifications & overlay",
+      description:
+        "Toasts in-app, notifs système Windows, overlay in-game et toasts par-dessus le jeu.",
+    },
+    {
+      id: "raccourcis",
+      label: "Raccourcis",
+      icon: Keyboard,
+      title: "Raccourcis clavier",
+      description:
+        "Combine des touches globales pour déclencher des actions du launcher sans ouvrir la fenêtre (capture, mute, etc.).",
+    },
+    {
+      id: "integrations",
+      label: "Intégrations",
+      icon: Plug,
+      title: "Intégrations externes",
+      description:
+        "Twitch (titre du stream auto au lancement d'un jeu) et OBS (overlay events sur ta scène de stream).",
+    },
+    {
+      id: "avance",
+      label: "Avancé",
+      icon: Wrench,
+      title: "Avancé",
+      description:
+        "Canal bêta, cache disque, logs, diagnostic système, retour au tour d'onboarding. Touche peu.",
+    },
+  ];
+  const currentTab = tabs.find((t) => t.id === activeTab) ?? tabs[0];
+
   return (
     <ScrollMemoryRoot routeKey="settings" className="p-12">
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-10">
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
         <p className="text-xs uppercase tracking-[0.25em] text-accent">Paramètres</p>
-        <h1 className="mt-2 font-display text-5xl text-fg-primary">Configuration</h1>
+        <h1 className="mt-2 font-display text-5xl text-fg-primary">{currentTab.title}</h1>
+        <p className="mt-2 max-w-3xl text-sm text-fg-muted">{currentTab.description}</p>
       </motion.div>
 
-      <div className="grid max-w-3xl gap-4">
-        <SettingToggle
-          icon={soundsEnabled ? Volume2 : VolumeX}
-          title="Sons d'interface"
-          description="Petits effets audio sur les boutons, hover, lancement et notifications."
-          value={soundsEnabled}
-          onToggle={() => {
-            toggleSounds();
-            if (!soundsEnabled) {
-              setTimeout(() => sounds.success(), 60);
-            }
-          }}
-        />
-        <SoundPreviewCard enabled={soundsEnabled} />
-        <ApparenceCard />
-        <ThemePanel />
-        <SeasonalPanel />
-        <BetaChannelPanel />
-        <NotificationsCard />
-        <OverlayCard />
-        <ShortcutsPanel />
-        <TwitchPanel />
-        <ObsPanel />
-        <DownloadsCard />
-        <LogsDiagnosticCard />
-        <SettingButton
-          icon={Stethoscope}
-          title="Diagnostic système"
-          description="OS, CPU, GPU, RAM libre, espace disque, Java détecté, VC++ runtimes. Utile pour debug rapidement les problèmes de lancement."
-          buttonLabel="Ouvrir"
-          onClick={() => {
-            sounds.click();
-            setDiagOpen(true);
-          }}
-        />
-        <SettingButton
-          icon={Sparkles}
-          title="Refaire le tour de présentation"
-          description="Re-joue le tour guidé d'onboarding (Bibliothèque / Communauté / Crews / Profil / Paramètres). Idéal après un upgrade majeur ou pour montrer le launcher à un ami."
-          buttonLabel="Lancer le tour"
-          onClick={() => {
-            sounds.click();
-            // Reset the LS flag so the tour shows even if user
-            // already completed it once. Then dispatch the event
-            // that UpdateBanner listens for to open the tour.
-            try {
-              localStorage.removeItem("launcher.onboardingDone");
-            } catch {
-              /* non-fatal */
-            }
-            window.dispatchEvent(new CustomEvent("launcher:replay-onboarding"));
-          }}
-        />
-        <MinecraftAccountsCard />
+      {/* Tab nav — pill row identique à AdminPage pour cohérence visuelle.
+          Active state via layoutId pour l'animation du pill qui glisse. */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 }}
+        className="mb-8 flex max-w-3xl flex-wrap gap-1 rounded-2xl bg-bg-soft/40 p-1.5 ring-1 ring-white/[0.06]"
+      >
+        {tabs.map((t) => {
+          const Icon = t.icon;
+          const active = activeTab === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => {
+                if (active) return;
+                sounds.click();
+                setActiveTab(t.id);
+              }}
+              className={cn(
+                "relative inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm transition-colors",
+                active ? "text-bg-base" : "text-fg-muted hover:text-fg-primary",
+              )}
+            >
+              {active && (
+                <motion.div
+                  layoutId="settings-tab-pill"
+                  className="absolute inset-0 rounded-xl bg-accent shadow-[0_0_18px_var(--color-accent-soft)]"
+                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                />
+              )}
+              <span className="relative z-10 inline-flex items-center gap-2">
+                <Icon className="size-4" />
+                {t.label}
+              </span>
+            </button>
+          );
+        })}
+      </motion.div>
 
-        <div className="mt-2 flex items-center gap-3 rounded-2xl bg-white/[0.02] p-4 ring-1 ring-white/[0.04]">
-          <div className="grid size-10 place-items-center rounded-xl bg-accent/10 text-accent ring-1 ring-accent/20">
-            <Tag className="size-4" strokeWidth={2} />
-          </div>
-          <div className="flex-1">
-            <div className="text-xs uppercase tracking-wider text-fg-dim">Version</div>
-            <div className="font-mono text-sm text-fg-primary">{versionDisplay}</div>
-          </div>
-        </div>
-      </div>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeTab}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.25 }}
+          className="grid max-w-3xl gap-4"
+        >
+          {activeTab === "apparence" && (
+            <>
+              <SettingToggle
+                icon={soundsEnabled ? Volume2 : VolumeX}
+                title="Sons d'interface"
+                description="Petits effets audio sur les boutons, hover, lancement et notifications."
+                value={soundsEnabled}
+                onToggle={() => {
+                  toggleSounds();
+                  if (!soundsEnabled) {
+                    setTimeout(() => sounds.success(), 60);
+                  }
+                }}
+              />
+              <SoundPreviewCard enabled={soundsEnabled} />
+              <ApparenceCard />
+              <ThemePanel />
+            </>
+          )}
+
+          {activeTab === "compte" && (
+            <>
+              <MinecraftAccountsCard />
+            </>
+          )}
+
+          {activeTab === "notifications" && (
+            <>
+              <NotificationsCard />
+              <OverlayCard />
+            </>
+          )}
+
+          {activeTab === "raccourcis" && (
+            <>
+              <ShortcutsPanel />
+            </>
+          )}
+
+          {activeTab === "integrations" && (
+            <>
+              <TwitchPanel />
+              <ObsPanel />
+            </>
+          )}
+
+          {activeTab === "avance" && (
+            <>
+              <BetaChannelPanel />
+              <DownloadsCard />
+              <LogsDiagnosticCard />
+              <SettingButton
+                icon={Stethoscope}
+                title="Diagnostic système"
+                description="OS, CPU, GPU, RAM libre, espace disque, Java détecté, VC++ runtimes. Utile pour debug rapidement les problèmes de lancement."
+                buttonLabel="Ouvrir"
+                onClick={() => {
+                  sounds.click();
+                  setDiagOpen(true);
+                }}
+              />
+              <SettingButton
+                icon={Sparkles}
+                title="Refaire le tour de présentation"
+                description="Re-joue le tour guidé d'onboarding (Bibliothèque / Communauté / Crews / Profil / Paramètres). Idéal après un upgrade majeur ou pour montrer le launcher à un ami."
+                buttonLabel="Lancer le tour"
+                onClick={() => {
+                  sounds.click();
+                  // Reset the LS flag so the tour shows even if user
+                  // already completed it once. Then dispatch the event
+                  // that UpdateBanner listens for to open the tour.
+                  try {
+                    localStorage.removeItem("launcher.onboardingDone");
+                  } catch {
+                    /* non-fatal */
+                  }
+                  window.dispatchEvent(new CustomEvent("launcher:replay-onboarding"));
+                }}
+              />
+              <div className="mt-2 flex items-center gap-3 rounded-2xl bg-white/[0.02] p-4 ring-1 ring-white/[0.04]">
+                <div className="grid size-10 place-items-center rounded-xl bg-accent/10 text-accent ring-1 ring-accent/20">
+                  <Tag className="size-4" strokeWidth={2} />
+                </div>
+                <div className="flex-1">
+                  <div className="text-xs uppercase tracking-wider text-fg-dim">Version</div>
+                  <div className="font-mono text-sm text-fg-primary">{versionDisplay}</div>
+                </div>
+              </div>
+            </>
+          )}
+        </motion.div>
+      </AnimatePresence>
 
       <DiagnosticModal open={diagOpen} onClose={() => setDiagOpen(false)} />
     </ScrollMemoryRoot>

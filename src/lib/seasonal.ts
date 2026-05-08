@@ -1,7 +1,10 @@
 // Themes saisonniers — Halloween (15 oct → 5 nov) et Noël (15 déc → 5 jan).
-// Inject des CSS vars sur <html> pour rebadger l'accent color. Le user
-// peut désactiver / forcer un thème via Settings (mode auto/halloween/
-// christmas/off).
+// Inject des CSS vars sur <html> pour rebadger l'accent color.
+//
+// Le mode est piloté par Firestore (admin-only) plutôt que par chaque
+// user. Mode par défaut "auto" — le launcher détecte la saison à partir
+// de la date système. L'admin peut forcer/désactiver depuis le panel
+// admin → onglet Saisons (cf. firebase/seasonalConfig.ts).
 //
 // Pas de particles ni d'emojis dans la sidebar pour l'instant — juste
 // la palette change. Particles en Phase ultérieure (besoin de configurer
@@ -108,24 +111,17 @@ export function applySeasonalTheme(theme: SeasonalTheme | null): void {
   root.style.setProperty("--color-accent-glow", `${theme.accent}80`);
 }
 
-const LS_MODE = "seasonal.mode.v1";
-
-export function loadSeasonalMode(): SeasonalMode {
-  try {
-    const raw = localStorage.getItem(LS_MODE);
-    if (raw === "auto" || raw === "halloween" || raw === "christmas" || raw === "off") {
-      return raw;
-    }
-    return "auto";
-  } catch {
-    return "auto";
-  }
-}
-
-export function saveSeasonalMode(mode: SeasonalMode): void {
-  try {
-    localStorage.setItem(LS_MODE, mode);
-  } catch {
-    /* ignore */
-  }
+/**
+ * Boot synchrone — appelé une fois au démarrage de l'app, AVANT que la
+ * première frame s'affiche. Applique le thème "auto" (basé sur la date
+ * système) pour éviter un flash visuel pendant que le watch Firestore
+ * se connecte.
+ *
+ * Le mode override admin (si différent de "auto") est appliqué ensuite
+ * via le watcher Firestore que l'App component installe une fois l'auth
+ * résolue (cf. App.tsx, useEffect dépendant de `user`). Pour 99% des
+ * sessions, "auto" = mode admin → pas de re-render perceptible.
+ */
+export function bootSeasonalTheme(): void {
+  applySeasonalTheme(resolveSeasonalTheme("auto"));
 }
