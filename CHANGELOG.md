@@ -28,6 +28,35 @@ dans ce fichier mais n'est pas envoyée.
 
 ### Nouveau
 
+### Amélioré
+
+### Corrigé
+
+### Supprimé
+
+### Sécurité
+
+<!-- ──────────────────────────────────────────────────────────────────
+     DÉTAILS TECHNIQUES — Archive interne, NON affichée au user.
+     Le release script `scripts/release-launcher.mjs` exclut cette
+     section des release notes envoyées via Velopack et Discord.
+     ────────────────────────────────────────────────────────────────── -->
+
+### Détails techniques
+
+## [v26.05.08] - 2026-05-08  · semver `26.508.0`
+
+
+<!--
+  Style guide : voir docs/CHANGELOG_STYLE.md
+  Une phrase courte, lisible par un user. Pas de chemin de fichier ni de
+  jargon. Le bénéfice user, pas la cause technique.
+  Si tu ajoutes X et que tu fix un bug de X dans le même cycle, garde
+  juste "Nouveau X" — le bug n'a jamais été en prod.
+-->
+
+### Nouveau
+
 - Commentaires sur les news, avec possibilité de répondre à un commentaire et de modifier ou supprimer les siens.
 - Sondages dans les salons des crews — bouton à côté du composer, comme dans les news.
 - Connecte ton compte Twitch dans les Paramètres pour que le titre de ton stream change automatiquement quand tu lances un module.
@@ -50,9 +79,7 @@ dans ce fichier mais n'est pas envoyée.
 - Première news en haut du fil cliquable : un bouton "Voir & commenter" ouvre la modal avec le thread de commentaires, même si la news est courte.
 - Marge ajoutée dans la zone de saisie des commentaires pour que le texte ne soit plus rogné par les bords arrondis.
 
-### Corrigé
 
-### Supprimé
 
 ### Sécurité
 
@@ -79,7 +106,6 @@ dans ce fichier mais n'est pas envoyée.
 - **Saisonniers admin-only** ([src/firebase/seasonalConfig.ts](src/firebase/seasonalConfig.ts), [src/components/admin/SeasonalAdminPanel.tsx](src/components/admin/SeasonalAdminPanel.tsx), [src/components/layout/SeasonalDecorations.tsx](src/components/layout/SeasonalDecorations.tsx)) — déplacé du store user vers `/config/seasonal` Firestore (rules `/config/{configId}` read authed, write admin-only). `bootSeasonalTheme()` applique "auto" sync au boot ; `App.tsx` useEffect dépend de `user` pour install le watcher Firestore (re-subscribe à chaque login pour bypass le permission-denied initial). MutationObserver sur `<html data-season>` côté `SeasonalDecorations` → bascule live des emojis/SVG. Halloween : 4 spider webs SVG + 4 citrouilles + 3 chauves-souris fixes + 4 flying bats + 8 falling leaves + 2 ghosts qui flottent + accents (tombe, araignée, lune, bonbon). Noël : 2 fairy lights SVG (top + bottom, 12 LEDs colorées qui pulsent en décalé) + 3 sapins + 14 falling snowflakes + accents (étoiles, cadeaux, cloches, renne). `pointer-events-none` partout, `motion.div` transform-only pour rester GPU.
 - **Settings tabs** ([src/pages/SettingsPage.tsx](src/pages/SettingsPage.tsx)) — refacto en 6 onglets identiques au pattern AdminPage : `apparence` (sons + theme + accent), `compte` (Minecraft accounts), `notifications` (windows + overlay + toasts), `raccourcis` (custom shortcuts), `integrations` (Twitch + OBS), `avance` (beta + cache + logs + diag + tour + version). `AnimatePresence mode="wait"` + `layoutId="settings-tab-pill"` pour l'animation du pill.
 - **Comments fix** : NewsCard featured news désormais toujours cliquable (drop guard `isLongFeatured`, label "Voir & commenter"). Textarea du composer : `px-1 leading-relaxed` pour compenser le `rounded-2xl` 16px du parent qui dépassait des `p-3` 12px → premières lettres rognées. Rules `/news/{nid}/comments/{cid}` déployées (le fix Publier).
-
 ## [v26.05.06.16] - 2026-05-06  · semver `26.506.15`
 
 ### Nouveau
