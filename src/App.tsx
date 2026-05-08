@@ -17,7 +17,8 @@ import { useFavoritesStore } from "@/store/favorites";
 import { logger, installGlobalLoggerHandlers } from "@/lib/logger";
 import { restoreTwitchConfig } from "@/lib/twitchAuth";
 import { restoreObsConfig } from "@/lib/obsBridge";
-import { bootCustomShortcuts } from "@/lib/customShortcuts";
+import { bootCustomShortcuts, onShortcut } from "@/lib/customShortcuts";
+import { captureAndSave } from "@/lib/screenshot";
 import { bootSeasonalTheme } from "@/components/settings/SeasonalPanel";
 import { bootThemes } from "@/components/settings/ThemePanel";
 import {
@@ -108,6 +109,13 @@ void (async () => {
   // ignorée — on garde le listener pour toute la durée de la session.
   try {
     await bootCustomShortcuts();
+    // Hook le raccourci screenshot.capture sur la fonction de capture
+    // (Phase G). Reste dormant si l'user n'a pas mappé de raccourci.
+    onShortcut("screenshot.capture", () => {
+      captureAndSave().catch((err) => {
+        console.warn("[screenshot] capture failed:", err);
+      });
+    });
   } catch {
     /* silent */
   }

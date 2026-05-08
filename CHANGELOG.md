@@ -39,6 +39,9 @@ dans ce fichier mais n'est pas envoyée.
 - Choix de la densité d'affichage : Compact, Confort, ou Aéré.
 - Choix du pack de sons : Soft Lofi (par défaut), Arcade 8-bit, ou Minimal (un seul ping discret).
 - Canal beta pour tester les modules en pré-release. Activable dans les Paramètres, soumis à invitation par l'admin.
+- Wiki collaboratif par crew — pages markdown éditables par tous les membres. Accessible via clic-droit sur un crew → "Outils du crew".
+- Liste de tâches partagée par crew — chacun peut ajouter, marquer en cours / terminé, supprimer.
+- Capture d'écran via raccourci clavier (F2 par défaut, rebindable dans les Paramètres).
 
 ### Amélioré
 

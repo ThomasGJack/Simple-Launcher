@@ -19,6 +19,7 @@ mod oauth;
 mod obs_ws;
 mod overlay;
 mod rcon;
+mod screenshot;
 mod shortcuts;
 #[cfg(windows)]
 mod single_instance;
@@ -237,6 +238,10 @@ pub fn run() {
             shortcuts::shortcuts_register,
             shortcuts::shortcuts_unregister,
             shortcuts::shortcuts_unregister_all,
+            // Capture d'écran — retourne les bytes PNG du monitor
+            // primaire. Le frontend décide de quoi en faire (sauver
+            // localement, uploader, afficher en preview).
+            screenshot::screenshot_capture,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

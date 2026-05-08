@@ -40,7 +40,7 @@ export const SHORTCUT_ACTIONS: ShortcutAction[] = [
     id: "screenshot.capture",
     label: "Capture d'écran",
     defaultKey: "F2",
-    hint: "Pas encore implémenté — sera dispo en Phase G (screenshot manager).",
+    hint: "Capture le moniteur principal et propose de sauver le PNG.",
   },
   {
     id: "mute.toggle",

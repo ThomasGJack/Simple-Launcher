@@ -87,6 +87,14 @@ tauri-plugin-global-shortcut = "2"
 # depuis le launcher vers OBS Studio chez le streamer.
 tokio-tungstenite = { version = "0.21", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
 url = "2"
+# Screenshot capture cross-platform — utilisé par `screenshot.rs`
+# pour la commande Tauri `screenshot_capture` qui capture l'écran
+# (utilise GDI BitBlt sur Windows). Pas de dialog / no-op si appelé
+# sans display.
+screenshots = "0.8"
+# Encoding PNG pour sérialiser la capture en bytes avant retour
+# au frontend (qui sauve sur disque ou affiche).
+image = { version = "0.25", default-features = false, features = ["png"] }
 # Win32 bindings — used by `single_instance.rs` to enforce only one
 # instance of Simple Launcher running at a time via a kernel-level
 # named mutex + a named event for cross-process "show window" IPC.
