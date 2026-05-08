@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertTriangle,
+  BookOpen,
   ClipboardCopy,
   Crown,
   Loader2,
@@ -245,6 +246,24 @@ export function CrewContextMenu({
               onClick={handleConfig}
             />
           )}
+
+          {/* Outils du crew — wiki collaboratif + liste de tâches.
+              Accessible à tous les members (lecture/écriture, fonctionne
+              même sur le master crew Simple Games). */}
+          <Item
+            icon={<BookOpen className="size-4" />}
+            label="Outils du crew"
+            hint="Wiki collaboratif + liste de tâches partagées"
+            onClick={() => {
+              onClose();
+              window.dispatchEvent(
+                new CustomEvent("crew-tools:open", {
+                  detail: { crewId: crew.id, crewName: crew.name },
+                }),
+              );
+            }}
+          />
+
 
           {/* Copy invite code (members + admin + owner) — master
               crew has no invite code (everyone is auto-joined). */}

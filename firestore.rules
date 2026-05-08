@@ -314,6 +314,28 @@ service cloud.firestore {
           }
         }
       }
+
+      // Wiki pages collaboratives par crew. Tout member peut lire +
+      // écrire (création / édition / suppression). Pas de propriétaire
+      // exclusif des pages — c'est volontairement collaboratif.
+      // L'admin / owner du crew peut déléguer plus de contrôle plus
+      // tard si besoin (lock par page, etc.).
+      match /wikiPages/{pageId} {
+        allow read: if isCrewMember();
+        allow create, update, delete: if isCrewMember();
+      }
+
+      // Liste de tâches partagée par crew. Tout member peut créer,
+      // toggle status, et supprimer ses propres tâches. Owner / admin
+      // du crew peut tout faire (modération).
+      match /todos/{todoId} {
+        allow read: if isCrewMember();
+        allow create: if isCrewMember();
+        allow update: if isCrewMember();
+        allow delete: if isCrewMember()
+          && (resource.data.authorUid == request.auth.uid
+              || isCrewAdminOrOwner());
+      }
     }
 
     // News broadcast on the home page — any authed launcher reads, only

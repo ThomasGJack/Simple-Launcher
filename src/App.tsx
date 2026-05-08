@@ -55,6 +55,7 @@ import {
 import { UiToastsHost } from "@/components/ui/UiToastsHost";
 import { InvitationPopupHost } from "@/components/invitations/InvitationPopup";
 import { LiveActivityToastHost } from "@/components/presence/LiveActivityToastHost";
+import { CrewToolsModalHost } from "@/components/crews/CrewToolsModalHost";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 import { OfflineBanner } from "@/components/layout/OfflineBanner";
 import {
@@ -647,6 +648,7 @@ function App() {
       <ErrorBoundary scope="invitation-popup"><InvitationPopupHost /></ErrorBoundary>
       <ErrorBoundary scope="live-activity-toast"><LiveActivityToastHost /></ErrorBoundary>
       <ErrorBoundary scope="ui-toasts"><UiToastsHost /></ErrorBoundary>
+      <ErrorBoundary scope="crew-tools"><CrewToolsModalHost /></ErrorBoundary>
     </>
   );
 }
