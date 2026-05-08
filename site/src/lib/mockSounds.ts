@@ -12,9 +12,20 @@ export const sounds = {
   success: () => {},
   error: () => {},
   notification: () => {},
+  messageReceived: () => {},
+  updateArrived: () => {},
+  achievementBronze: () => {},
+  achievementSilver: () => {},
+  achievementGold: () => {},
+  achievementPlatinum: () => {},
+  achievementMilestone: () => {},
 };
 
 export function setSoundsEnabled(_value: boolean) {}
 export function getSoundsEnabled(): boolean {
   return false;
+}
+export function setSoundpack(_id: string) {}
+export function getActiveSoundpackId(): string {
+  return "softlofi";
 }

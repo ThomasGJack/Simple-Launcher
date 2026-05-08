@@ -56,6 +56,7 @@ import { TwitchPanel } from "@/components/settings/TwitchPanel";
 import { ObsPanel } from "@/components/settings/ObsPanel";
 import { ShortcutsPanel } from "@/components/settings/ShortcutsPanel";
 import { SeasonalPanel } from "@/components/settings/SeasonalPanel";
+import { ThemePanel } from "@/components/settings/ThemePanel";
 import { ScrollMemoryRoot } from "@/hooks/ScrollMemoryRoot";
 import {
   DEFAULT_OVERLAY_HOTKEY,
@@ -124,6 +125,7 @@ export function SettingsPage() {
         />
         <SoundPreviewCard enabled={soundsEnabled} />
         <ApparenceCard />
+        <ThemePanel />
         <SeasonalPanel />
         <NotificationsCard />
         <OverlayCard />

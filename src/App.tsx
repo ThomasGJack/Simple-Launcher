@@ -19,6 +19,7 @@ import { restoreTwitchConfig } from "@/lib/twitchAuth";
 import { restoreObsConfig } from "@/lib/obsBridge";
 import { bootCustomShortcuts } from "@/lib/customShortcuts";
 import { bootSeasonalTheme } from "@/components/settings/SeasonalPanel";
+import { bootThemes } from "@/components/settings/ThemePanel";
 import {
   useUsers,
   useModules,
@@ -113,6 +114,13 @@ void (async () => {
   // Synchrone — pas de Tauri command, juste des CSS vars sur <html>.
   try {
     bootSeasonalTheme();
+  } catch {
+    /* silent */
+  }
+  // Themes complets : applique font + layout persistés. Le soundpack
+  // est lazy-loaded au premier sons.X() — pas besoin de l'init ici.
+  try {
+    await bootThemes();
   } catch {
     /* silent */
   }

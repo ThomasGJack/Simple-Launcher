@@ -35,6 +35,9 @@ dans ce fichier mais n'est pas envoyée.
 - Raccourcis clavier customisables dans les Paramètres — capture d'écran, recherche, navigation modules.
 - Thèmes saisonniers Halloween et Noël — couleurs qui s'adaptent automatiquement à la période.
 - Cadres d'avatar débloquables — réservés aux soutiens, aux saisons, ou disponibles par défaut.
+- Choix de la police d'écriture (Inter, Outfit, Manrope, Space Grotesk, JetBrains Mono ou ta police custom Google Fonts).
+- Choix de la densité d'affichage : Compact, Confort, ou Aéré.
+- Choix du pack de sons : Soft Lofi (par défaut), Arcade 8-bit, ou Minimal (un seul ping discret).
 
 ### Amélioré
 
