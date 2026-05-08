@@ -289,8 +289,16 @@ function extractAndRewriteChangelog(path, releaseSemver, releaseDisplay) {
   //                     Réinjecté dans CHANGELOG.md sous le header de version
   //                     pour archive interne / contexte futur.
   // Voir docs/CHANGELOG_STYLE.md pour la convention d'écriture.
-  const userBlock = stripEmptyCategories(stripTechnicalSection(block));
-  const archivalBlock = stripEmptyCategories(block);
+  // 1. Retire les commentaires HTML (style guide en haut + séparateur
+  //    Détails techniques en bas) AVANT toute autre transformation —
+  //    sinon stripEmptyCategories considère un commentaire comme du
+  //    contenu et garde une section vide juste à cause de ça.
+  // 2. Pour le userBlock : retire aussi la sous-section Détails techniques.
+  // 3. Enfin, stripEmptyCategories enlève les `### Sécurité` etc. qui
+  //    n'ont rien dessous.
+  const cleanedBlock = stripHtmlComments(block);
+  const userBlock = stripEmptyCategories(stripTechnicalSection(cleanedBlock));
+  const archivalBlock = stripEmptyCategories(cleanedBlock);
   const userBody = userBlock.join("\n").trim();
 
   const today = new Date().toISOString().slice(0, 10);
@@ -354,6 +362,49 @@ function stripTechnicalSection(lines) {
       inTech = false;
     }
     if (!inTech) out.push(line);
+  }
+  return out;
+}
+
+/**
+ * Retire tous les commentaires HTML `<!-- ... -->` d'un block, qu'ils
+ * soient single-line ou multi-line. Utilisé pour nettoyer les release
+ * notes avant publication — le template `[Unreleased]` contient un
+ * commentaire de style guide en haut + un commentaire séparateur avant
+ * "Détails techniques", aucun des deux n'a sa place dans ce qu'on
+ * envoie au user.
+ */
+function stripHtmlComments(lines) {
+  const out = [];
+  let inComment = false;
+  for (const line of lines) {
+    if (inComment) {
+      const closeIdx = line.indexOf("-->");
+      if (closeIdx === -1) continue;
+      // Le commentaire ferme ici — garde ce qui suit s'il y a quelque chose
+      const after = line.slice(closeIdx + 3);
+      inComment = false;
+      if (after.trim()) out.push(after);
+      continue;
+    }
+    const openIdx = line.indexOf("<!--");
+    if (openIdx === -1) {
+      out.push(line);
+      continue;
+    }
+    // Le commentaire ouvre ici. Garde ce qui précède sur la même ligne.
+    const before = line.slice(0, openIdx);
+    // Cherche s'il ferme aussi sur la même ligne
+    const closeIdx = line.indexOf("-->", openIdx + 4);
+    if (closeIdx !== -1) {
+      const after = line.slice(closeIdx + 3);
+      const cleaned = before + after;
+      if (cleaned.trim()) out.push(cleaned);
+      continue;
+    }
+    // Multi-ligne — entre dans le mode commentaire
+    if (before.trim()) out.push(before);
+    inComment = true;
   }
   return out;
 }

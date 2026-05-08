@@ -46,15 +46,6 @@ dans ce fichier mais n'est pas envoyée.
 
 ## [v26.05.08] - 2026-05-08  · semver `26.508.0`
 
-
-<!--
-  Style guide : voir docs/CHANGELOG_STYLE.md
-  Une phrase courte, lisible par un user. Pas de chemin de fichier ni de
-  jargon. Le bénéfice user, pas la cause technique.
-  Si tu ajoutes X et que tu fix un bug de X dans le même cycle, garde
-  juste "Nouveau X" — le bug n'a jamais été en prod.
--->
-
 ### Nouveau
 
 - Commentaires sur les news, avec possibilité de répondre à un commentaire et de modifier ou supprimer les siens.
@@ -78,20 +69,6 @@ dans ce fichier mais n'est pas envoyée.
 - Paramètres réorganisés en 6 onglets (Apparence, Compte, Notifications, Raccourcis, Intégrations, Avancé) au lieu d'une grosse liste à scroller.
 - Première news en haut du fil cliquable : un bouton "Voir & commenter" ouvre la modal avec le thread de commentaires, même si la news est courte.
 - Marge ajoutée dans la zone de saisie des commentaires pour que le texte ne soit plus rogné par les bords arrondis.
-
-
-
-### Sécurité
-
-<!-- ──────────────────────────────────────────────────────────────────
-     DÉTAILS TECHNIQUES — Archive interne, NON affichée au user.
-     Le release script `scripts/release-launcher.mjs` exclut cette
-     section des release notes envoyées via Velopack et Discord.
-     Y mettre : paths de fichiers, refacto, perf debug, raisonnement
-     architectural — tout ce qui aide un futur dev (ou un futur Claude)
-     à comprendre le pourquoi d'un changement, mais qui n'a aucune
-     valeur pour un utilisateur final.
-     ────────────────────────────────────────────────────────────────── -->
 
 ### Détails techniques
 
