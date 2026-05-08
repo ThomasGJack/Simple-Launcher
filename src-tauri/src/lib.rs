@@ -21,6 +21,7 @@ mod overlay;
 mod rcon;
 mod screenshot;
 mod shortcuts;
+mod steam;
 #[cfg(windows)]
 mod single_instance;
 mod tray;
@@ -242,6 +243,11 @@ pub fn run() {
             // primaire. Le frontend décide de quoi en faire (sauver
             // localement, uploader, afficher en preview).
             screenshot::screenshot_capture,
+            // Steam library — détecte l'install Steam et liste les jeux
+            // via les .acf de steamapps/. Le frontend bulk-importe en
+            // shortcuts (steam://run/{appid}).
+            steam::steam_detect,
+            steam::steam_list_games,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

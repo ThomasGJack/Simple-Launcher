@@ -5,6 +5,7 @@ import { ModuleCard } from "@/components/library/ModuleCard";
 import { ShortcutForm } from "@/components/library/ShortcutForm";
 import { CustomMinecraftForm } from "@/components/library/CustomMinecraftForm";
 import { AddGameTypePicker } from "@/components/library/AddGameTypePicker";
+import { SteamImportModal } from "@/components/library/SteamImportModal";
 import { useModules, useModulesPrimed } from "@/store/firebaseStores";
 import { watchUserShortcuts, type ShortcutModule } from "@/firebase/shortcuts";
 import { watchUserCustomMinecraft } from "@/firebase/customMinecraft";
@@ -35,6 +36,7 @@ export function LibraryPage() {
   const [picker, setPicker] = useState<"closed" | "type" | "shortcut" | "custom-mc">(
     "closed",
   );
+  const [steamModalOpen, setSteamModalOpen] = useState(false);
   const [editing, setEditing] = useState<
     | { kind: "shortcut"; shortcut: ShortcutModule }
     | { kind: "custom-mc"; instance: CustomMinecraftModule }
@@ -103,18 +105,35 @@ export function LibraryPage() {
                   : `${all.length} jeu${all.length > 1 ? "x" : ""} disponible${all.length > 1 ? "s" : ""}.`}
             </p>
           </div>
-          <button
-            onClick={() => {
-              sounds.click();
-              setPicker("type");
-            }}
-            onMouseEnter={() => sounds.hover()}
-            className="no-drag inline-flex shrink-0 items-center gap-2 rounded-2xl bg-accent px-5 py-3 text-sm font-medium text-bg-base shadow-[0_0_24px_var(--color-accent-soft)] transition-shadow hover:shadow-[0_0_36px_var(--color-accent-glow)]"
-          >
-            <Plus className="size-4" strokeWidth={2.5} />
-            Ajouter un jeu
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              onClick={() => {
+                sounds.click();
+                setSteamModalOpen(true);
+              }}
+              className="no-drag inline-flex items-center gap-2 rounded-2xl bg-white/[0.04] px-4 py-3 text-sm font-medium text-fg-primary ring-1 ring-white/[0.06] transition hover:bg-white/[0.08]"
+              title="Importer toute ta bibliothèque Steam en raccourcis"
+            >
+              <span className="text-base">🎮</span>
+              Importer Steam
+            </button>
+            <button
+              onClick={() => {
+                sounds.click();
+                setPicker("type");
+              }}
+              onMouseEnter={() => sounds.hover()}
+              className="no-drag inline-flex items-center gap-2 rounded-2xl bg-accent px-5 py-3 text-sm font-medium text-bg-base shadow-[0_0_24px_var(--color-accent-soft)] transition-shadow hover:shadow-[0_0_36px_var(--color-accent-glow)]"
+            >
+              <Plus className="size-4" strokeWidth={2.5} />
+              Ajouter un jeu
+            </button>
+          </div>
         </motion.div>
+
+        {steamModalOpen && (
+          <SteamImportModal onClose={() => setSteamModalOpen(false)} />
+        )}
 
         {loading ? (
           <div className="grid h-64 place-items-center text-fg-dim">

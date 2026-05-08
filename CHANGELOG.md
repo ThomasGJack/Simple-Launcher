@@ -42,6 +42,7 @@ dans ce fichier mais n'est pas envoyée.
 - Wiki collaboratif par crew — pages markdown éditables par tous les membres. Accessible via clic-droit sur un crew → "Outils du crew".
 - Liste de tâches partagée par crew — chacun peut ajouter, marquer en cours / terminé, supprimer.
 - Capture d'écran via raccourci clavier (F2 par défaut, rebindable dans les Paramètres).
+- Importer toute ta bibliothèque Steam en un clic — chaque jeu devient un raccourci qui se lance via Steam.
 
 ### Amélioré
 
