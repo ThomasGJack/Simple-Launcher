@@ -15,6 +15,8 @@ import { pushHeartbeat, type CurrentActivity } from "@/firebase/presence";
 import { watchFavorites } from "@/firebase/favorites";
 import { useFavoritesStore } from "@/store/favorites";
 import { logger, installGlobalLoggerHandlers } from "@/lib/logger";
+import { restoreTwitchConfig } from "@/lib/twitchAuth";
+import { restoreObsConfig } from "@/lib/obsBridge";
 import {
   useUsers,
   useModules,
@@ -80,6 +82,23 @@ void (async () => {
     /* offline / non-tauri — keep the "dev" fallback */
   }
   logger.info("App boot", { source: "App" });
+})();
+
+// Restore intégrations externes (Twitch RPC + OBS bridge) — best-effort
+// silencieux. Si la config est persistée en localStorage, on reconnecte
+// au boot pour que le user n'ait pas à re-cliquer "Connecter" à chaque
+// lancement. Erreurs (token expiré, OBS pas lancé) sont logged + ignored.
+void (async () => {
+  try {
+    await restoreTwitchConfig();
+  } catch {
+    /* silent */
+  }
+  try {
+    await restoreObsConfig();
+  } catch {
+    /* silent */
+  }
 })();
 
 /**

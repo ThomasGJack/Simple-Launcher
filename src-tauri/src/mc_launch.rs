@@ -19,12 +19,13 @@ use std::process::Stdio;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Runtime, State};
+use tauri::{AppHandle, Emitter, Manager, Runtime, State};
 use tokio::fs;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 
 use crate::discord_rpc::DiscordRpc;
+use crate::twitch_rpc::TwitchRpc;
 use crate::mc_java::mc_java_resolve;
 use crate::mc_vanilla::{
     instance_natives_dir, libraries_dir, maven_path, mc_root, versions_dir,
@@ -1087,6 +1088,11 @@ pub async fn launch<R: Runtime>(
         },
     );
     discord.arc().set_playing(&module_name).await;
+    // Twitch RPC en parallèle — pousse le titre du stream si Twitch
+    // est connecté côté Settings. No-op silencieux sinon.
+    if let Some(twitch) = app.try_state::<TwitchRpc>() {
+        twitch.arc().set_title(&format!("Joue à {}", module_name)).await;
+    }
 
     // Stream stdout/stderr line-by-line into Tauri events. The frontend
     // can append them to a console UI.

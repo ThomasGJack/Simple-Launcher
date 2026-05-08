@@ -30,6 +30,8 @@ dans ce fichier mais n'est pas envoyée.
 
 - Commentaires sur les news, avec possibilité de répondre à un commentaire et de modifier ou supprimer les siens.
 - Sondages dans les salons des crews — bouton à côté du composer, comme dans les news.
+- Connecte ton compte Twitch dans les Paramètres pour que le titre de ton stream change automatiquement quand tu lances un module.
+- Connexion à OBS Studio dans les Paramètres pour préparer un overlay activité du crew sur ton stream.
 
 ### Amélioré
 

@@ -52,6 +52,8 @@ import {
 import { cn } from "@/lib/cn";
 import { useTickEvery } from "@/hooks/useTickEvery";
 import { DiagnosticModal } from "@/components/settings/DiagnosticModal";
+import { TwitchPanel } from "@/components/settings/TwitchPanel";
+import { ObsPanel } from "@/components/settings/ObsPanel";
 import { ScrollMemoryRoot } from "@/hooks/ScrollMemoryRoot";
 import {
   DEFAULT_OVERLAY_HOTKEY,
@@ -122,6 +124,8 @@ export function SettingsPage() {
         <ApparenceCard />
         <NotificationsCard />
         <OverlayCard />
+        <TwitchPanel />
+        <ObsPanel />
         <DownloadsCard />
         <LogsDiagnosticCard />
         <SettingButton

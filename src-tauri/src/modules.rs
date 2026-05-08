@@ -13,6 +13,7 @@ use tokio::process::Command;
 use tokio::sync::Mutex as TokioMutex;
 
 use crate::discord_rpc::DiscordRpc;
+use crate::twitch_rpc::TwitchRpc;
 
 pub struct LaunchTracker {
     inner: Arc<TrackerInner>,
@@ -346,6 +347,12 @@ async fn spawn_tracked(
         },
     );
     discord.arc().set_playing(module_name).await;
+    // Twitch RPC en parallèle de Discord — pousse le titre du stream
+    // si le user a connecté son compte Twitch dans Settings. No-op
+    // silencieux sinon.
+    if let Some(twitch) = app.try_state::<TwitchRpc>() {
+        twitch.arc().set_title(&format!("Joue à {}", module_name)).await;
+    }
 
     let tracker_arc = tracker.arc();
     let discord_arc = discord.arc();

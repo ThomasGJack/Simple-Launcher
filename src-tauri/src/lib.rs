@@ -16,11 +16,13 @@ mod mc_vanilla;
 mod mc_zip;
 mod modules;
 mod oauth;
+mod obs_ws;
 mod overlay;
 mod rcon;
 #[cfg(windows)]
 mod single_instance;
 mod tray;
+mod twitch_rpc;
 mod velo_updater;
 
 use tauri::{Emitter, Manager};
@@ -70,6 +72,8 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(modules::LaunchTracker::new())
         .manage(discord_rpc::DiscordRpc::new())
+        .manage(twitch_rpc::TwitchRpc::new())
+        .manage(obs_ws::ObsWs::new())
         .manage(rcon::RconRegistry::new())
         .manage(log_file::LogFileState::new())
         .manage(mc_auth::McAuthState::new())
@@ -211,6 +215,20 @@ pub fn run() {
             velo_updater::velo_apply,
             velo_updater::velo_current_version,
             velo_updater::velo_is_installed,
+            // Twitch Rich Presence — set le titre du stream du user au
+            // lancement d'un module (équivalent Discord RPC mais via
+            // API REST Helix).
+            twitch_rpc::twitch_validate_token,
+            twitch_rpc::twitch_set_config,
+            twitch_rpc::twitch_set_title,
+            twitch_rpc::twitch_get_config,
+            // OBS WebSocket bridge — pousse des events overlay (achievement,
+            // friend online, crew activity) depuis le launcher vers OBS
+            // Studio chez le streamer.
+            obs_ws::obs_connect,
+            obs_ws::obs_disconnect,
+            obs_ws::obs_send_overlay_event,
+            obs_ws::obs_get_config,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -80,6 +80,13 @@ sysinfo = "0.32"
 # `RegisterHotKey` on Windows so it triggers even when the game has
 # focus. See `overlay.rs`.
 tauri-plugin-global-shortcut = "2"
+# WebSocket client pour l'intégration OBS — `obs-websocket` plugin écoute
+# par défaut sur ws://localhost:4455 et expose un protocole OBS-WebSocket
+# v5 (RFC 6455 + handshake auth SHA-256 challenge). Utilisé par `obs_ws.rs`
+# pour broadcast des events overlay (achievement, friend online, etc.)
+# depuis le launcher vers OBS Studio chez le streamer.
+tokio-tungstenite = { version = "0.21", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
+url = "2"
 # Win32 bindings — used by `single_instance.rs` to enforce only one
 # instance of Simple Launcher running at a time via a kernel-level
 # named mutex + a named event for cross-process "show window" IPC.
