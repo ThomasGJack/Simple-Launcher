@@ -21,6 +21,37 @@ de fixes intra-dev qui n'étaient jamais arrivés en prod — bruit pur côté u
 
 ---
 
+## ⚠ Le test du non-tech
+
+**Avant d'écrire une entrée, pose-toi cette question :**
+
+> *Si je lis cette ligne à ma mère, ma sœur, ma cousine — quelqu'un qui sait
+> juste ouvrir un mail et un navigateur — est-ce qu'elle comprend ce qui
+> change pour elle ?*
+
+Si la réponse est **non** → reformule, ou déplace en "Détails techniques".
+
+**Mots et concepts à bannir** des sections user-facing :
+
+- `onboarding`, `spotlight`, `coach-mark`, `tooltip`, `modal`, `slide-over`,
+  `bbox`, `viewport`, `scrollbar`, `hover state`, `ring`, `glow`, `padding`
+- Noms de composants React (`MembersList`, `OnboardingTour`, `NewsCard`)
+- Mentions de techno (`Velopack`, `Tauri`, `WebView`, `Firestore`, `Rust`,
+  `React`, `framer-motion`, `Zustand`)
+- Notation `O(n²)`, `useEffect`, `props`, `state`, `flex`, `grid`
+- Paths de fichiers, noms de variables (`useMotionValue`, `data-tour-target`)
+- Anglais quand un mot français existe (`fix` → "correction", `bug` →
+  "problème", `popup` → "fenêtre")
+
+**Mots qui restent OK** parce qu'ils sont compris du grand public :
+
+- "le launcher", "le crew", "Discord", "Minecraft", "modpack", "achievement"
+  (ces deux derniers sont entrés dans le langage gamer)
+- "rapide / lent", "se connecter", "se déconnecter", "télécharger",
+  "installer", "supprimer", "ajouter", "modifier"
+
+---
+
 ## Règles d'écriture (sections user-facing)
 
 Les sections **Nouveau**, **Amélioré**, **Corrigé**, **Supprimé**, **Sécurité**
@@ -114,48 +145,92 @@ fixes intra-dev → **Détails techniques**.
 
 ---
 
-## Exemples concrets
+## Exemples avant / après
 
-### ✅ Bonne release note
+### Onboarding tour
+
+❌ *Trop technique*
+> "Onboarding tour étoffé : 10 étapes au lieu de 6 (src/components/onboarding/OnboardingTour.tsx + 4 pages avec data-tour-target) — chaque section majeure a désormais une étape "vue d'ensemble" (spotlight sur le bouton sidebar) PUIS une étape "détail" (spotlight sur un élément clé de la page)..."
+
+✅ *Test non-tech passé*
+> "Visite guidée enrichie au premier lancement — 10 étapes pour découvrir tout le launcher."
+
+### Refacto perf
+
+❌ *Trop technique*
+> "MembersList O(n²) → O(n) via usersByUid Map. Gain : 50ms → 5ms."
+
+✅ *Test non-tech passé*
+> "Plus rapide quand un crew compte beaucoup de membres."
+
+### Migration auto-update
+
+❌ *Trop technique*
+> "Migration vers Velopack — delta updates ~3-5 MB au lieu de 80 MB, install atomique avec rollback, plus de dialog NSIS."
+
+✅ *Test non-tech passé*
+> "Mises à jour beaucoup plus rapides : seulement quelques Mo à télécharger au lieu de 80, et installation invisible."
+
+### Fix bug
+
+❌ *Trop technique*
+> "Bouton Passer non cliquable — z-10 explicite, fond bg-bg-base/40, pointer-events-auto sur la card."
+
+✅ *Test non-tech passé*
+> "Le bouton « Passer » du tutoriel répond maintenant au clic."
+
+(ou si le bug n'a jamais été en prod : pas de mention côté user, tout en
+"Détails techniques".)
+
+### Cycle de dev même jour
+
+Tu ajoutes une visite guidée. Pendant le dev tu te rends compte que le
+bouton "Suivant" est trop petit, tu le fix dans la même release.
+
+❌ *Mauvais — pollue les notes*
+```
+### Nouveau
+- Visite guidée enrichie.
+
+### Corrigé
+- Bouton "Suivant" plus visible.   ← le user n'a JAMAIS vu le bouton invisible
+- Bouton "Passer" cliquable.
+```
+
+✅ *Bon — bug intra-dev → Détails techniques*
+```
+### Nouveau
+- Visite guidée enrichie au premier lancement.
+
+### Détails techniques
+- Fix bouton "Suivant" peu visible (intra-dev, jamais en prod).
+- Fix bouton "Passer" non cliquable (intra-dev).
+```
+
+---
+
+## Bonne release note complète (exemple modèle)
 
 ```markdown
 ## [Unreleased]
 
 ### Nouveau
-- Profil public partageable sur /u/ton-id (avatar, bio, achievements, heatmap).
-- Calendrier crew partagé avec rappel J-1.
+- Profil public partageable sur ton-id (avatar, bio, achievements, heatmap).
+- Calendrier partagé du crew avec rappel la veille des sessions prévues.
 
 ### Amélioré
-- Le launcher démarre 2× plus vite sur les crews de 60+ membres.
-- L'overlay in-game (Shift+F9) suit ton thème custom.
+- Le launcher démarre deux fois plus vite quand un crew est gros.
+- La fenêtre transparente en jeu (Shift+F9) suit la couleur que tu as choisie.
 
 ### Corrigé
-- Plus de freeze quand on rejoint un channel avec 1000+ messages.
+- Le launcher ne bloque plus quand un salon a des milliers de messages.
 
 ### Détails techniques
-- MembersList O(n²) → O(n) via usersByUid Map partagé entre footer + body
-  (src/components/crews/MembersList.tsx). Gain typique : 50ms → < 5ms.
-- Channel scroll virtualisé via react-window pour les channels > 500
-  messages (cf. src/components/crews/ChannelView.tsx).
-- Stage 4 d'optim perf — voir docs/PHASE2.md.
+- MembersList O(n²) → O(n) via usersByUid Map partagé.
+  src/components/crews/MembersList.tsx. Gain : 50ms → < 5ms.
+- ChannelView passé en virtualisation react-window au-delà de 500 messages.
+- Voir docs/PHASE2.md pour le contexte global de l'optim.
 ```
-
-### ❌ Mauvaise release note (style ancien)
-
-```markdown
-### Corrigé
-- **Bouton "Suivant" peu visible / clipped**
-  ([src/components/onboarding/OnboardingTour.tsx](src/components/...))
-  — le bouton Suivant était trop discret (text-xs px-3.5 py-1.5 weight
-  semibold) et pouvait être clipped à largeur étroite. Refonte : text-sm
-  font-bold, padding plus généreux (px-5 py-2.5), glow shadow plus
-  prononcé, hover scale-up 1.03 + active scale-down 0.98 pour un
-  feedback tactile clair. Impossible à manquer.
-```
-
-→ Le user ne sait même pas qu'il y avait un onboarding (cycle de dev même
-jour). Ni le path. Ni le scale-up. Si on le veut quand même côté user-
-facing : *"Onboarding plus lisible"*. Sinon → **Détails techniques**.
 
 ---
 
