@@ -57,6 +57,7 @@ import { ObsPanel } from "@/components/settings/ObsPanel";
 import { ShortcutsPanel } from "@/components/settings/ShortcutsPanel";
 import { SeasonalPanel } from "@/components/settings/SeasonalPanel";
 import { ThemePanel } from "@/components/settings/ThemePanel";
+import { BetaChannelPanel } from "@/components/settings/BetaChannelPanel";
 import { ScrollMemoryRoot } from "@/hooks/ScrollMemoryRoot";
 import {
   DEFAULT_OVERLAY_HOTKEY,
@@ -127,6 +128,7 @@ export function SettingsPage() {
         <ApparenceCard />
         <ThemePanel />
         <SeasonalPanel />
+        <BetaChannelPanel />
         <NotificationsCard />
         <OverlayCard />
         <ShortcutsPanel />

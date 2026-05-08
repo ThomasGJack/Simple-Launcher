@@ -9,13 +9,26 @@ import { useModules, useModulesPrimed } from "@/store/firebaseStores";
 import { watchUserShortcuts, type ShortcutModule } from "@/firebase/shortcuts";
 import { watchUserCustomMinecraft } from "@/firebase/customMinecraft";
 import { useAuthStore } from "@/store/auth";
+import { useSettingsStore } from "@/store/settings";
+import { filterVisibleModules } from "@/lib/moduleVisibility";
 import { sounds } from "@/lib/sounds";
 import type { CustomMinecraftModule, LauncherModule } from "@/types/module";
 import { useScrollMemory } from "@/hooks/useScrollMemory";
 
 export function LibraryPage() {
   const user = useAuthStore((s) => s.user);
-  const allModules = useModules();
+  const rawModules = useModules();
+  const enableBeta = useSettingsStore((s) => s.enableBetaChannel);
+  // Filtre les modules canal "beta" selon admin status + toggle user.
+  // Les modules stable sont toujours visibles. cf. moduleVisibility.ts.
+  const allModules = useMemo(
+    () =>
+      filterVisibleModules(rawModules, {
+        uid: user?.uid ?? null,
+        betaEnabled: enableBeta,
+      }),
+    [rawModules, user?.uid, enableBeta],
+  );
   const modulesPrimed = useModulesPrimed();
   const [shortcuts, setShortcuts] = useState<ShortcutModule[] | null>(null);
   const [customMc, setCustomMc] = useState<CustomMinecraftModule[] | null>(null);

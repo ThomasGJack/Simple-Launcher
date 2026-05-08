@@ -38,6 +38,7 @@ dans ce fichier mais n'est pas envoyée.
 - Choix de la police d'écriture (Inter, Outfit, Manrope, Space Grotesk, JetBrains Mono ou ta police custom Google Fonts).
 - Choix de la densité d'affichage : Compact, Confort, ou Aéré.
 - Choix du pack de sons : Soft Lofi (par défaut), Arcade 8-bit, ou Minimal (un seul ping discret).
+- Canal beta pour tester les modules en pré-release. Activable dans les Paramètres, soumis à invitation par l'admin.
 
 ### Amélioré
 

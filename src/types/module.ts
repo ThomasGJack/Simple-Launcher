@@ -82,6 +82,19 @@ export type BaseModule = {
   page?: ModulePage;
   allowedDiscordIds?: string[];
   server?: ServerInfo;
+  /**
+   * Canal de release — "stable" (default) ou "beta". Quand "beta", le
+   * module n'est visible qu'à un user qui a le toggle "Activer le
+   * canal beta" (`useSettingsStore.enableBetaChannel`) ET qui est
+   * dans `prereleaseTesterUids` (whitelist admin).
+   */
+  prereleaseChannel?: "stable" | "beta";
+  /**
+   * Whitelist des testeurs autorisés à voir un module en canal beta.
+   * Si vide ou absent, le canal beta est invisible pour tous les
+   * users non-admin. Admin peut toujours voir tout.
+   */
+  prereleaseTesterUids?: string[];
 };
 
 export type HostedModule = BaseModule & {
@@ -152,6 +165,15 @@ export type MinecraftModule = BaseModule & {
   nativeLoaderVersion?: string;
   /** Optional modpack overlay applied on top of vanilla + loader. */
   nativeModpack?: NativeModpackSource;
+  /**
+   * Version explicite du modpack — set par l'admin quand il publie
+   * une nouvelle version d'un mrpack/zip. Comparée côté client à la
+   * version locale persistée en localStorage (`module.{id}.modpackVersion`).
+   * Si différente → bandeau "Mise à jour du modpack disponible" sur
+   * la card du module. Click → re-install via la chaîne mc_modrinth_install
+   * ou mc_zip_install standard.
+   */
+  modpackVersion?: string;
 };
 
 /**
