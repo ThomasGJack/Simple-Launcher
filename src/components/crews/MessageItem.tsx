@@ -28,6 +28,7 @@ import { handleExternalLinkClick } from "@/lib/linkUtils";
 import { useUsers } from "@/store/firebaseStores";
 import { TierAvatar } from "@/components/tier/TierAvatar";
 import { TierName } from "@/components/tier/TierName";
+import { PollMessage } from "@/components/crews/PollMessage";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
 
@@ -276,6 +277,16 @@ export const MessageItem = memo(function MessageItem({
                 />
               </a>
             )}
+            {message.poll && (
+              <div className="mt-2 max-w-md">
+                <PollMessage
+                  crewId={crewId}
+                  channelId={channelId}
+                  messageId={message.id}
+                  poll={message.poll}
+                />
+              </div>
+            )}
           </>
         )}
 
@@ -413,6 +424,7 @@ export const MessageItem = memo(function MessageItem({
     prev.message.editedAt === next.message.editedAt &&
     prev.message.pinned === next.message.pinned &&
     prev.message.imageUrl === next.message.imageUrl &&
+    prev.message.poll === next.message.poll &&
     prev.message.replyToId === next.message.replyToId &&
     prev.message.replyToText === next.message.replyToText &&
     prev.message.replyToSenderName === next.message.replyToSenderName &&

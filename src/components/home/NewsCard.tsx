@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Megaphone, Pin, Newspaper, Maximize2, X, ChevronRight } from "lucide-react";
 import { watchNews, type News } from "@/firebase/news";
+import { CommentThread } from "@/components/news/CommentThread";
 import {
   REACTION_EMOJIS,
   toggleReaction,
@@ -170,9 +171,12 @@ function NewsDetailModal({
         {/* The full-size NewsItem inside the modal — same component
             used on HomePage but with no clamping. We pass an explicit
             isInModal flag so it can drop the "Voir +" button (we're
-            already in the modal — it'd be useless). */}
+            already in the modal — it'd be useless). Le thread de
+            commentaires est empilé en dessous, dans le même container
+            scrollable. */}
         <div className="info-scroll max-h-[80vh] overflow-y-auto rounded-3xl">
           <NewsItem item={item} isInModal />
+          <CommentThread newsId={item.id} />
         </div>
       </motion.div>
     </motion.div>
@@ -205,17 +209,12 @@ function NewsItem({
     : "";
   const html = typeof body === "string" ? sanitizeHtml(body) : "";
 
-  // Heuristic for "long news that deserves a Voir + button" on the
-  // featured item : raw body > 280 chars OR contains a structural
-  // markdown element (headings, lists, code blocks). We don't need
-  // perfect detection — the worst case is a short news that has a
-  // useless "Voir +" button (which still works fine).
-  const isLongFeatured =
-    !compact &&
-    !isInModal &&
-    !!item.body &&
-    (item.body.length > 280 ||
-      /\n#{1,6}\s|^\s*[-*+]\s|^\s*\d+\.\s|```/m.test(item.body));
+  // CTA "Voir + commenter" shown on every featured news (non-compact,
+  // non-modal). Avant on n'affichait le bouton que sur les news longues
+  // (> 280 chars / blocs markdown), mais depuis l'ajout des commentaires
+  // c'est devenu le seul chemin d'accès à la modal sur une news courte.
+  // Sans bouton, les news brèves sont injoignables → on l'affiche toujours.
+  const showOpenCTA = !compact && !isInModal && !!onOpen;
 
   // Compact items are clickable cards. Featured items (top of HomePage
   // feed) get the explicit "Voir +" button below the body instead, to
@@ -316,22 +315,22 @@ function NewsItem({
           {item.authorName && !compact && (
             <div className="mt-2 text-[10px] text-fg-dim">— {item.authorName}</div>
           )}
-          {/* Voir + button on the featured item when its body is long,
-              and we're not already inside the modal. Click stops
-              propagation so it doesn't accidentally trigger any
-              parent handler. */}
-          {isLongFeatured && onOpen && (
+          {/* CTA "Voir + commenter" — affichée systématiquement sur la
+              news featured (non-compact, non-modal). C'est le point
+              d'entrée pour le thread de commentaires en plus de la news
+              en grand format. */}
+          {showOpenCTA && (
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                onOpen();
+                onOpen?.();
               }}
               className="no-drag mt-3 inline-flex items-center gap-1.5 rounded-full bg-accent/10 px-3 py-1.5 text-[11px] font-medium text-accent ring-1 ring-accent/30 transition-all hover:bg-accent/20 hover:shadow-[0_0_14px_var(--color-accent-soft)]"
               style={{ color: accent }}
             >
               <Maximize2 className="size-3" />
-              Voir la news complète
+              Voir &amp; commenter
             </button>
           )}
           {!compact && item.poll && <PollWidget newsId={item.id} poll={item.poll} accent={accent} />}

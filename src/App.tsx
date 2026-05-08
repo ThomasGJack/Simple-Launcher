@@ -15,6 +15,13 @@ import { pushHeartbeat, type CurrentActivity } from "@/firebase/presence";
 import { watchFavorites } from "@/firebase/favorites";
 import { useFavoritesStore } from "@/store/favorites";
 import { logger, installGlobalLoggerHandlers } from "@/lib/logger";
+import { restoreTwitchConfig } from "@/lib/twitchAuth";
+import { restoreObsConfig } from "@/lib/obsBridge";
+import { bootCustomShortcuts, onShortcut } from "@/lib/customShortcuts";
+import { captureAndSave } from "@/lib/screenshot";
+import { applySeasonalTheme, bootSeasonalTheme, resolveSeasonalTheme } from "@/lib/seasonal";
+import { watchSeasonalConfig } from "@/firebase/seasonalConfig";
+import { bootThemes } from "@/components/settings/ThemePanel";
 import {
   useUsers,
   useModules,
@@ -50,6 +57,7 @@ import {
 import { UiToastsHost } from "@/components/ui/UiToastsHost";
 import { InvitationPopupHost } from "@/components/invitations/InvitationPopup";
 import { LiveActivityToastHost } from "@/components/presence/LiveActivityToastHost";
+import { CrewToolsModalHost } from "@/components/crews/CrewToolsModalHost";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 import { OfflineBanner } from "@/components/layout/OfflineBanner";
 import {
@@ -80,6 +88,52 @@ void (async () => {
     /* offline / non-tauri — keep the "dev" fallback */
   }
   logger.info("App boot", { source: "App" });
+})();
+
+// Restore intégrations externes (Twitch RPC + OBS bridge) — best-effort
+// silencieux. Si la config est persistée en localStorage, on reconnecte
+// au boot pour que le user n'ait pas à re-cliquer "Connecter" à chaque
+// lancement. Erreurs (token expiré, OBS pas lancé) sont logged + ignored.
+void (async () => {
+  try {
+    await restoreTwitchConfig();
+  } catch {
+    /* silent */
+  }
+  try {
+    await restoreObsConfig();
+  } catch {
+    /* silent */
+  }
+  // Custom shortcuts : applique les bindings localStorage et installe le
+  // dispatcher d'events `shortcut-triggered`. La cleanup unlisten est
+  // ignorée — on garde le listener pour toute la durée de la session.
+  try {
+    await bootCustomShortcuts();
+    // Hook le raccourci screenshot.capture sur la fonction de capture
+    // (Phase G). Reste dormant si l'user n'a pas mappé de raccourci.
+    onShortcut("screenshot.capture", () => {
+      captureAndSave().catch((err) => {
+        console.warn("[screenshot] capture failed:", err);
+      });
+    });
+  } catch {
+    /* silent */
+  }
+  // Themes saisonniers : applique le mode persisté (auto / forcé / off).
+  // Synchrone — pas de Tauri command, juste des CSS vars sur <html>.
+  try {
+    bootSeasonalTheme();
+  } catch {
+    /* silent */
+  }
+  // Themes complets : applique font + layout persistés. Le soundpack
+  // est lazy-loaded au premier sons.X() — pas besoin de l'init ici.
+  try {
+    await bootThemes();
+  } catch {
+    /* silent */
+  }
 })();
 
 /**
@@ -196,6 +250,20 @@ function App() {
       unsubscribe();
     };
   }, [setUser, setOfflineUser, setLoading]);
+
+  // Saisonniers — watch Firestore /config/seasonal pour appliquer les
+  // overrides admin (Halloween / Noël / off forcés). Boot a déjà
+  // appliqué "auto" sync, ce watcher prend le relais dès que l'auth
+  // résout (rules require authed read). Re-subscribe à chaque login /
+  // logout — Firestore SDK ne re-tente pas auto après une erreur de
+  // permission.
+  useEffect(() => {
+    if (!user) return;
+    const unsub = watchSeasonalConfig((config) => {
+      applySeasonalTheme(resolveSeasonalTheme(config.mode));
+    });
+    return unsub;
+  }, [user]);
 
   // Log every page navigation as an action — gives the admin a breadcrumb
   // trail of what the user did before any bug was reported.
@@ -603,6 +671,7 @@ function App() {
       <ErrorBoundary scope="invitation-popup"><InvitationPopupHost /></ErrorBoundary>
       <ErrorBoundary scope="live-activity-toast"><LiveActivityToastHost /></ErrorBoundary>
       <ErrorBoundary scope="ui-toasts"><UiToastsHost /></ErrorBoundary>
+      <ErrorBoundary scope="crew-tools"><CrewToolsModalHost /></ErrorBoundary>
     </>
   );
 }

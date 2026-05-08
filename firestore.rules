@@ -63,6 +63,19 @@ service cloud.firestore {
         allow delete: if false;
       }
 
+      // Cosmétiques granted (frames d'avatar, badges, banners). Owner-
+      // write pour les unlocks "auto" (ex: achievement → grant client-
+      // side), admin-write pour les grants manuels. Lecture publique
+      // pour que le profil affiché par d'autres users puisse rendre
+      // les frames équipées.
+      match /cosmetics/{cosmeticId} {
+        allow read: if request.auth != null;
+        allow create, update: if request.auth != null
+          && (request.auth.uid == uid || isAdmin());
+        allow delete: if request.auth != null
+          && (request.auth.uid == uid || isAdmin());
+      }
+
       // Per-user notification feed (achievements unlocked, invitations
       // received, news published, etc.) shown in the bell panel of the
       // sidebar. Read is owner-only — strictly private. Create is open
@@ -288,7 +301,40 @@ service cloud.firestore {
               isCrewMember() &&
               reactionId.matches(request.auth.uid + '__.*');
           }
+
+          // Poll votes — when un message a un sondage embarqué, les
+          // votes vivent ici. Single-choice : un doc par utilisateur,
+          // re-tap la même option clear le vote, re-tap une autre
+          // remplace. Tout member peut lire/voter ; chacun ne touche
+          // qu'à son propre doc (uid == request.auth.uid).
+          match /votes/{uid} {
+            allow read: if isCrewMember();
+            allow create, update, delete:
+              if request.auth != null && request.auth.uid == uid && isCrewMember();
+          }
         }
+      }
+
+      // Wiki pages collaboratives par crew. Tout member peut lire +
+      // écrire (création / édition / suppression). Pas de propriétaire
+      // exclusif des pages — c'est volontairement collaboratif.
+      // L'admin / owner du crew peut déléguer plus de contrôle plus
+      // tard si besoin (lock par page, etc.).
+      match /wikiPages/{pageId} {
+        allow read: if isCrewMember();
+        allow create, update, delete: if isCrewMember();
+      }
+
+      // Liste de tâches partagée par crew. Tout member peut créer,
+      // toggle status, et supprimer ses propres tâches. Owner / admin
+      // du crew peut tout faire (modération).
+      match /todos/{todoId} {
+        allow read: if isCrewMember();
+        allow create: if isCrewMember();
+        allow update: if isCrewMember();
+        allow delete: if isCrewMember()
+          && (resource.data.authorUid == request.auth.uid
+              || isCrewAdminOrOwner());
       }
     }
 
@@ -314,6 +360,26 @@ service cloud.firestore {
         allow create, update, delete:
           if request.auth != null && request.auth.uid == uid;
       }
+
+      // Comments — chaque comment est un doc auto-id (pas un per-user
+      // comme reactions/votes). Tout authed peut lire ; le create est
+      // gated sur authorUid == request.auth.uid (pour empêcher
+      // l'impersonification) ; update/delete owner-only.
+      match /comments/{commentId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null
+          && request.resource.data.authorUid == request.auth.uid;
+        allow update, delete: if request.auth != null
+          && resource.data.authorUid == request.auth.uid;
+      }
+    }
+
+    // Config globale (saisonniers, futurs toggles app-wide). Read par tout
+    // user authed (le launcher l'utilise au boot pour appliquer le thème),
+    // write admin-only. Voir src/firebase/seasonalConfig.ts.
+    match /config/{configId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
     }
 
     // Modules: any authenticated user can read; admins can write.

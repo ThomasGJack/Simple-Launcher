@@ -27,10 +27,17 @@ type SettingsState = {
 
   /** Reset every Apparence preference to defaults. */
   resetApparence: () => void;
+
+  // ─── Module beta channel ───────────────────────────────────────────
+  /** Quand true, le user voit aussi les modules `prereleaseChannel: "beta"`
+   *  pour lesquels il est dans la whitelist `prereleaseTesterUids`. */
+  enableBetaChannel: boolean;
+  toggleBetaChannel: () => void;
 };
 
 const LS_ACCENT = "settings.accentColor";
 const LS_ANIM = "settings.animationsEnabled";
+const LS_BETA = "settings.enableBetaChannel";
 
 function readAccent(): string | null {
   try {
@@ -101,4 +108,26 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     writeAnimations(true);
     set({ accentColor: null, animationsEnabled: true });
   },
+
+  enableBetaChannel: readBeta(),
+  toggleBetaChannel: () => {
+    const next = !get().enableBetaChannel;
+    writeBeta(next);
+    set({ enableBetaChannel: next });
+  },
 }));
+
+function readBeta(): boolean {
+  try {
+    return localStorage.getItem(LS_BETA) === "true";
+  } catch {
+    return false;
+  }
+}
+function writeBeta(on: boolean): void {
+  try {
+    localStorage.setItem(LS_BETA, on ? "true" : "false");
+  } catch {
+    /* ignore */
+  }
+}

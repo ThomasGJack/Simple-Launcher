@@ -129,6 +129,31 @@ export function ChannelView({
     }
   };
 
+  /**
+   * Publie un sondage dans le channel comme un message dont le texte
+   * est minimal (placeholder) et le champ `poll` est rempli. Le rendu
+   * côté MessageItem détecte `message.poll != null` et affiche le
+   * PollMessage widget.
+   */
+  const handlePollSubmit = async (poll: { question: string; options: string[] }) => {
+    if (!myUid) return;
+    try {
+      await sendChannelMessage(
+        crewId,
+        channelId,
+        `📊 ${poll.question}`,
+        myUid,
+        myName,
+        myAvatar,
+        { poll },
+      );
+      sounds.success();
+    } catch (err) {
+      console.warn("[crews] poll send failed:", err);
+      throw err;
+    }
+  };
+
   return (
     <>
       <header className="flex items-center gap-3 border-b border-white/[0.06] bg-bg-soft/30 px-5 py-3">
@@ -285,6 +310,7 @@ export function ChannelView({
         replyTo={replyTo}
         onCancelReply={() => setReplyTo(null)}
         onSubmit={handleSend}
+        onPollSubmit={handlePollSubmit}
       />
     </>
   );

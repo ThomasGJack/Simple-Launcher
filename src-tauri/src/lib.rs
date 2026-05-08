@@ -16,11 +16,16 @@ mod mc_vanilla;
 mod mc_zip;
 mod modules;
 mod oauth;
+mod obs_ws;
 mod overlay;
 mod rcon;
+mod screenshot;
+mod shortcuts;
+mod steam;
 #[cfg(windows)]
 mod single_instance;
 mod tray;
+mod twitch_rpc;
 mod velo_updater;
 
 use tauri::{Emitter, Manager};
@@ -70,10 +75,13 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(modules::LaunchTracker::new())
         .manage(discord_rpc::DiscordRpc::new())
+        .manage(twitch_rpc::TwitchRpc::new())
+        .manage(obs_ws::ObsWs::new())
         .manage(rcon::RconRegistry::new())
         .manage(log_file::LogFileState::new())
         .manage(mc_auth::McAuthState::new())
         .manage(overlay::OverlayState::new())
+        .manage(shortcuts::ShortcutsState::new())
         .manage(velo_updater::VeloState::new())
         .on_window_event(|window, event| {
             // Intercept the main-window close request: instead of exiting
@@ -211,6 +219,35 @@ pub fn run() {
             velo_updater::velo_apply,
             velo_updater::velo_current_version,
             velo_updater::velo_is_installed,
+            // Twitch Rich Presence — set le titre du stream du user au
+            // lancement d'un module (équivalent Discord RPC mais via
+            // API REST Helix).
+            twitch_rpc::twitch_validate_token,
+            twitch_rpc::twitch_set_config,
+            twitch_rpc::twitch_set_title,
+            twitch_rpc::twitch_get_config,
+            // OBS WebSocket bridge — pousse des events overlay (achievement,
+            // friend online, crew activity) depuis le launcher vers OBS
+            // Studio chez le streamer.
+            obs_ws::obs_connect,
+            obs_ws::obs_disconnect,
+            obs_ws::obs_send_overlay_event,
+            obs_ws::obs_get_config,
+            // Custom shortcuts — multi-binding global hotkeys gérés par
+            // le frontend (les actions sont définies côté React, le
+            // Rust ne fait que register/unregister + emit l'event).
+            shortcuts::shortcuts_register,
+            shortcuts::shortcuts_unregister,
+            shortcuts::shortcuts_unregister_all,
+            // Capture d'écran — retourne les bytes PNG du monitor
+            // primaire. Le frontend décide de quoi en faire (sauver
+            // localement, uploader, afficher en preview).
+            screenshot::screenshot_capture,
+            // Steam library — détecte l'install Steam et liste les jeux
+            // via les .acf de steamapps/. Le frontend bulk-importe en
+            // shortcuts (steam://run/{appid}).
+            steam::steam_detect,
+            steam::steam_list_games,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

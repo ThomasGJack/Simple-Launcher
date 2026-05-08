@@ -184,6 +184,11 @@ export function ModuleCard({
         <div className="flex flex-wrap items-start gap-1.5">
           <SourceBadge module={module} />
           <StatusBadge module={module} status={status} loaded={stateLoaded} action={action} />
+          {module.prereleaseChannel === "beta" && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-300 ring-1 ring-amber-500/40 backdrop-blur-md">
+              BÊTA
+            </span>
+          )}
           {module.server?.type === "minecraft" && (
             <MinecraftStatusBadge address={module.server.address} compact />
           )}

@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
+  BarChart3,
   CornerDownLeft,
   Image as ImageIcon,
   Loader2,
   Send,
   X,
 } from "lucide-react";
+import { PollComposer } from "./PollComposer";
 import {
   extractMentionedUids,
   injectMentionTokens,
@@ -36,12 +38,17 @@ export function MessageComposer({
   replyTo,
   onCancelReply,
   onSubmit,
+  onPollSubmit,
 }: {
   channelName: string;
   replyTo: CrewMessage | null;
   onCancelReply: () => void;
   onSubmit: ComposerSubmit;
+  /** Callback invoqué quand l'utilisateur valide un sondage depuis la
+   *  modal PollComposer. Si non fourni, le bouton "Sondage" est caché. */
+  onPollSubmit?: (poll: { question: string; options: string[] }) => Promise<void>;
 }) {
+  const [showPollComposer, setShowPollComposer] = useState(false);
   const allUsers = useUsers();
   const me = useAuthStore((s) => s.user);
   const taRef = useRef<HTMLTextAreaElement | null>(null);
@@ -344,6 +351,16 @@ export function MessageComposer({
           >
             <ImageIcon className="size-4" />
           </button>
+          {onPollSubmit && (
+            <button
+              type="button"
+              onClick={() => setShowPollComposer(true)}
+              title="Créer un sondage"
+              className="grid size-9 shrink-0 place-items-center rounded-xl text-fg-muted hover:bg-white/[0.06] hover:text-fg-primary"
+            >
+              <BarChart3 className="size-4" />
+            </button>
+          )}
           <textarea
             ref={taRef}
             value={text}
@@ -395,6 +412,18 @@ export function MessageComposer({
           Maj+Entrée pour saut de ligne
         </p>
       </div>
+
+      <AnimatePresence>
+        {showPollComposer && onPollSubmit && (
+          <PollComposer
+            onCancel={() => setShowPollComposer(false)}
+            onSubmit={async (poll) => {
+              await onPollSubmit(poll);
+              setShowPollComposer(false);
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
