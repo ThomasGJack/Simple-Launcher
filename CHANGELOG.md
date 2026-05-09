@@ -28,6 +28,28 @@ dans ce fichier mais n'est pas envoyée.
 
 ### Nouveau
 
+### Amélioré
+
+### Corrigé
+
+### Supprimé
+
+### Sécurité
+
+<!-- ──────────────────────────────────────────────────────────────────
+     DÉTAILS TECHNIQUES — Archive interne, NON affichée au user.
+     Le release script `scripts/release-launcher.mjs` exclut cette
+     section des release notes envoyées via Velopack et Discord.
+     ────────────────────────────────────────────────────────────────── -->
+
+### Détails techniques
+
+## [v26.05.09.2] - 2026-05-09  · semver `26.509.1`
+
+
+
+### Nouveau
+
 - Réactions emoji sur les commentaires de news — ❤️ 🔥 👍 😂 🎉 cliquables au survol de chaque commentaire.
 - Mentions @utilisateur dans les commentaires de news, avec autocomplétion et notification automatique du destinataire.
 - Statut personnalisé — bouton dans la sidebar pour définir un message ("💤 AFK", "🍔 Pause repas", "🎯 Concentré", ou texte libre jusqu'à 80 caractères) visible par les autres members.
@@ -45,11 +67,6 @@ dans ce fichier mais n'est pas envoyée.
 - Visuels Steam plus jolis : la cover officielle stylisée 600×900 (avec logo intégré) remplace l'ancienne bannière header.jpg basse résolution.
 - Notifications Windows correctement marquées "Simple Launcher" au lieu de "Windows PowerShell".
 
-<!-- ──────────────────────────────────────────────────────────────────
-     DÉTAILS TECHNIQUES — Archive interne, NON affichée au user.
-     Le release script `scripts/release-launcher.mjs` exclut cette
-     section des release notes envoyées via Velopack et Discord.
-     ────────────────────────────────────────────────────────────────── -->
 
 ### Détails techniques
 
@@ -65,7 +82,6 @@ dans ce fichier mais n'est pas envoyée.
 - **Windows AUMID** ([src-tauri/src/win_aumid.rs](src-tauri/src/win_aumid.rs), [src-tauri/Cargo.toml](src-tauri/Cargo.toml)) — `SetCurrentProcessExplicitAppUserModelID("com.simpleglass.simplelauncher")` au boot via `windows = { features = ["Win32_UI_Shell"] }` + write registry HKCU `Software\Classes\AppUserModelId\com.simpleglass.simplelauncher` (DisplayName="Simple Launcher", IconUri=path icon) via `winreg = "0.52"`. Les notifications Windows lisent maintenant l'AUMID au lieu du parent process name (PowerShell quand l'app est lancée via shortcut PS).
 - **Discord OAuth fix (intra-dev)** ([functions/src/index.ts](functions/src/index.ts)) — la function était bound à `version:"1"` du secret `DISCORD_CLIENT_SECRET` malgré les redeploys. Diagnostic via logs temporaires (4-char fingerprints) qui ont prouvé que la prod servait encore l'ancien secret. Fix : `firebase functions:secrets:set DISCORD_CLIENT_SECRET` proper pour bump v2, redeploy a picked up `version:"latest"`. Logs de diag retirés après confirmation.
 - **CHANGELOG_STYLE.md règles absolues** ([docs/CHANGELOG_STYLE.md](docs/CHANGELOG_STYLE.md)) — ajout de 2 règles non-négociables dans la section "Workflow recommandé pendant le dev" : (1) mettre à jour `[Unreleased]` à chaque feature finie (pas en fin de cycle) ; (2) avant chaque `release:launcher`, fetch `https://simplelaunche.web.app/launcher/versions.json` et déduplier ligne par ligne contre les 2-3 dernières releases. Documenté pour éviter le bug Phase A-H qui aurait été ré-annoncé en doublon.
-
 ## [v26.05.09] - 2026-05-09  · semver `26.509.0`
 
 
