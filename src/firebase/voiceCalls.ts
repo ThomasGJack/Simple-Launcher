@@ -185,23 +185,44 @@ export async function joinVoiceSession(
     "voice",
     SESSION_DOC_ID,
   );
-  // Crée le doc session s'il n'existe pas, ou bump participantUids.
-  // setDoc(merge:true) = upsert sans écraser les autres champs.
-  await setDoc(
-    sessionRef,
-    {
-      startedAt: serverTimestamp(),
-      startedByUid: uid, // overridden si non-créateur (ok, pas critique)
-      participantUids: arrayUnion(uid),
-    },
-    { merge: true },
-  );
+  // 1. Crée le doc session s'il n'existe pas, ou bump participantUids.
+  //    setDoc(merge:true) = upsert sans écraser les autres champs.
+  console.log("[voiceCalls] step 1: write session doc");
+  try {
+    await setDoc(
+      sessionRef,
+      {
+        startedAt: serverTimestamp(),
+        startedByUid: uid,
+        participantUids: arrayUnion(uid),
+      },
+      { merge: true },
+    );
+    console.log("[voiceCalls] step 1 OK");
+  } catch (err) {
+    console.error("[voiceCalls] step 1 FAILED:", err);
+    throw new Error(`Création/maj session vocale refusée — ${(err as Error).message}`);
+  }
+
+  // 2. Crée mon peer doc.
+  console.log("[voiceCalls] step 2: write peer doc");
   const peerRef = doc(sessionRef, "peers", uid);
-  await setDoc(peerRef, {
-    joinedAt: serverTimestamp(),
-    micMuted: false,
-    deafened: false,
-  });
+  try {
+    await setDoc(peerRef, {
+      joinedAt: serverTimestamp(),
+      micMuted: false,
+      deafened: false,
+    });
+    console.log("[voiceCalls] step 2 OK");
+  } catch (err) {
+    console.error("[voiceCalls] step 2 FAILED:", err);
+    // Cleanup partiel : retirer uid de participantUids pour ne pas
+    // laisser un fantôme dans la session.
+    await updateDoc(sessionRef, {
+      participantUids: arrayRemove(uid),
+    }).catch(() => undefined);
+    throw new Error(`Création peer doc refusée — ${(err as Error).message}`);
+  }
 }
 
 /** Leave — supprime le peer doc + retire uid de participantUids. */

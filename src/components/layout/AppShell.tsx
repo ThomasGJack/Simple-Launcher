@@ -4,6 +4,7 @@ import { TitleBar } from "@/components/window/TitleBar";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { AnimatedBackground } from "@/components/layout/AnimatedBackground";
 import { SeasonalDecorations } from "@/components/layout/SeasonalDecorations";
+import { ImageViewer } from "@/components/ui/ImageViewer";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 import { PageSkeleton } from "@/components/ui/Skeleton";
 import { useUIStore, type Route } from "@/store/ui";
@@ -89,6 +90,13 @@ export function AppShell() {
       </div>
 
       <UpdateBanner />
+
+      {/* Lightbox d'image — singleton mounted ici (au-dessus du layout
+          mais sous les autres modals) pour que n'importe quel composant
+          puisse l'ouvrir via `useImageViewer.getState().open(url)`.
+          Pas une page web qui s'ouvre dans un onglet → c'est un vrai
+          viewer intégré au logiciel. */}
+      <ImageViewer />
     </div>
   );
 }

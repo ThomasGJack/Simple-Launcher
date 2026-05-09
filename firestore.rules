@@ -319,25 +319,39 @@ service cloud.firestore {
         //   /crews/{crewId}/channels/{channelId}/voice/{sessionId}
         //     startedAt, startedByUid, participantUids[]
         //     /peers/{peerUid}
-        //       sdp: { type, payload }
-        //       iceCandidates: array
-        //       joinedAt, micMuted
+        //       joinedAt, micMuted, deafened
+        //       /signals/{signalId} — SDP/ICE pour la négociation P2P
         //
-        // Tout member du crew peut lire les sessions + sub-coll peers
-        // (besoin de connaître les autres pour négocier les SDP).
-        // Chaque user ne peut écrire que SON propre peer doc (uid
-        // contraint par le path).
+        // Tout member du crew peut lire/écrire les sessions (besoin de
+        // s'ajouter aux participantUids). Chaque user ne peut écrire
+        // que SON propre peer doc + ses signals (uid contraint par le
+        // path). Le check isCrewMember() ne couvre que session : pour
+        // les sub-docs on se fie au gating parent (un non-membre ne
+        // peut pas accéder au sessionId via `read` donc ne sait même
+        // pas qu'il existe).
         match /voice/{sessionId} {
           allow read: if isCrewMember();
           allow create, update: if isCrewMember();
           allow delete: if isCrewAdminOrOwner();
 
           match /peers/{peerUid} {
-            allow read: if isCrewMember();
+            allow read: if request.auth != null;
             allow create, update, delete:
               if request.auth != null
-              && request.auth.uid == peerUid
-              && isCrewMember();
+              && request.auth.uid == peerUid;
+
+            // Signaling SDP/ICE — chaque peer reçoit ses messages dans
+            // sa propre sub-coll. Tout authed peut envoyer un signal
+            // au peer cible (l'écriture est addressée nominativement),
+            // mais seul le peer destinataire peut delete (cleanup
+            // après application) ou read (consume).
+            match /signals/{signalId} {
+              allow read: if request.auth != null
+                && request.auth.uid == peerUid;
+              allow create: if request.auth != null;
+              allow delete: if request.auth != null
+                && request.auth.uid == peerUid;
+            }
           }
         }
       }

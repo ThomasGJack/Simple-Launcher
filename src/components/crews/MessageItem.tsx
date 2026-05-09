@@ -263,11 +263,18 @@ export const MessageItem = memo(function MessageItem({
               <MessageBody text={message.text} nameForUid={nameForUid} />
             )}
             {message.imageUrl && (
-              <a
-                href={message.imageUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-1 block max-w-md overflow-hidden rounded-xl ring-1 ring-white/[0.06] hover:ring-accent/40"
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // Ouvre le viewer intégré au lieu d'un onglet browser :
+                  // l'app reste l'app, pas une webview qui ouvre une page.
+                  void import("@/store/imageViewer").then(({ openImage }) =>
+                    openImage(message.imageUrl!, message.senderName ?? null),
+                  );
+                }}
+                className="no-drag mt-1 block max-w-md overflow-hidden rounded-xl ring-1 ring-white/[0.06] transition hover:ring-accent/40"
+                title="Voir l'image en grand"
               >
                 <img
                   src={message.imageUrl}
@@ -275,7 +282,7 @@ export const MessageItem = memo(function MessageItem({
                   className="max-h-80 w-auto object-contain"
                   referrerPolicy="no-referrer"
                 />
-              </a>
+              </button>
             )}
             {message.poll && (
               <div className="mt-2 max-w-md">

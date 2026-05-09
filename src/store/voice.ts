@@ -74,11 +74,16 @@ export const useVoiceStore = create<VoiceState & VoiceActions>((set, get) => ({
     }
     set({ error: null });
     try {
+      console.log("[voice] joining", { crewId, channelId, myUid });
       // 1. Acquire mic.
+      console.log("[voice] requesting mic...");
       localStream = await getMicStream();
+      console.log("[voice] mic acquired:", localStream.getAudioTracks().length, "tracks");
 
       // 2. Register dans Firestore (crée le peer doc + bump session).
+      console.log("[voice] writing Firestore session doc...");
       await joinVoiceSession(crewId, channelId, myUid);
+      console.log("[voice] Firestore write OK");
 
       // 3. Init mesh + watch peers Firestore pour add/remove peers WebRTC.
       mesh = new MeshSession(crewId, channelId, myUid, localStream, {
