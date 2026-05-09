@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main + overlay + toasts windows",
-  "windows": ["main", "overlay", "toasts"],
+  "description": "Capability for the main + overlay + toasts + pip windows",
+  "windows": ["main", "overlay", "toasts", "pip"],
   "permissions": [
     "core:default",
     "core:window:allow-minimize",

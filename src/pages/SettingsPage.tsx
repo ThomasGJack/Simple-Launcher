@@ -59,6 +59,7 @@ import { TwitchPanel } from "@/components/settings/TwitchPanel";
 import { ObsPanel } from "@/components/settings/ObsPanel";
 import { ShortcutsPanel } from "@/components/settings/ShortcutsPanel";
 import { ThemePanel } from "@/components/settings/ThemePanel";
+import { PipPanel } from "@/components/settings/PipPanel";
 import { BetaChannelPanel } from "@/components/settings/BetaChannelPanel";
 import { ScrollMemoryRoot } from "@/hooks/ScrollMemoryRoot";
 import {
@@ -266,6 +267,7 @@ export function SettingsPage() {
             <>
               <NotificationsCard />
               <OverlayCard />
+              <PipPanel />
             </>
           )}
 

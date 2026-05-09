@@ -313,6 +313,33 @@ service cloud.firestore {
               if request.auth != null && request.auth.uid == uid && isCrewMember();
           }
         }
+
+        // Salons vocaux WebRTC par channel — Phase I.
+        // Schéma :
+        //   /crews/{crewId}/channels/{channelId}/voice/{sessionId}
+        //     startedAt, startedByUid, participantUids[]
+        //     /peers/{peerUid}
+        //       sdp: { type, payload }
+        //       iceCandidates: array
+        //       joinedAt, micMuted
+        //
+        // Tout member du crew peut lire les sessions + sub-coll peers
+        // (besoin de connaître les autres pour négocier les SDP).
+        // Chaque user ne peut écrire que SON propre peer doc (uid
+        // contraint par le path).
+        match /voice/{sessionId} {
+          allow read: if isCrewMember();
+          allow create, update: if isCrewMember();
+          allow delete: if isCrewAdminOrOwner();
+
+          match /peers/{peerUid} {
+            allow read: if isCrewMember();
+            allow create, update, delete:
+              if request.auth != null
+              && request.auth.uid == peerUid
+              && isCrewMember();
+          }
+        }
       }
 
       // Wiki pages collaboratives par crew. Tout member peut lire +

@@ -45,6 +45,7 @@ export default defineConfig(async () => ({
         main: path.resolve(__dirname, "index.html"),
         overlay: path.resolve(__dirname, "overlay.html"),
         toasts: path.resolve(__dirname, "toasts.html"),
+        pip: path.resolve(__dirname, "pip.html"),
       },
       output: {
         manualChunks(id) {
