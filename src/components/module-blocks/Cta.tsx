@@ -14,7 +14,13 @@ export function BlockCta(props: Props) {
     if (props.buttonAction === "launch" && props.onLaunch) {
       props.onLaunch();
     } else if (props.buttonAction === "url" && props.buttonUrl) {
-      window.open(props.buttonUrl, "_blank", "noopener,noreferrer");
+      // Délègue à l'OS via tauri-plugin-opener — `window.open` est
+      // bloqué par la security policy de Tauri WebView2 et fait penser
+      // que l'app est une page web.
+      const url = props.buttonUrl;
+      void import("@tauri-apps/plugin-opener")
+        .then(({ openUrl }) => openUrl(url))
+        .catch((err) => console.warn("[cta] openUrl failed:", err));
     } else if (props.buttonAction === "scroll-top") {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }

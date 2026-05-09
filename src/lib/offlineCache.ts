@@ -1,5 +1,6 @@
 import type { User } from "firebase/auth";
 import type { LauncherModule } from "@/types/module";
+import type { Crew } from "@/firebase/crews";
 
 /**
  * LocalStorage-backed offline cache for the minimum data needed to
@@ -21,6 +22,8 @@ import type { LauncherModule } from "@/types/module";
 
 const KEY_USER = "offline.user.v1";
 const KEY_MODULES = "offline.modules.v1";
+const KEY_CREWS = "offline.crews.v1";
+const KEY_MY_CREW_IDS = "offline.myCrewIds.v1";
 
 export type CachedUser = {
   uid: string;
@@ -98,9 +101,75 @@ export function clearOfflineCache(): void {
   try {
     localStorage.removeItem(KEY_USER);
     localStorage.removeItem(KEY_MODULES);
+    localStorage.removeItem(KEY_CREWS);
+    localStorage.removeItem(KEY_MY_CREW_IDS);
   } catch {
     /* non-fatal */
   }
+}
+
+// ─── Crews + my crew memberships ────────────────────────────────────────
+//
+// Pourquoi cacher : sans cache, CrewsPage flash le placeholder "Aucun
+// clan / Rejoindre / Créer" pendant les ~500 ms où Firestore se
+// resync. Avec cache hot-seed, le user voit immédiatement sa dernière
+// liste connue, qui est ensuite remplacée par la version live dès que
+// Firestore réplique.
+
+export function saveCachedCrews(crews: Crew[]): void {
+  try {
+    localStorage.setItem(KEY_CREWS, JSON.stringify(crews));
+  } catch {
+    // Quota exceeded — try slimmer (drop description) before giving up.
+    try {
+      const slim = crews.map((c) => ({ ...c, description: undefined }));
+      localStorage.setItem(KEY_CREWS, JSON.stringify(slim));
+    } catch {
+      /* full — give up */
+    }
+  }
+}
+
+export function loadCachedCrews(): Crew[] {
+  try {
+    const raw = localStorage.getItem(KEY_CREWS);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed as Crew[];
+  } catch {
+    /* parse error — drop */
+  }
+  return [];
+}
+
+export function saveCachedMyCrewIds(uid: string, ids: string[]): void {
+  try {
+    const map = loadCachedMyCrewIdsMap();
+    map[uid] = ids;
+    localStorage.setItem(KEY_MY_CREW_IDS, JSON.stringify(map));
+  } catch {
+    /* non-fatal */
+  }
+}
+
+export function loadCachedMyCrewIds(uid: string | null | undefined): string[] {
+  if (!uid) return [];
+  const map = loadCachedMyCrewIdsMap();
+  return map[uid] ?? [];
+}
+
+function loadCachedMyCrewIdsMap(): Record<string, string[]> {
+  try {
+    const raw = localStorage.getItem(KEY_MY_CREW_IDS);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, string[]>;
+    }
+  } catch {
+    /* drop */
+  }
+  return {};
 }
 
 /**

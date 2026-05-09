@@ -34,6 +34,12 @@ import { cn } from "@/lib/cn";
 import { CreateCrewModal } from "@/components/crews/CreateCrewModal";
 import { JoinByCodeModal } from "@/components/crews/JoinByCodeModal";
 import { BrowseCrewsModal } from "@/components/crews/BrowseCrewsModal";
+import {
+  loadCachedCrews,
+  saveCachedCrews,
+  loadCachedMyCrewIds,
+  saveCachedMyCrewIds,
+} from "@/lib/offlineCache";
 
 /**
  * Discord-like clan/crew page. Three-column layout:
@@ -63,8 +69,20 @@ export function CrewsPage() {
   const canCreateCrew =
     isAdmin(me) || hasAnyTier(myProfile?.tier ?? null);
 
-  const [allCrews, setAllCrews] = useState<Crew[]>([]);
-  const [myCrewIds, setMyCrewIds] = useState<Set<string>>(new Set());
+  // Hot-seed depuis le cache localStorage pour éviter le flash
+  // "Aucun clan / Rejoindre / Créer" pendant que Firestore se resync.
+  // Le cache est rafraîchi à chaque snapshot reçu, donc au prochain
+  // boot on a la dernière vue connue.
+  const [allCrews, setAllCrews] = useState<Crew[]>(() => loadCachedCrews());
+  const [crewsPrimed, setCrewsPrimed] = useState<boolean>(
+    () => loadCachedCrews().length > 0,
+  );
+  const [myCrewIds, setMyCrewIds] = useState<Set<string>>(() =>
+    new Set(loadCachedMyCrewIds(me?.uid)),
+  );
+  const [myCrewIdsPrimed, setMyCrewIdsPrimed] = useState<boolean>(
+    () => loadCachedMyCrewIds(me?.uid).length > 0,
+  );
   const [channels, setChannels] = useState<CrewChannel[]>([]);
   const [members, setMembers] = useState<CrewMember[]>([]);
   const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
@@ -82,14 +100,28 @@ export function CrewsPage() {
     position: { x: number; y: number };
   } | null>(null);
 
-  useEffect(() => watchCrews(setAllCrews), []);
+  useEffect(
+    () =>
+      watchCrews((crews) => {
+        setAllCrews(crews);
+        setCrewsPrimed(true);
+        // Persiste pour le prochain boot — évite le flash placeholder.
+        saveCachedCrews(crews);
+      }),
+    [],
+  );
 
   useEffect(() => {
     if (!me) {
       setMyCrewIds(new Set());
+      setMyCrewIdsPrimed(true);
       return;
     }
-    return watchMyCrewIds(me.uid, (ids) => setMyCrewIds(new Set(ids)));
+    return watchMyCrewIds(me.uid, (ids) => {
+      setMyCrewIds(new Set(ids));
+      setMyCrewIdsPrimed(true);
+      saveCachedMyCrewIds(me.uid, ids);
+    });
   }, [me]);
 
   // Master crews are always visible (everyone is implicitly a member).
@@ -181,7 +213,32 @@ export function CrewsPage() {
     }
   };
 
-  if (visibleCrews.length === 0) {
+  // Empty-state : on n'affiche le placeholder « Aucun clan / Rejoindre /
+  // Créer » que si on est SÛRS qu'il n'y a pas de crew (les watchers
+  // ont fini leur premier snapshot). Sans ça, Firestore peut prendre
+  // ~500 ms à répondre au boot et on flash inutilement le placeholder
+  // alors que l'user a en fait des crews. Le cache localStorage hot-
+  // seed `crewsPrimed` à `true` immédiatement quand des crews y sont,
+  // donc l'utilisateur récurrent ne voit plus jamais ce flash.
+  const fullyPrimed = crewsPrimed && (!me || myCrewIdsPrimed);
+
+  // Pas encore primed + pas de cache → skeleton minimal (ligne floue).
+  // Évite à la fois le flash "Aucun clan" ET le flash de la layout
+  // principale vide. Quand les watchers fire, on transitionne fluide.
+  if (!fullyPrimed && visibleCrews.length === 0) {
+    return (
+      <div className="grid h-full place-items-center p-12">
+        <div className="flex flex-col items-center gap-3 opacity-50">
+          <Castle className="size-10 animate-pulse text-fg-dim" strokeWidth={1.5} />
+          <div className="text-xs uppercase tracking-[0.25em] text-fg-dim">
+            Chargement des crews…
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (fullyPrimed && visibleCrews.length === 0) {
     return (
       <div className="grid h-full place-items-center p-12">
         <div className="max-w-md rounded-3xl glass p-10 text-center">

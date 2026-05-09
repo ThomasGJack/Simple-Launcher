@@ -23,6 +23,7 @@
 
 import { type MouseEvent as ReactMouseEvent } from "react";
 import { sounds } from "@/lib/sounds";
+import { openImage } from "@/store/imageViewer";
 
 /**
  * Match http(s) URLs that are NOT already wrapped in markdown link
@@ -59,6 +60,25 @@ export function preprocessAutolinks(src: string): string {
  *   <div onClick={handleExternalLinkClick} dangerouslySetInnerHTML={...} />
  */
 export function handleExternalLinkClick(e: ReactMouseEvent<HTMLElement>) {
+  // 1) Image cliquée dans le markdown rendu → ouvrir notre lightbox
+  //    intégrée plutôt qu'une nav webview qui sortirait de l'app.
+  const imgTarget = (e.target as HTMLElement | null)?.closest?.("img");
+  if (imgTarget) {
+    const src = imgTarget.getAttribute("src");
+    if (src && /^https?:\/\//i.test(src)) {
+      e.preventDefault();
+      e.stopPropagation();
+      sounds.click();
+      const alt = imgTarget.getAttribute("alt") || null;
+      openImage(src, alt);
+      return;
+    }
+  }
+
+  // 2) Lien externe — délègue à l'OS (browser) via tauri-plugin-opener.
+  //    On ne peut pas faire mieux pour des liens externes : on ne va
+  //    pas naviguer dans la webview du launcher (security policy
+  //    bloque + le user perdrait son state).
   const target = (e.target as HTMLElement | null)?.closest?.("a");
   if (!target) return;
   const href = target.getAttribute("href");

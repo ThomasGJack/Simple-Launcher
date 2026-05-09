@@ -64,7 +64,13 @@ function ScreenshotsGrid({ images }: { images: string[] }) {
           <motion.button
             key={url + i}
             whileHover={{ scale: 1.02 }}
-            onClick={() => window.open(url, "_blank")}
+            onClick={() => {
+              // Lightbox intégrée — l'app reste l'app, pas une page
+              // qui s'ouvre dans le browser de l'OS.
+              void import("@/store/imageViewer").then(({ openImage }) =>
+                openImage(url, `Capture ${i + 1}`),
+              );
+            }}
             className="group aspect-video overflow-hidden rounded-xl ring-1 ring-white/[0.06] transition-shadow hover:ring-accent/30 hover:shadow-[0_0_24px_var(--color-accent-soft)]"
           >
             <img

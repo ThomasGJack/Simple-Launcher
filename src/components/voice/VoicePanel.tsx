@@ -211,8 +211,11 @@ export function VoicePanel({
           </div>
         )}
 
-        {/* Erreur — affichée si la connexion a échoué */}
-        {voice.error && isInThisChannel && (
+        {/* Erreur — affichée à la moindre erreur, peu importe l'état
+            de la session (sinon les échecs de join restent invisibles
+            à l'user, le bouton « Rejoindre » a juste l'air de ne rien
+            faire). */}
+        {voice.error && (
           <div className="border-t border-danger/20 bg-danger/[0.06] px-4 py-2 text-xs text-danger">
             ⚠ {voice.error}{" "}
             <button

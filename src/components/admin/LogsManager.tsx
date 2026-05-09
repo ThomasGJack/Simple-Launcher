@@ -117,7 +117,19 @@ export function LogsManager() {
   const handleDownload = async (file: LogFileEntry) => {
     try {
       const url = await getLogFileDownloadUrl(file.fullPath);
-      window.open(url, "_blank");
+      // Download via blob URL → reste dans l'app (pas un onglet browser
+      // qui s'ouvre). Le fichier est sauvé dans le dossier
+      // Téléchargements de l'OS comme n'importe quel download.
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = file.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
     } catch (err) {
       console.warn("[admin-logs] download failed:", err);
     }
