@@ -44,6 +44,31 @@ dans ce fichier mais n'est pas envoyée.
 
 ### Détails techniques
 
+## [v26.05.09] - 2026-05-09  · semver `26.509.0`
+
+
+
+### Nouveau
+
+- Salon vocal entre membres d'un crew dans n'importe quel channel — clique « Vocal » dans l'en-tête, jusqu'à 8 personnes en même temps. Mute, sourd, et déconnexion en 1 clic.
+- Mini-fenêtre Picture-in-Picture flottante par-dessus tes jeux : voit qui est en ligne et reçoit tes notifs sans quitter ton jeu. À activer dans Paramètres → Notifications, ou via un raccourci clavier.
+- Aperçu d'image intégré : clique sur n'importe quelle image (message d'un crew, news, capture d'un module) pour la voir en grand sans quitter le launcher. Zoom, télécharger, ouvrir dans le navigateur si tu veux.
+
+### Amélioré
+
+- L'écran des crews ne flashe plus le placeholder « Aucun clan / Rejoindre / Créer » au boot — la dernière vue connue est restaurée instantanément depuis le cache local.
+
+
+
+
+
+### Détails techniques
+
+- **Phase I — Voice WebRTC** ([src/firebase/voiceCalls.ts](src/firebase/voiceCalls.ts), [src/lib/webrtc.ts](src/lib/webrtc.ts), [src/lib/audioDevices.ts](src/lib/audioDevices.ts), [src/store/voice.ts](src/store/voice.ts), [src/components/voice/](src/components/voice/) VoicePanel + VoiceParticipant + AudioMixer) — mesh peer-to-peer (jusqu'à 8 participants). Signaling via Firestore sub-coll `/crews/{crewId}/channels/{channelId}/voice/active/peers/{peerUid}/signals/{auto-id}` — chaque user watch sa propre boîte aux lettres, consume + delete chaque signal après l'avoir appliqué à sa `RTCPeerConnection`. Perfect negotiation pattern : uid lexicographiquement plus petit initie l'offer pour éviter le glare. STUN public Google (`stun.l.google.com:19302`), pas de TURN — accept ~20% d'échec NAT-symmetric pour MVP. Audio constraints : `echoCancellation + noiseSuppression + autoGainControl` activés. VAD via `AnalyserNode` Web Audio API (RMS > 0.04 = speaking) → ring vert pulsant autour de l'avatar du peer qui parle. Output device picker via `setSinkId()` (Edge WebView2 supporte). Rules Firestore : tout member peut lire les sub-coll voice + peers, chacun ne peut écrire que son propre peer doc (uid contraint par le path). Le Zustand store `useVoiceStore` est singleton — un seul user dans un seul vocal channel à la fois. `MeshSession` garde les ressources non-sérialisables (RTCPeerConnection, MediaStream) en module-scope hors du store.
+- **Phase G complétée — Picture-in-Picture** ([src-tauri/src/pip.rs](src-tauri/src/pip.rs), [pip.html](pip.html), [src/pip.tsx](src/pip.tsx), [src/components/pip/PipApp.tsx](src/components/pip/PipApp.tsx), [src/lib/pip.ts](src/lib/pip.ts), [src/components/settings/PipPanel.tsx](src/components/settings/PipPanel.tsx)) — 4e fenêtre Tauri (en plus de main / overlay / toasts) déclarée dans `tauri.conf.json` avec `transparent: true + decorations: false + alwaysOnTop: true + skipTaskbar: true + visible: false` au boot. Frontend mount un mini-feed (amis online + 5 dernières notifs) avec drag-region sur le header pour repositioning. Position persistée en localStorage (`pip.bounds.v1`) + restored au prochain show via `LogicalPosition`/`LogicalSize` (DPI-aware). Toggle dispo : (a) Settings → Notifications card PiP, (b) raccourci custom `pip.toggle` rebindable via Settings → Raccourcis. Lazy-import du module pip côté handler shortcut pour pas charger Web Audio au boot. Vite multi-page : ajouté `pip` aux `rollupOptions.input`. Capability `default.json` : ajouté `pip` au tableau `windows` pour que les invokes window:* fonctionnent.
+- **WebRTC fixes intra-dev** : rules `/voice/{sessionId}/peers/{peerUid}` simplifiées à `request.auth.uid == peerUid` (le helper `isCrewMember()` propageait mal sur master crews via `crewData()` get-chain) ; oublié les rules pour la sub-coll `/signals/{signalId}` qui faisait silently rejeter tous les writes SDP/ICE → ajout `read/delete: peerUid only ; create: any authed`. Logging granulaire dans `joinVoiceSession` (steps 1+2) + `joinChannel` pour catch les writes individuels. `VoicePanel` : erreur affichée inconditionnellement (avant gated sur `isInThisChannel === true` qui était false quand le join échouait → erreur invisible).
+- **Image lightbox intégré** ([src/components/ui/ImageViewer.tsx](src/components/ui/ImageViewer.tsx), [src/store/imageViewer.ts](src/store/imageViewer.ts), [src/lib/linkUtils.ts](src/lib/linkUtils.ts)) — modal full-screen mounted dans AppShell, store Zustand `useImageViewer.open(url, caption)`. Zoom 0.5×–5× via wheel/buttons + drag pan via Framer Motion `drag`. Touche Esc/click backdrop/X pour fermer, R/0 pour reset. Bouton télécharger via fetch+blob URL (pas de redirect browser). Bouton "Ouvrir dans le navigateur" comme fallback. `handleExternalLinkClick` étendu pour intercepter `<img>` clicks dans le markdown rendu (news, comments crew). Anti-feel "page web" : éliminé `<a target="_blank">` sur les images de message + `window.open(_blank)` sur ScreenshotsGrid (modules) + Cta block (URL action) + LogsManager download (remplacé par blob URL). `tauri-plugin-opener` reste utilisé pour les liens externes vraiment externes (URLs, partage profile).
+- **Crews caching** ([src/lib/offlineCache.ts](src/lib/offlineCache.ts), [src/pages/CrewsPage.tsx](src/pages/CrewsPage.tsx)) — slots localStorage `offline.crews.v1` (liste complète) + `offline.myCrewIds.v1` (memberships par uid). Hot-seed au boot via `useState(() => loadCachedCrews())` + flag `crewsPrimed` initiallement true si cache non-vide. Empty state placeholder "Aucun clan / Rejoindre / Créer" gated sur `fullyPrimed && visibleCrews.length === 0` — sinon skeleton minimal "Chargement des crews…" pour éviter le flash inverse. Watchers `watchCrews`/`watchMyCrewIds` persistent à chaque snapshot pour le prochain boot. Empêche le FOUC de placeholder qui faisait penser à un site web qui charge.
 ## [v26.05.08] - 2026-05-08  · semver `26.508.0`
 
 ### Nouveau
