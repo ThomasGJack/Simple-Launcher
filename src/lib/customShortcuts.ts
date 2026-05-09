@@ -65,6 +65,12 @@ export const SHORTCUT_ACTIONS: ShortcutAction[] = [
     defaultKey: "",
     hint: "Pour aller vite quand tu cherches un user / module / channel.",
   },
+  {
+    id: "pip.toggle",
+    label: "Picture-in-Picture",
+    defaultKey: "",
+    hint: "Affiche/cache la mini-fenêtre flottante avec amis online + notifs.",
+  },
 ];
 
 const LS_KEY = "shortcuts.bindings.v1";

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Hash, Pin, Search, X } from "lucide-react";
+import { Hash, Pin, Search, X, Mic } from "lucide-react";
 import {
   recordNotification,
 } from "@/firebase/notifications";
@@ -15,6 +15,8 @@ import {
 } from "@/firebase/crews";
 import { MessageItem } from "@/components/crews/MessageItem";
 import { MessageComposer } from "@/components/crews/MessageComposer";
+import { VoicePanel } from "@/components/voice/VoicePanel";
+import { useVoiceStore } from "@/store/voice";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
 
@@ -46,6 +48,14 @@ export function ChannelView({
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [replyTo, setReplyTo] = useState<CrewMessage | null>(null);
+  const [voicePanelOpen, setVoicePanelOpen] = useState(false);
+  // Auto-open le panel vocal quand on est connecté à CE channel.
+  const voiceActive = useVoiceStore((s) => s.active);
+  const isInThisVoice =
+    voiceActive?.crewId === crew.id && voiceActive?.channelId === channel.id;
+  useEffect(() => {
+    if (isInThisVoice) setVoicePanelOpen(true);
+  }, [isInThisVoice]);
   const scrollerRef = useRef<HTMLDivElement>(null);
 
   const crewId = crew.id;
@@ -182,6 +192,23 @@ export function ChannelView({
         )}
         <button
           type="button"
+          onClick={() => {
+            sounds.click();
+            setVoicePanelOpen((v) => !v);
+          }}
+          title="Salon vocal"
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs ring-1 transition",
+            voicePanelOpen || isInThisVoice
+              ? "bg-emerald-400/15 text-emerald-300 ring-emerald-400/30"
+              : "bg-white/[0.03] text-fg-muted ring-white/[0.06] hover:bg-white/[0.06]",
+          )}
+        >
+          <Mic className="size-3" />
+          Vocal
+        </button>
+        <button
+          type="button"
           onClick={() => setSearchOpen((v) => !v)}
           title="Rechercher"
           className={cn(
@@ -194,6 +221,17 @@ export function ChannelView({
           <Search className="size-3.5" />
         </button>
       </header>
+
+      <AnimatePresence>
+        {voicePanelOpen && (
+          <VoicePanel
+            crewId={crewId}
+            channelId={channelId}
+            crewName={crew.name}
+            channelName={channel.name}
+          />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {searchOpen && (

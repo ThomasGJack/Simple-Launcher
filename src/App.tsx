@@ -117,6 +117,13 @@ void (async () => {
         console.warn("[screenshot] capture failed:", err);
       });
     });
+    onShortcut("pip.toggle", () => {
+      // Lazy import — la PiP est utilisée occasionnellement, pas
+      // besoin de pull le module dès le boot.
+      import("@/lib/pip")
+        .then(({ togglePip }) => togglePip())
+        .catch((err) => console.warn("[pip] toggle failed:", err));
+    });
   } catch {
     /* silent */
   }

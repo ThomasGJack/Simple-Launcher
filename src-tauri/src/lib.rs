@@ -18,6 +18,7 @@ mod modules;
 mod oauth;
 mod obs_ws;
 mod overlay;
+mod pip;
 mod rcon;
 mod screenshot;
 mod shortcuts;
@@ -213,6 +214,10 @@ pub fn run() {
             overlay::overlay_toggle,
             overlay::overlay_show,
             overlay::overlay_hide,
+            pip::pip_toggle,
+            pip::pip_show,
+            pip::pip_hide,
+            pip::pip_set_bounds,
             // Velopack auto-updater commands (replaces tauri-plugin-updater)
             velo_updater::velo_check,
             velo_updater::velo_download,
