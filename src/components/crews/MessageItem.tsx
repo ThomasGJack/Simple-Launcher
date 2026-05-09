@@ -181,6 +181,10 @@ export const MessageItem = memo(function MessageItem({
           size="sm"
           className="shrink-0"
           fallbackTone="muted"
+          frameId={
+            allUsers.find((u) => u.uid === message.senderUid)?.equippedFrameId ??
+            null
+          }
         />
       )}
 

@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Library, Settings, LogIn, Shield, Users, Star, MessageCircle, Castle, Crown, Bell } from "lucide-react";
+import { Library, Settings, LogIn, Shield, Users, Star, MessageCircle, Castle, Crown, Bell, Smile } from "lucide-react";
 import { useUIStore, type Route } from "@/store/ui";
 import { useAuthStore } from "@/store/auth";
 import { useFavoritesStore } from "@/store/favorites";
@@ -12,6 +12,7 @@ import { unreadCount, otherParticipant, type Conversation } from "@/types/messag
 import { notify } from "@/lib/notifications";
 import { NotificationsCenter } from "@/components/notifications/NotificationsCenter";
 import { TierAvatar } from "@/components/tier/TierAvatar";
+import { CustomStatusModalHost } from "@/components/presence/CustomStatusModal";
 import type { LauncherModule } from "@/types/module";
 import { cn } from "@/lib/cn";
 
@@ -25,6 +26,12 @@ export function Sidebar() {
   const notifs = useNotifications(user?.uid);
   const unreadNotifs = notifs.filter((n) => n.readAtMs === null).length;
   const [notifsOpen, setNotifsOpen] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
+  const allUsers = useUsers();
+  const myCustomStatus = useMemo(
+    () => allUsers.find((u) => u.uid === user?.uid)?.customStatus ?? null,
+    [allUsers, user?.uid],
+  );
   // Tracks the last-seen state of each conversation to detect new arrivals.
   // Map: conversationId → lastMessage.sentAt of the last message we observed.
   // When a new message lands AND it's from someone else AND we're not on the
@@ -224,6 +231,17 @@ export function Sidebar() {
             onClick={() => navigate({ name: "admin" })}
           />
         )}
+        {user && (
+          <NavButton
+            icon={Smile}
+            label={myCustomStatus ? `Statut : ${myCustomStatus}` : "Définir un statut"}
+            active={statusOpen}
+            onClick={() => {
+              sounds.click();
+              setStatusOpen(true);
+            }}
+          />
+        )}
         <NavButton
           icon={Settings}
           label="Paramètres"
@@ -254,6 +272,14 @@ export function Sidebar() {
       </div>
 
       <NotificationsCenter open={notifsOpen} onClose={() => setNotifsOpen(false)} />
+      {user && (
+        <CustomStatusModalHost
+          uid={user.uid}
+          currentStatus={myCustomStatus}
+          open={statusOpen}
+          onClose={() => setStatusOpen(false)}
+        />
+      )}
     </aside>
   );
 }
@@ -552,7 +578,9 @@ function AvatarButton({
   // sidebar avatar reflects supporter status with the same animated
   // frame seen elsewhere in the app.
   const allUsers = useUsers();
-  const tier = allUsers.find((u) => u.uid === uid)?.tier ?? null;
+  const me = allUsers.find((u) => u.uid === uid);
+  const tier = me?.tier ?? null;
+  const equippedFrameId = me?.equippedFrameId ?? null;
 
   return (
     <button
@@ -590,6 +618,7 @@ function AvatarButton({
         displayName={displayName}
         size="md"
         className="relative z-10"
+        frameId={equippedFrameId}
       />
       <span className="pointer-events-none absolute left-full ml-3 whitespace-nowrap rounded-md bg-bg-elevated px-2.5 py-1 text-xs text-fg-primary opacity-0 shadow-lg ring-1 ring-white/[0.06] transition-opacity group-hover:opacity-100 z-50">
         {displayName}

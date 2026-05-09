@@ -29,6 +29,9 @@ export type CrewTodo = {
   assignedUids: string[];
   status: TodoStatus;
   priority: TodoPriority;
+  /** Date d'échéance (ms epoch) ou null. Affichée dans la todo row,
+   *  badge rouge si dépassée. */
+  dueDate: number | null;
   position: number;
   createdAt: number;
   completedAt: number | null;
@@ -64,6 +67,7 @@ export function watchCrewTodos(
             : [],
           status: validStatus(data.status),
           priority: validPriority(data.priority),
+          dueDate: tsToMs(data.dueDate),
           position: typeof data.position === "number" ? data.position : 0,
           createdAt: tsToMs(data.createdAt) ?? 0,
           completedAt: tsToMs(data.completedAt),
@@ -86,7 +90,11 @@ export async function createTodo(
   body: string,
   authorUid: string,
   authorName: string | null,
-  priority: TodoPriority = "normal",
+  options: {
+    priority?: TodoPriority;
+    dueDate?: number | null;
+    assignedUids?: string[];
+  } = {},
 ): Promise<string> {
   const fb = getFirebase();
   if (!fb) throw new Error("Firebase not configured");
@@ -95,15 +103,36 @@ export async function createTodo(
     body,
     authorUid,
     authorName,
-    assignedUids: [],
+    assignedUids: options.assignedUids ?? [],
     status: "todo" as TodoStatus,
-    priority,
+    priority: options.priority ?? ("normal" as TodoPriority),
+    dueDate: options.dueDate ?? null,
     position: Date.now(),
     createdAt: serverTimestamp(),
     completedAt: null,
     completedByUid: null,
   });
   return ref.id;
+}
+
+export async function updateTodoPriority(
+  crewId: string,
+  todoId: string,
+  priority: TodoPriority,
+): Promise<void> {
+  const fb = getFirebase();
+  if (!fb) throw new Error("Firebase not configured");
+  await updateDoc(doc(fb.db, "crews", crewId, "todos", todoId), { priority });
+}
+
+export async function updateTodoDueDate(
+  crewId: string,
+  todoId: string,
+  dueDate: number | null,
+): Promise<void> {
+  const fb = getFirebase();
+  if (!fb) throw new Error("Firebase not configured");
+  await updateDoc(doc(fb.db, "crews", crewId, "todos", todoId), { dueDate });
 }
 
 export async function updateTodoStatus(

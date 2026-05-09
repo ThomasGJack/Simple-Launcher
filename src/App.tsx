@@ -113,9 +113,23 @@ void (async () => {
     // Hook le raccourci screenshot.capture sur la fonction de capture
     // (Phase G). Reste dormant si l'user n'a pas mappé de raccourci.
     onShortcut("screenshot.capture", () => {
-      captureAndSave().catch((err) => {
-        console.warn("[screenshot] capture failed:", err);
-      });
+      // Capture + upload Firebase Storage (gallery profile) + download
+      // local (Pictures). Si l'user n'est pas authed (rare), fallback
+      // sur captureAndSave (download seul).
+      const me = useAuthStore.getState().user;
+      if (me) {
+        void import("@/lib/screenshot")
+          .then(({ captureUploadAndSave }) => captureUploadAndSave(me.uid))
+          .catch((err) => {
+            console.warn("[screenshot] capture+upload failed:", err);
+            // Fallback : juste le download local sans upload
+            captureAndSave().catch(() => {});
+          });
+      } else {
+        captureAndSave().catch((err) => {
+          console.warn("[screenshot] capture failed:", err);
+        });
+      }
     });
     onShortcut("pip.toggle", () => {
       // Lazy import — la PiP est utilisée occasionnellement, pas

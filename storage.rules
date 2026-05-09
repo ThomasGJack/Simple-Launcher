@@ -73,5 +73,18 @@ service firebase.storage {
       allow delete: if request.auth != null && (request.auth.uid == uid || isAdmin());
     }
 
+    // Screenshots (PNG capturés via F2 dans le launcher). Public read
+    // pour qu'un autre user puisse les voir sur la page profile
+    // partagée. Write restreint à l'owner. 10 MiB cap suffit pour des
+    // PNG haute def 4K.
+    match /users/{uid}/screenshots/{file} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
   }
 }

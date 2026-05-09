@@ -1,13 +1,20 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { MessageSquare, Send, X } from "lucide-react";
+import { MessageSquare, Send, X, AtSign } from "lucide-react";
 import {
   postComment,
   watchComments,
   type NewsComment,
 } from "@/firebase/newsComments";
+import {
+  injectMentionTokens,
+  extractMentionedUids,
+} from "@/lib/crewMessageFormat";
 import { useAuthStore } from "@/store/auth";
+import { useUsers } from "@/store/firebaseStores";
+import { recordNotification } from "@/firebase/notifications";
 import { sounds } from "@/lib/sounds";
+import { cn } from "@/lib/cn";
 import { CommentItem } from "./CommentItem";
 
 /**
@@ -24,11 +31,91 @@ import { CommentItem } from "./CommentItem";
  */
 export function CommentThread({ newsId }: { newsId: string }) {
   const me = useAuthStore((s) => s.user);
+  const allUsers = useUsers();
   const [comments, setComments] = useState<NewsComment[]>([]);
   const [draft, setDraft] = useState("");
   const [replyTo, setReplyTo] = useState<NewsComment | null>(null);
   const [busy, setBusy] = useState(false);
   const [primed, setPrimed] = useState(false);
+
+  // Mention autocomplete — réutilise le mécanisme du MessageComposer
+  // crew. État local au composer.
+  const taRef = useRef<HTMLTextAreaElement | null>(null);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [highlightIdx, setHighlightIdx] = useState(0);
+  const [resolvedMentions, setResolvedMentions] = useState<
+    Array<{ uid: string; displayName: string }>
+  >([]);
+
+  // Top 5 users qui matchent la query (case-insensitive prefix on
+  // displayName ou username).
+  const suggestions = useMemo(() => {
+    if (mentionQuery === null) return [];
+    const q = mentionQuery.toLowerCase();
+    return allUsers
+      .filter(
+        (u) =>
+          u.displayName &&
+          (q === "" ||
+            u.displayName.toLowerCase().includes(q) ||
+            u.username?.toLowerCase().includes(q)),
+      )
+      .slice(0, 5);
+  }, [allUsers, mentionQuery]);
+
+  const updateMentionQuery = (next: string) => {
+    setDraft(next);
+    const ta = taRef.current;
+    if (!ta) {
+      setMentionQuery(null);
+      return;
+    }
+    const cursor = ta.selectionStart;
+    const upToCursor = next.slice(0, cursor);
+    const match = /(?:^|\s)@([\p{L}\p{N}_-]*)$/u.exec(upToCursor);
+    if (match) {
+      setMentionQuery(match[1]);
+      setHighlightIdx(0);
+    } else {
+      setMentionQuery(null);
+    }
+  };
+
+  const insertMention = (user: {
+    uid: string;
+    displayName: string | null;
+    username: string | null;
+  }) => {
+    const ta = taRef.current;
+    if (!ta) return;
+    const display = user.displayName ?? user.username ?? "";
+    if (!display) return;
+    const cursor = ta.selectionStart;
+    const upToCursor = draft.slice(0, cursor);
+    const after = draft.slice(cursor);
+    const replaced = upToCursor.replace(/@[\p{L}\p{N}_-]*$/u, `@${display} `);
+    const next = replaced + after;
+    setDraft(next);
+    setMentionQuery(null);
+    setResolvedMentions((arr) => {
+      if (arr.find((m) => m.uid === user.uid)) return arr;
+      return [...arr, { uid: user.uid, displayName: display }];
+    });
+    requestAnimationFrame(() => {
+      ta.focus();
+      const newCursor = replaced.length;
+      ta.setSelectionRange(newCursor, newCursor);
+    });
+  };
+
+  // Reset les mentions résolues quand l'user les retire du texte —
+  // évite que des mentions stale leak dans un nouveau commentaire.
+  useEffect(() => {
+    if (resolvedMentions.length === 0) return;
+    setResolvedMentions((arr) =>
+      arr.filter((m) => draft.includes(`@${m.displayName}`)),
+    );
+  }, [draft, resolvedMentions.length]);
 
   useEffect(() => {
     const unsub = watchComments(newsId, (next) => {
@@ -52,16 +139,37 @@ export function CommentThread({ newsId }: { newsId: string }) {
     if (!text || !me || busy) return;
     setBusy(true);
     try {
+      // Convertit les `@DisplayName` en tokens canoniques `<@uid>`
+      // avant save (pareil que MessageComposer crew).
+      const tokenized = injectMentionTokens(text, resolvedMentions);
+      const mentionedUids = extractMentionedUids(tokenized);
+
       await postComment(
         newsId,
         me.uid,
         me.displayName ?? null,
         me.photoURL ?? null,
-        text,
+        tokenized,
         replyTo?.id ?? null,
       );
+
+      // Notif aux mentionnés (skip self-mention).
+      for (const uid of mentionedUids) {
+        if (uid === me.uid) continue;
+        recordNotification(uid, {
+          kind: "system",
+          title: `${me.displayName ?? "Quelqu'un"} t'a mentionné dans un commentaire`,
+          description: text.replace(/<@[^>]+>/g, "").slice(0, 140) || "Mention",
+          link: `news`,
+        }).catch((err) =>
+          console.warn("[comments] mention notif failed:", err),
+        );
+      }
+
       setDraft("");
       setReplyTo(null);
+      setResolvedMentions([]);
+      setMentionQuery(null);
       sounds.success();
     } catch (err) {
       console.warn("[CommentThread] post failed:", err);
@@ -106,27 +214,100 @@ export function CommentThread({ newsId }: { newsId: string }) {
               </button>
             </div>
           )}
-          <textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder={
-              replyTo
-                ? `Répondre à ${replyTo.authorName ?? "ce commentaire"}…`
-                : "Écris un commentaire — markdown léger supporté (**gras**, *italique*, [lien](url))…"
-            }
-            rows={3}
-            // px-1 + leading-relaxed : sans padding horizontal le texte
-            // s'aligne sur le coin arrondi (rounded-2xl du parent ≈ 16px)
-            // alors que le textarea n'a que 12px (p-3) → les premières
-            // lettres semblent grignotées par la courbe. 4px d'inset suffit.
-            className="w-full resize-none rounded-lg bg-transparent px-1 text-sm leading-relaxed text-fg-primary outline-none placeholder:text-fg-dim"
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-                e.preventDefault();
-                handleSubmit();
+          <div className="relative">
+            <textarea
+              ref={taRef}
+              value={draft}
+              onChange={(e) => updateMentionQuery(e.target.value)}
+              placeholder={
+                replyTo
+                  ? `Répondre à ${replyTo.authorName ?? "ce commentaire"}…`
+                  : "Écris un commentaire — markdown léger + @user pour mentionner…"
               }
-            }}
-          />
+              rows={3}
+              // px-1 + leading-relaxed : sans padding horizontal le texte
+              // s'aligne sur le coin arrondi (rounded-2xl du parent ≈ 16px)
+              // alors que le textarea n'a que 12px (p-3) → les premières
+              // lettres semblent grignotées par la courbe. 4px d'inset suffit.
+              className="w-full resize-none rounded-lg bg-transparent px-1 text-sm leading-relaxed text-fg-primary outline-none placeholder:text-fg-dim"
+              onKeyDown={(e) => {
+                // Mention picker keyboard nav
+                if (mentionQuery !== null && suggestions.length > 0) {
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setHighlightIdx((i) => (i + 1) % suggestions.length);
+                    return;
+                  }
+                  if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setHighlightIdx(
+                      (i) => (i - 1 + suggestions.length) % suggestions.length,
+                    );
+                    return;
+                  }
+                  if (e.key === "Enter" || e.key === "Tab") {
+                    e.preventDefault();
+                    insertMention(suggestions[highlightIdx]);
+                    return;
+                  }
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    setMentionQuery(null);
+                    return;
+                  }
+                }
+                if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                  e.preventDefault();
+                  handleSubmit();
+                }
+              }}
+            />
+
+            {/* Mention autocomplete popup */}
+            {mentionQuery !== null && suggestions.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="absolute bottom-full left-0 right-0 mb-1 max-h-48 overflow-y-auto rounded-lg bg-bg-elevated/95 ring-1 ring-white/[0.08] shadow-[0_8px_24px_rgba(0,0,0,0.4)] backdrop-blur-md"
+              >
+                <div className="flex items-center gap-1.5 border-b border-white/[0.06] px-3 py-1.5 text-[10px] uppercase tracking-[0.2em] text-fg-dim">
+                  <AtSign className="size-3" />
+                  Mentionner un user
+                </div>
+                {suggestions.map((u, i) => {
+                  const initial = (u.displayName ?? "?").charAt(0).toUpperCase();
+                  return (
+                    <button
+                      key={u.uid}
+                      type="button"
+                      onClick={() => insertMention(u)}
+                      onMouseEnter={() => setHighlightIdx(i)}
+                      className={cn(
+                        "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition",
+                        i === highlightIdx
+                          ? "bg-accent/15 text-fg-primary"
+                          : "text-fg-muted hover:bg-white/[0.04]",
+                      )}
+                    >
+                      {u.avatarUrl ? (
+                        <img
+                          src={u.avatarUrl}
+                          alt=""
+                          className="size-6 rounded-full ring-1 ring-white/10"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div className="grid size-6 place-items-center rounded-full bg-accent/15 text-[10px] font-semibold text-accent">
+                          {initial}
+                        </div>
+                      )}
+                      <span className="truncate">{u.displayName ?? u.username}</span>
+                    </button>
+                  );
+                })}
+              </motion.div>
+            )}
+          </div>
           <div className="flex items-center justify-between">
             <span className="text-[10px] text-fg-dim">
               Ctrl+Entrée pour publier

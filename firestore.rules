@@ -47,6 +47,14 @@ service cloud.firestore {
         allow read, write: if request.auth != null && request.auth.uid == uid;
       }
 
+      // Screenshots — gallery par-user. Read public (visible sur la
+      // page profile publique partageable), write owner-only.
+      match /screenshots/{screenshotId} {
+        allow read: if request.auth != null;
+        allow create, update, delete:
+          if request.auth != null && request.auth.uid == uid;
+      }
+
       // Personal custom Minecraft instances — private to the owner. Same
       // shape as the public Minecraft module type but stored per-user so
       // the user can spin up their own modpacks (vanilla + loader + their
@@ -412,6 +420,15 @@ service cloud.firestore {
           && request.resource.data.authorUid == request.auth.uid;
         allow update, delete: if request.auth != null
           && resource.data.authorUid == request.auth.uid;
+
+        // Réactions emoji par comment — même pattern que les news
+        // reactions : 1 doc par (comment, user) avec la liste des
+        // emojis activés. Read tout authed, write only own doc.
+        match /reactions/{uid} {
+          allow read: if request.auth != null;
+          allow create, update, delete:
+            if request.auth != null && request.auth.uid == uid;
+        }
       }
     }
 
@@ -421,6 +438,17 @@ service cloud.firestore {
     match /config/{configId} {
       allow read: if request.auth != null;
       allow write: if isAdmin();
+    }
+
+    // Cache Steam Web API — métadonnées riches de chaque jeu Steam
+    // (cover, screenshots, trailers, description, prix, joueurs en
+    // ligne, achievements globaux). Le launcher fetch via Tauri Rust
+    // command et persiste ici pour le partager entre tous les users
+    // du crew (TTL 24h côté frontend). Read+write all authed users —
+    // c'est juste un cache Steam-side, pas de donnée sensible.
+    match /steamApps/{appId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null;
     }
 
     // Modules: any authenticated user can read; admins can write.

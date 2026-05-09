@@ -106,5 +106,15 @@ windows = { version = "0.58", features = [
     "Win32_Foundation",
     "Win32_Security",
     "Win32_System_Threading",
+    # `Win32_UI_Shell` apporte `SetCurrentProcessExplicitAppUserModelID`
+    # — utilisé par `win_aumid.rs` pour que les toast notifications
+    # Windows affichent "Simple Launcher" comme source au lieu de
+    # "Windows PowerShell" (dev) ou "App" (prod sans installer).
+    "Win32_UI_Shell",
 ] }
+# Wrapper haut-niveau du registre Windows — utilisé par `win_aumid.rs`
+# pour enregistrer l'AUMID dans HKCU\Software\Classes\AppUserModelId\
+# avec son DisplayName + IconUri. Sans ça, Windows ne sait pas comment
+# afficher le source d'une toast notification.
+winreg = "0.52"
 

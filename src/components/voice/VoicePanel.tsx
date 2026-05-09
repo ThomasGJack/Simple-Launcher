@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, MicOff, Headphones, HeadphoneOff, PhoneOff, Users } from "lucide-react";
+import {
+  Mic,
+  MicOff,
+  Headphones,
+  HeadphoneOff,
+  PhoneOff,
+  Users,
+  Volume2,
+} from "lucide-react";
 import { useVoiceStore } from "@/store/voice";
 import { useAuthStore } from "@/store/auth";
 import { useUsers } from "@/store/firebaseStores";
@@ -9,6 +17,7 @@ import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
 import { VoiceParticipant } from "./VoiceParticipant";
 import { AudioMixer } from "./AudioMixer";
+import { MicTestModalHost } from "./MicTestModal";
 
 const MAX_PARTICIPANTS = 8;
 
@@ -41,6 +50,7 @@ export function VoicePanel({
   const usersList = useUsers();
   const voice = useVoiceStore();
   const [session, setSession] = useState<VoiceSession | null>(null);
+  const [micTestOpen, setMicTestOpen] = useState(false);
 
   // Watch session active dans ce channel — pour afficher "X en vocal"
   // quand on n'a pas encore rejoint.
@@ -142,31 +152,44 @@ export function VoicePanel({
               </button>
             </div>
           ) : (
-            <button
-              onClick={handleJoin}
-              disabled={!me || isFull}
-              title={
-                !me
-                  ? "Connecte-toi pour rejoindre le vocal"
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => {
+                  sounds.click();
+                  setMicTestOpen(true);
+                }}
+                title="Tester ton micro avant de rejoindre"
+                className="inline-flex items-center gap-1 rounded-lg bg-white/[0.04] px-2.5 py-2 text-xs text-fg-muted ring-1 ring-white/[0.06] transition hover:bg-white/[0.08] hover:text-fg-primary"
+              >
+                <Volume2 className="size-3" />
+                Tester
+              </button>
+              <button
+                onClick={handleJoin}
+                disabled={!me || isFull}
+                title={
+                  !me
+                    ? "Connecte-toi pour rejoindre le vocal"
+                    : isFull
+                      ? `Salon plein (${MAX_PARTICIPANTS} max)`
+                      : isInOtherChannel
+                        ? "Va te déconnecter de ton vocal actif d'abord"
+                        : undefined
+                }
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition",
+                  "bg-emerald-400/15 text-emerald-300 ring-1 ring-emerald-400/30 hover:bg-emerald-400/25 hover:shadow-[0_0_18px_rgba(74,222,128,0.3)]",
+                  "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-emerald-400/15 disabled:hover:shadow-none",
+                )}
+              >
+                <Mic className="size-3.5" />
+                {isInOtherChannel
+                  ? "Déjà en vocal ailleurs"
                   : isFull
-                    ? `Salon plein (${MAX_PARTICIPANTS} max)`
-                    : isInOtherChannel
-                      ? "Va te déconnecter de ton vocal actif d'abord"
-                      : undefined
-              }
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition",
-                "bg-emerald-400/15 text-emerald-300 ring-1 ring-emerald-400/30 hover:bg-emerald-400/25 hover:shadow-[0_0_18px_rgba(74,222,128,0.3)]",
-                "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-emerald-400/15 disabled:hover:shadow-none",
-              )}
-            >
-              <Mic className="size-3.5" />
-              {isInOtherChannel
-                ? "Déjà en vocal ailleurs"
-                : isFull
-                  ? "Plein"
-                  : "Rejoindre"}
-            </button>
+                    ? "Plein"
+                    : "Rejoindre"}
+              </button>
+            </div>
           )}
         </div>
 
@@ -228,6 +251,8 @@ export function VoicePanel({
           </div>
         )}
       </motion.div>
+
+      <MicTestModalHost open={micTestOpen} onClose={() => setMicTestOpen(false)} />
     </>
   );
 }

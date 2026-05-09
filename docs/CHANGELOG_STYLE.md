@@ -236,13 +236,57 @@ bouton "Suivant" est trop petit, tu le fix dans la même release.
 
 ## Workflow recommandé pendant le dev
 
-1. Dès que tu fais un changement, ajoute une ligne brute sous `## [Unreleased]` 
-   (n'importe quelle sous-section, même approximative).
-2. Avant `npm run release:launcher`, **relis** ta section `[Unreleased]` 
-   et :
-   - Reformule en phrases user-facing
+### ⚠ Règle absolue n°1 — Mettre à jour `[Unreleased]` à chaque feature
+
+**Dès qu'une feature/fix/amélioration est terminée, ajoute UNE ligne sous
+`## [Unreleased]`**, dans la sous-section qui correspond (Nouveau / Amélioré /
+Corrigé / Supprimé / Sécurité). Pas après, pas "en fin de cycle" — **tout de
+suite**, pendant que le contexte est frais.
+
+Si tu fais 8 features sans rien noter, tu vas oublier la moitié au moment du
+release, et le reste sera mal reformulé parce que tu auras perdu le contexte.
+
+Ajoute aussi une entrée dans **Détails techniques** (paths, raisonnement,
+gotchas) au même moment — c'est le seul moment où tu te souviens du *pourquoi*.
+
+### ⚠ Règle absolue n°2 — Vérifier les doublons avant push
+
+**AVANT chaque `npm run release:launcher`, fetch la liste des versions déjà
+publiées et compare avec `[Unreleased]` :**
+
+```bash
+curl -sL https://simplelaunche.web.app/launcher/versions.json -o $TEMP/versions.json
+```
+
+Lis au minimum les notes des **2-3 dernières versions** et vérifie qu'aucune
+entrée de ton `[Unreleased]` ne fait doublon avec ce qui est déjà en prod.
+
+C'est arrivé : un cycle de dev où Phase A-H avait été release dans la version
+N, puis le `[Unreleased]` n'a pas été cleané, et la version N+1 ré-annonçait
+les mêmes features. Le user le voit, ça décrédibilise.
+
+Causes typiques de doublons :
+- Tu reprends une session après un compact, et tu ré-annonces une feature qui
+  a déjà été release dans une session précédente.
+- Tu fix un bug d'une feature déjà release et tu réécris l'entrée "Nouveau"
+  au lieu de mettre une ligne "Corrigé".
+- Tu confonds le développement local (CHANGELOG.md) avec ce qui est
+  effectivement en prod (versions.json).
+
+### Étapes complètes
+
+1. **Pendant le dev** : à chaque feature finie, ajoute UNE ligne sous
+   `[Unreleased]` (règle 1).
+2. **Juste avant le push** :
+   - **Fetch les versions prod** (règle 2) :
+     `curl -sL https://simplelaunche.web.app/launcher/versions.json -o $TEMP/versions.json`
+   - Lis les notes des 2-3 dernières releases.
+   - Pour chaque ligne du `[Unreleased]`, vérifie qu'elle n'est PAS déjà en prod.
+   - Si doublon trouvé → supprime la ligne du `[Unreleased]`.
+3. **Relis `[Unreleased]`** et :
+   - Reformule en phrases user-facing (test du non-tech)
    - Migre les détails techniques vers la section dédiée
    - Vire les "Corrigé" qui sont des fixes intra-dev (jamais en prod)
-3. `npm run bump` puis `npm run release:launcher`.
-4. `firebase deploy --only hosting`
-5. `npm run release:notify` (envoie l'embed Discord).
+4. `npm run bump` puis `npm run release:launcher`.
+5. `firebase deploy --only hosting`
+6. `npm run release:notify` (envoie l'embed Discord).

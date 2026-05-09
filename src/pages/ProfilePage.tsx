@@ -4,6 +4,7 @@ import { LogOut, Calendar, Mail, Hash, Gamepad2, Clock, Rocket, Trophy, Sigma, F
 import { ShareProfileModal } from "@/components/profile/ShareProfileModal";
 import { PlayHeatmap } from "@/components/profile/PlayHeatmap";
 import { CosmeticsGallery } from "@/components/cosmetics/CosmeticsGallery";
+import { ScreenshotsGallery } from "@/components/screenshots/ScreenshotsGallery";
 import { sounds } from "@/lib/sounds";
 import { useAuthStore } from "@/store/auth";
 import { useUIStore } from "@/store/ui";
@@ -288,6 +289,26 @@ export function ProfilePage() {
         <div className="mt-6 max-w-2xl">
           <CosmeticsGallery tier={null} currentEquipped={null} />
         </div>
+      )}
+
+      {/* Gallery des screenshots — auto-alimentée par F2 dans le launcher */}
+      {user && (
+        <motion.section
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="mt-10"
+        >
+          <div className="mb-3 flex items-center gap-2">
+            <p className="text-xs uppercase tracking-[0.25em] text-accent">
+              📸 Mes captures
+            </p>
+            <span className="text-[10px] text-fg-dim">
+              F2 dans le launcher pour capturer
+            </span>
+          </div>
+          <ScreenshotsGallery uid={user.uid} isOwner={true} />
+        </motion.section>
       )}
 
       {discordId && (

@@ -24,26 +24,17 @@ export async function listSteamGames(): Promise<SteamGame[]> {
 }
 
 /**
- * URLs des assets Steam pour un appId donné. Steam héberge les images
- * sur leur CDN public Cloudflare — pas besoin de scraper le filesystem
- * ni d'appeler une API authentifiée.
+ * URL de la cover verticale Steam haute définition d'un appId. C'est
+ * exactement la même image que Steam affiche dans sa propre library
+ * (l'art "tall capsule" 600×900 que les éditeurs uploadent depuis 2019).
  *
- * - `library_600x900.jpg` : cover verticale 600×900, idéale pour la
- *   card de la library (ratio 4:5 que ModuleCard attend).
- * - `header.jpg` : bannière horizontale 460×215, sert d'icône carrée
- *   recadrée sur la library (mb-2 size-10 dans ModuleCard).
- * - `library_hero.jpg` : key art 1920×620, utilisé pour la page module
- *   en fond. (Pas tous les jeux ont cet asset, fallback header.)
- *
- * Si un asset est absent (jeu vraiment vieux ou retiré), l'URL renverra
- * un 404 et `<img>` tombera en placeholder ModuleCard (Gamepad2 icon).
+ * Version `_2x` = 1200×1800 px, retina-quality. Match parfaitement le
+ * ratio aspect-[4/5] de ModuleCard. Si l'asset n'existe pas (vieux
+ * jeu sans library art), 404 → onError fallback vers header.jpg ou
+ * placeholder ModuleCard.
  */
-function steamAssetUrls(appId: string): { cover: string; header: string } {
-  const base = `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${appId}`;
-  return {
-    cover: `${base}/library_600x900.jpg`,
-    header: `${base}/header.jpg`,
-  };
+export function steamCoverUrl(appId: string): string {
+  return `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${appId}/library_600x900_2x.jpg`;
 }
 
 /**
@@ -52,11 +43,10 @@ function steamAssetUrls(appId: string): { cover: string; header: string } {
  * Steam Client résout le chemin lui-même. Pas besoin de parser
  * `appinfo.vdf` binaire.
  *
- * Récupère aussi les assets visuels depuis le CDN Steam : cover
- * verticale (`bannerUrl`) et header horizontal (`iconUrl`). Sans ça,
- * la library affichait juste le nom sur fond noir → moche. Avec ces
- * URLs, ModuleCard rend la cover comme banner full-card et le header
- * comme icône en bas — UX cohérente avec les modules custom.
+ * Visual : juste la cover verticale 1200×1800 (la même que Steam
+ * utilise dans sa library). Pas d'iconUrl — la cover contient déjà
+ * le logo / titre stylisé du jeu, un overlay d'icône serait redondant
+ * et moche (header.jpg cramé à 40×40px).
  */
 export function steamGameToShortcut(game: SteamGame): {
   id: string;
@@ -64,19 +54,15 @@ export function steamGameToShortcut(game: SteamGame): {
   name: string;
   shortDescription: string;
   executablePath: string;
-  iconUrl: string;
   bannerUrl: string;
 } {
-  const assets = steamAssetUrls(game.appId);
   return {
     id: `steam-${game.appId}`,
     type: "shortcut",
     name: game.name,
     shortDescription: `Lancé via Steam (App ID ${game.appId})`,
     executablePath: `steam://run/${game.appId}`,
-    // Header carré utilisé comme icon (60×60 affiché dans la card).
-    iconUrl: assets.header,
-    // Cover verticale 4:5 utilisée comme banner full-card.
-    bannerUrl: assets.cover,
+    // Cover verticale 1200×1800 = celle exacte de Steam library.
+    bannerUrl: steamCoverUrl(game.appId),
   };
 }

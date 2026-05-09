@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useEffect, useRef } from "react";
 import { useVoiceStore } from "@/store/voice";
 import { applyOutputDevice } from "@/lib/audioDevices";
 
@@ -20,6 +20,7 @@ import { applyOutputDevice } from "@/lib/audioDevices";
 export function AudioMixer() {
   const remoteStreams = useVoiceStore((s) => s.remoteStreams);
   const deafened = useVoiceStore((s) => s.deafened);
+  const peerVolumes = useVoiceStore((s) => s.peerVolumes);
 
   // Convert Map → array stable pour iteration JSX. useMemo pour éviter
   // les re-renders de chaque <RemoteAudio> à chaque change non-pertinent.
@@ -31,23 +32,48 @@ export function AudioMixer() {
   return (
     <div aria-hidden style={{ display: "none" }}>
       {entries.map(([uid, stream]) => (
-        <RemoteAudio key={uid} stream={stream} muted={deafened} />
+        <RemoteAudio
+          key={uid}
+          stream={stream}
+          muted={deafened}
+          volume={peerVolumes.get(uid) ?? 1.0}
+        />
       ))}
     </div>
   );
 }
 
-function RemoteAudio({ stream, muted }: { stream: MediaStream; muted: boolean }) {
+function RemoteAudio({
+  stream,
+  muted,
+  volume,
+}: {
+  stream: MediaStream;
+  muted: boolean;
+  volume: number;
+}) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Apply volume changes live. La prop `volume` HTML <audio> est
+  // honorée par WebView2 — 0 = silence, 1 = volume max.
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    el.volume = Math.max(0, Math.min(1, volume));
+  }, [volume]);
+
   return (
     <audio
       autoPlay
       playsInline
       muted={muted}
       ref={(el) => {
+        audioRef.current = el;
         if (!el) return;
         if (el.srcObject !== stream) {
           el.srcObject = stream;
         }
+        el.volume = Math.max(0, Math.min(1, volume));
         // Apply chosen output device (asynchrone — silently fail si
         // setSinkId() pas supporté ou device introuvable).
         void applyOutputDevice(el);

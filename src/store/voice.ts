@@ -28,9 +28,20 @@ export type VoiceState = {
   remoteStreams: Map<string, MediaStream>;
   /** Speaking state (VAD) par uid — pour pulser le ring d'avatar. */
   speakingUids: Set<string>;
+  /** Volume per-peer (0..1). Default 1.0 si absent. AudioMixer applique
+   *  ça sur chaque <audio> remote pour permettre de baisser le volume
+   *  d'un participant individuel (ex: un pote qui crie). */
+  peerVolumes: Map<string, number>;
   /** Mes propres flags. */
   micMuted: boolean;
   deafened: boolean;
+  /** Push-to-talk activé : si true, le mic ne transmet QUE quand
+   *  l'user maintient la touche assignée (cf. customShortcuts.ts).
+   *  Sinon, transmission constante (open mic). */
+  pushToTalk: boolean;
+  /** Quand pushToTalk = true, indique si la touche est actuellement
+   *  enfoncée. Le mic transmet uniquement si pushToTalkActive === true. */
+  pushToTalkActive: boolean;
   /** Erreurs récentes — affichées dans le panel. */
   error: string | null;
 };
@@ -47,6 +58,9 @@ type VoiceActions = {
   toggleMic: () => Promise<void>;
   toggleDeafen: () => Promise<void>;
   setSpeaking: (uid: string, speaking: boolean) => void;
+  setPeerVolume: (uid: string, volume: number) => void;
+  setPushToTalk: (enabled: boolean) => void;
+  setPushToTalkActive: (active: boolean) => void;
   clearError: () => void;
 };
 
@@ -57,13 +71,33 @@ let mesh: MeshSession | null = null;
 let localStream: MediaStream | null = null;
 let peersUnsub: (() => void) | null = null;
 
+// Boot du push-to-talk depuis localStorage — l'user persiste son choix.
+const LS_PTT = "voice.ptt.v1";
+function loadPtt(): boolean {
+  try {
+    return localStorage.getItem(LS_PTT) === "1";
+  } catch {
+    return false;
+  }
+}
+function savePtt(v: boolean) {
+  try {
+    localStorage.setItem(LS_PTT, v ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+}
+
 export const useVoiceStore = create<VoiceState & VoiceActions>((set, get) => ({
   active: null,
   peers: [],
   remoteStreams: new Map(),
   speakingUids: new Set(),
+  peerVolumes: new Map(),
   micMuted: false,
   deafened: false,
+  pushToTalk: loadPtt(),
+  pushToTalkActive: false,
   error: null,
 
   async joinChannel(crewId, channelId, crewName, channelName, myUid) {
@@ -213,6 +247,37 @@ export const useVoiceStore = create<VoiceState & VoiceActions>((set, get) => ({
       else next.delete(uid);
       return { speakingUids: next };
     });
+  },
+
+  setPeerVolume(uid, volume) {
+    const clamped = Math.max(0, Math.min(1, volume));
+    set((state) => {
+      const next = new Map(state.peerVolumes);
+      next.set(uid, clamped);
+      return { peerVolumes: next };
+    });
+  },
+
+  setPushToTalk(enabled) {
+    savePtt(enabled);
+    set({ pushToTalk: enabled, pushToTalkActive: false });
+    // En mode PTT, on coupe le mic d'office — il ne s'active que
+    // quand pushToTalkActive devient true (touche enfoncée).
+    if (mesh && enabled) {
+      mesh.setMicMuted(true);
+    } else if (mesh && !enabled) {
+      // Sortie du PTT : restaure l'état muted/unmuted classique.
+      mesh.setMicMuted(get().micMuted);
+    }
+  },
+
+  setPushToTalkActive(active) {
+    if (!get().pushToTalk) return;
+    set({ pushToTalkActive: active });
+    if (mesh) {
+      // Mic actif uniquement quand active=true ET pas muted classique.
+      mesh.setMicMuted(!active || get().micMuted);
+    }
   },
 
   clearError() {

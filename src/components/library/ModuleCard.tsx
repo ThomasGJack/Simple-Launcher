@@ -31,10 +31,16 @@ export function ModuleCard({
   module,
   index,
   onEdit,
+  onSteamDetail,
 }: {
   module: LauncherModule;
   index: number;
   onEdit?: () => void;
+  /** Pour les shortcuts Steam (executablePath = `steam://run/{appId}`),
+   *  le card click ouvre une modal d'aperçu enrichi (covers, screenshots,
+   *  trailer, achievements, joueurs en ligne) au lieu de naviguer vers
+   *  la page detail générique. La modal a son propre bouton "Lancer". */
+  onSteamDetail?: (appId: string) => void;
 }) {
   const navigate = useUIStore((s) => s.navigate);
   const user = useAuthStore((s) => s.user);
@@ -59,7 +65,21 @@ export function ModuleCard({
   const [action, setAction] = useState<Action>({ kind: "idle" });
   const cleanupRef = useRef<(() => void) | null>(null);
 
-  const openDetail = () => navigate({ name: "module", moduleId: module.id });
+  const openDetail = () => {
+    // Pour les shortcuts Steam, ouvre la modal d'aperçu Steam enrichi
+    // au lieu de la page detail générique. Reconnaît via le pattern
+    // d'executablePath `steam://run/{appId}` ou l'id `steam-{appId}`.
+    if (module.type === "shortcut" && onSteamDetail) {
+      const fromPath = /^steam:\/\/run\/(\d+)/i.exec(module.executablePath ?? "");
+      const fromId = /^steam-(\d+)$/i.exec(module.id);
+      const appId = fromPath?.[1] ?? fromId?.[1] ?? null;
+      if (appId) {
+        onSteamDetail(appId);
+        return;
+      }
+    }
+    navigate({ name: "module", moduleId: module.id });
+  };
 
   useEffect(() => {
     if (module.type === "shortcut" || module.type === "custom-minecraft") {
@@ -92,6 +112,28 @@ export function ModuleCard({
   }, []);
 
   const status: DerivedStatus = deriveStatus(module, local);
+
+  // Steam shortcuts : remplace bannerUrl + iconUrl à la volée par les
+  // bons assets Steam high-def. Comme ça les shortcuts importés AVANT
+  // qu'on choisisse les bonnes URLs (ancien format `library_600x900.jpg`
+  // ou pire `header.jpg`) bénéficient des nouveaux visuels sans qu'on
+  // ait à re-importer ou migrer Firestore.
+  const steamAppId = (() => {
+    if (module.type !== "shortcut") return null;
+    const m = /^steam:\/\/run\/(\d+)/i.exec(module.executablePath ?? "");
+    if (m) return m[1];
+    const idMatch = /^steam-(\d+)$/i.exec(module.id);
+    return idMatch ? idMatch[1] : null;
+  })();
+
+  const effectiveBannerUrl = steamAppId
+    ? `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${steamAppId}/library_600x900_2x.jpg`
+    : module.bannerUrl;
+
+  // Pas d'icon overlay pour les shortcuts Steam : la cover library
+  // contient déjà le logo / titre stylisé du jeu, un mini-header en
+  // overlay ferait doublon visuel.
+  const effectiveIconUrl = steamAppId ? undefined : module.iconUrl;
 
   const handlePrimary = async (e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -162,11 +204,24 @@ export function ModuleCard({
       onClick={openDetail}
       className="group relative aspect-[4/5] overflow-hidden rounded-2xl glass cursor-pointer"
     >
-      {module.bannerUrl ? (
+      {effectiveBannerUrl ? (
         <img
-          src={module.bannerUrl}
+          src={effectiveBannerUrl}
           alt={module.name}
+          referrerPolicy="no-referrer"
           className="absolute inset-0 size-full object-cover transition-transform duration-700 group-hover:scale-105"
+          onError={(e) => {
+            // Fallback : si la cover_2x n'existe pas (vieux jeu Steam
+            // sans library art récent), retombe sur la cover normale,
+            // puis sur le header. Si tout échoue, l'<img> reste cassée
+            // mais le placeholder Gamepad2 ci-dessous prend le relais.
+            const img = e.currentTarget;
+            if (steamAppId && img.src.includes("library_600x900_2x.jpg")) {
+              img.src = `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${steamAppId}/library_600x900.jpg`;
+            } else if (steamAppId && img.src.includes("library_600x900.jpg")) {
+              img.src = `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${steamAppId}/header.jpg`;
+            }
+          }}
         />
       ) : (
         <div className="absolute inset-0 bg-gradient-to-br from-accent/20 via-transparent to-fuchsia-500/20" />
@@ -174,7 +229,7 @@ export function ModuleCard({
 
       <div className="absolute inset-0 bg-gradient-to-t from-bg-base via-bg-base/40 to-transparent" />
 
-      {!module.bannerUrl && (
+      {!effectiveBannerUrl && (
         <div className="absolute inset-0 grid place-items-center text-fg-dim">
           <Gamepad2 className="size-12" strokeWidth={1.5} />
         </div>
@@ -233,8 +288,8 @@ export function ModuleCard({
       </div>
 
       <div className="absolute inset-x-0 bottom-0 p-4">
-        {module.iconUrl && (
-          <img src={module.iconUrl} alt="" className="mb-2 size-10 rounded-lg ring-1 ring-white/10" />
+        {effectiveIconUrl && (
+          <img src={effectiveIconUrl} alt="" className="mb-2 size-10 rounded-lg ring-1 ring-white/10" />
         )}
         <div className="text-base font-semibold text-fg-primary line-clamp-1">{module.name}</div>
         {module.shortDescription && (

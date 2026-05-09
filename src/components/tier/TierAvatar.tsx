@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Crown, Heart, Sparkles } from "lucide-react";
 import type { SupporterTier } from "@/lib/supporterTier";
 import { TIER_LABEL } from "@/lib/supporterTier";
+import { CosmeticRingOverlay } from "@/components/cosmetics/AvatarFrame";
 import { cn } from "@/lib/cn";
 
 /**
@@ -41,6 +42,7 @@ export function TierAvatar({
   className,
   fallbackTone,
   animated,
+  frameId,
 }: {
   tier: SupporterTier | null | undefined;
   src: string | null;
@@ -60,6 +62,11 @@ export function TierAvatar({
    *  you really want the animation (e.g. on a 1-off prominent xs
    *  badge). */
   animated?: boolean;
+  /** Cosmetic frame équipé par l'user (id depuis `lib/cosmetics.ts`).
+   *  Rendered en overlay SVG par-dessus le tier frame existant — les
+   *  deux décorations s'empilent sans conflit. Null = pas de frame
+   *  cosmétique. */
+  frameId?: string | null | undefined;
 }) {
   const dims = SIZE_PX[size];
   const initials = (displayName ?? "?").slice(0, 1).toUpperCase();
@@ -104,6 +111,19 @@ export function TierAvatar({
   );
 
   if (!hasTier) {
+    // Sans tier mais peut avoir un frame cosmétique — wrap dans un
+    // container relative pour que l'overlay puisse se positionner.
+    if (frameId) {
+      return (
+        <div
+          className={cn("relative inline-block", className)}
+          style={{ width: dims.avatar, height: dims.avatar }}
+        >
+          {avatar}
+          <CosmeticRingOverlay frameId={frameId} size={dims.avatar} />
+        </div>
+      );
+    }
     return <div className={className}>{avatar}</div>;
   }
 
@@ -130,6 +150,9 @@ export function TierAvatar({
       >
         {avatar}
       </div>
+
+      {/* Cosmetic frame en overlay — s'empile par-dessus le tier frame */}
+      <CosmeticRingOverlay frameId={frameId} size={dims.frame} />
 
       {/* Tier badge in the bottom-right corner */}
       <TierBadge tier={tier} sizePx={dims.badge} />

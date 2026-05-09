@@ -111,6 +111,8 @@ export function MembersList({
           lastSeen: u.lastSeen ?? null,
           status: statusFromLastSeen(u.lastSeen, now),
           currentActivity: u.currentActivity ?? null,
+          customStatus: u.customStatus ?? null,
+          equippedFrameId: u.equippedFrameId ?? null,
           customRoleId: m?.customRoleId ?? null,
         };
       });
@@ -127,6 +129,8 @@ export function MembersList({
           lastSeen: live?.lastSeen ?? null,
           status: statusFromLastSeen(live?.lastSeen ?? null, now),
           currentActivity: live?.currentActivity ?? null,
+          customStatus: live?.customStatus ?? null,
+          equippedFrameId: live?.equippedFrameId ?? null,
           customRoleId: m.customRoleId ?? null,
         };
       });
@@ -480,6 +484,10 @@ type DisplayedMember = {
   currentActivity:
     | { moduleId: string; moduleName: string; startedAt: number }
     | null;
+  /** Status custom — override l'affichage "joue à X" quand non-null. */
+  customStatus: string | null;
+  /** Cadre cosmétique équipé — overlay SVG par-dessus l'avatar. */
+  equippedFrameId: string | null;
   /** Custom role id assigned to this member, if any. Resolved against
    *  the crew's `customRoles` list to render the colored name + the
    *  Discord-style section header. */
@@ -554,6 +562,7 @@ const MemberRow = memo(function MemberRow({
             displayName={member.displayName}
             size="sm"
             fallbackTone="muted"
+            frameId={member.equippedFrameId}
           />
           <span
             className={cn(
@@ -593,12 +602,18 @@ const MemberRow = memo(function MemberRow({
               <Shield className="size-3 shrink-0 text-cyan-300" />
             ) : null}
           </div>
-          {activity && (
+          {member.customStatus ? (
+            // Status custom override l'activité (intention explicite de
+            // l'user > détection auto).
+            <div className="flex items-center gap-1 truncate text-[10px] text-accent">
+              <span className="truncate">{member.customStatus}</span>
+            </div>
+          ) : activity ? (
             <div className="flex items-center gap-1 truncate text-[10px] text-emerald-300">
               <Gamepad2 className="size-2.5" />
               <span className="truncate">{activity.moduleName}</span>
             </div>
-          )}
+          ) : null}
         </div>
       </button>
 
@@ -678,6 +693,8 @@ const MemberRow = memo(function MemberRow({
     prev.member.customRoleId === next.member.customRoleId &&
     prev.member.currentActivity?.moduleId === next.member.currentActivity?.moduleId &&
     prev.member.currentActivity?.moduleName === next.member.currentActivity?.moduleName &&
+    prev.member.customStatus === next.member.customStatus &&
+    prev.member.equippedFrameId === next.member.equippedFrameId &&
     prev.customRoleColor === next.customRoleColor &&
     prev.customRoleName === next.customRoleName &&
     prev.amOwnerOrAdmin === next.amOwnerOrAdmin &&

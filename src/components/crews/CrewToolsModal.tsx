@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BookOpen,
@@ -12,6 +12,10 @@ import {
   CircleDot,
   CircleCheck,
   CircleSlash,
+  Search,
+  Calendar,
+  Flag,
+  AlertTriangle,
 } from "lucide-react";
 import { marked } from "marked";
 import { sanitizeHtml } from "@/lib/sanitizeHtml";
@@ -29,9 +33,12 @@ import {
   watchCrewTodos,
   createTodo,
   updateTodoStatus,
+  updateTodoPriority,
+  updateTodoDueDate,
   deleteTodo,
   type CrewTodo,
   type TodoStatus,
+  type TodoPriority,
 } from "@/firebase/crewTodos";
 
 /**
@@ -150,6 +157,8 @@ function WikiTab({ crewId }: { crewId: string }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({ title: "", body: "" });
+  const [search, setSearch] = useState("");
+  const [sortMode, setSortMode] = useState<"order" | "recent" | "alpha">("order");
 
   useEffect(() => {
     return watchWikiPages(crewId, (p) => {
@@ -157,6 +166,29 @@ function WikiTab({ crewId }: { crewId: string }) {
       if (!selectedId && p.length > 0) setSelectedId(p[0].id);
     });
   }, [crewId, selectedId]);
+
+  // Filtre + sort des pages selon la search query + le sort mode.
+  // - "order" : ordre de position (par défaut, comme avant)
+  // - "recent" : par updatedAt desc
+  // - "alpha" : par titre alphabétique
+  const visiblePages = useMemo(() => {
+    let arr = pages;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      arr = pages.filter(
+        (p) =>
+          p.title.toLowerCase().includes(q) ||
+          p.body.toLowerCase().includes(q),
+      );
+    }
+    const sorted = [...arr];
+    if (sortMode === "recent") {
+      sorted.sort((a, b) => b.updatedAt - a.updatedAt);
+    } else if (sortMode === "alpha") {
+      sorted.sort((a, b) => a.title.localeCompare(b.title));
+    }
+    return sorted;
+  }, [pages, search, sortMode]);
 
   const selected = pages.find((p) => p.id === selectedId) ?? null;
 
@@ -204,11 +236,11 @@ function WikiTab({ crewId }: { crewId: string }) {
   };
 
   return (
-    <div className="grid gap-4 md:grid-cols-[200px_1fr]">
-      {/* Liste des pages */}
-      <div className="flex flex-col gap-1">
-        <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-fg-dim">
-          <span>Pages ({pages.length})</span>
+    <div className="grid gap-4 md:grid-cols-[220px_1fr]">
+      {/* Liste des pages avec search + sort */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-fg-dim">
+          <span>Pages ({visiblePages.length}/{pages.length})</span>
           <button
             onClick={handleCreate}
             className="rounded-md bg-white/[0.04] p-1 text-fg-muted hover:bg-white/[0.08] hover:text-accent"
@@ -217,28 +249,64 @@ function WikiTab({ crewId }: { crewId: string }) {
             <Plus className="size-3" />
           </button>
         </div>
+
+        {/* Search input */}
+        <div className="relative">
+          <Search className="absolute left-2 top-1/2 size-3 -translate-y-1/2 text-fg-dim" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Chercher…"
+            className="w-full rounded-md bg-bg-base/60 py-1 pl-7 pr-2 text-[11px] text-fg-primary outline-none ring-1 ring-white/[0.08] focus:ring-accent/40"
+          />
+        </div>
+
+        {/* Sort buttons */}
+        <div className="flex gap-0.5 rounded-md bg-bg-base/40 p-0.5 text-[9px] uppercase tracking-wider">
+          {(["order", "recent", "alpha"] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setSortMode(m)}
+              className={cn(
+                "flex-1 rounded px-1 py-0.5 transition",
+                sortMode === m
+                  ? "bg-accent/15 text-accent"
+                  : "text-fg-dim hover:bg-white/[0.04] hover:text-fg-muted",
+              )}
+            >
+              {m === "order" ? "Ordre" : m === "recent" ? "Récent" : "A→Z"}
+            </button>
+          ))}
+        </div>
+
         {pages.length === 0 ? (
           <p className="text-xs text-fg-dim">
             Pas de pages. Crée la première !
           </p>
+        ) : visiblePages.length === 0 ? (
+          <p className="text-xs text-fg-dim">
+            Aucun résultat pour « {search} ».
+          </p>
         ) : (
-          pages.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => {
-                setSelectedId(p.id);
-                setEditing(false);
-              }}
-              className={cn(
-                "rounded-lg px-3 py-1.5 text-left text-xs transition",
-                selectedId === p.id
-                  ? "bg-accent/15 text-fg-primary ring-1 ring-accent/30"
-                  : "text-fg-muted hover:bg-white/[0.05]",
-              )}
-            >
-              {p.title}
-            </button>
-          ))
+          <div className="flex max-h-[60vh] flex-col gap-1 overflow-y-auto">
+            {visiblePages.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => {
+                  setSelectedId(p.id);
+                  setEditing(false);
+                }}
+                className={cn(
+                  "rounded-lg px-3 py-1.5 text-left text-xs transition",
+                  selectedId === p.id
+                    ? "bg-accent/15 text-fg-primary ring-1 ring-accent/30"
+                    : "text-fg-muted hover:bg-white/[0.05]",
+                )}
+              >
+                {p.title}
+              </button>
+            ))}
+          </div>
         )}
       </div>
 
@@ -334,17 +402,50 @@ function TodosTab({ crewId }: { crewId: string }) {
   const me = useAuthStore((s) => s.user);
   const [todos, setTodos] = useState<CrewTodo[]>([]);
   const [draft, setDraft] = useState("");
+  const [draftPriority, setDraftPriority] = useState<TodoPriority>("normal");
+  const [draftDueDate, setDraftDueDate] = useState<string>(""); // ISO date string yyyy-mm-dd
+  const [filter, setFilter] = useState<"all" | TodoStatus>("all");
+  const [sortBy, setSortBy] = useState<"date" | "priority">("date");
 
   useEffect(() => {
     return watchCrewTodos(crewId, setTodos);
   }, [crewId]);
 
+  const visibleTodos = useMemo(() => {
+    let arr = filter === "all" ? todos : todos.filter((t) => t.status === filter);
+    arr = [...arr];
+    if (sortBy === "priority") {
+      const rank: Record<TodoPriority, number> = { high: 0, normal: 1, low: 2 };
+      arr.sort((a, b) => rank[a.priority] - rank[b.priority]);
+    }
+    // sortBy === "date" garde l'ordre de createdAt desc déjà fourni par
+    // le watcher Firestore — pas de re-sort.
+    return arr;
+  }, [todos, filter, sortBy]);
+
+  const counts = useMemo(() => {
+    return {
+      all: todos.length,
+      todo: todos.filter((t) => t.status === "todo").length,
+      "in-progress": todos.filter((t) => t.status === "in-progress").length,
+      done: todos.filter((t) => t.status === "done").length,
+    };
+  }, [todos]);
+
   const handleAdd = async () => {
     if (!me) return;
     const text = draft.trim();
     if (!text) return;
-    await createTodo(crewId, text, "", me.uid, me.displayName ?? null);
+    const dueDateMs = draftDueDate
+      ? new Date(draftDueDate).getTime() || null
+      : null;
+    await createTodo(crewId, text, "", me.uid, me.displayName ?? null, {
+      priority: draftPriority,
+      dueDate: dueDateMs,
+    });
     setDraft("");
+    setDraftPriority("normal");
+    setDraftDueDate("");
     sounds.click();
   };
 
@@ -367,35 +468,132 @@ function TodosTab({ crewId }: { crewId: string }) {
     sounds.click();
   };
 
+  const cyclePriority = async (todo: CrewTodo) => {
+    const next: TodoPriority =
+      todo.priority === "low" ? "normal" : todo.priority === "normal" ? "high" : "low";
+    await updateTodoPriority(crewId, todo.id, next);
+    sounds.click();
+  };
+
+  const setDueDate = async (todo: CrewTodo, dateStr: string) => {
+    const ms = dateStr ? new Date(dateStr).getTime() || null : null;
+    await updateTodoDueDate(crewId, todo.id, ms);
+    sounds.click();
+  };
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-2 rounded-xl bg-bg-base/40 p-3 ring-1 ring-white/[0.06]">
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && draft.trim()) handleAdd();
-          }}
-          placeholder="Nouvelle tâche — ex: « construire la base nord »"
-          className="flex-1 bg-transparent text-sm text-fg-primary outline-none placeholder:text-fg-dim"
-        />
-        <button
-          onClick={handleAdd}
-          disabled={!draft.trim()}
-          className="inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-bg-base disabled:opacity-50"
-        >
-          <Plus className="size-3" /> Ajouter
-        </button>
+      {/* Composer enrichi : titre + priorité + due date */}
+      <div className="rounded-xl bg-bg-base/40 p-3 ring-1 ring-white/[0.06]">
+        <div className="flex items-center gap-2">
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && draft.trim()) handleAdd();
+            }}
+            placeholder="Nouvelle tâche — ex: « construire la base nord »"
+            className="flex-1 bg-transparent text-sm text-fg-primary outline-none placeholder:text-fg-dim"
+          />
+          <button
+            onClick={handleAdd}
+            disabled={!draft.trim()}
+            className="inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-bg-base disabled:opacity-50"
+          >
+            <Plus className="size-3" /> Ajouter
+          </button>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+          <div className="inline-flex gap-0.5 rounded-md bg-bg-base/60 p-0.5 ring-1 ring-white/[0.04]">
+            {(["low", "normal", "high"] as const).map((p) => (
+              <button
+                key={p}
+                onClick={() => setDraftPriority(p)}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded px-2 py-0.5 transition",
+                  draftPriority === p
+                    ? priorityClass(p, "active")
+                    : "text-fg-dim hover:bg-white/[0.04]",
+                )}
+              >
+                <Flag className="size-2.5" />
+                {p === "low" ? "Basse" : p === "normal" ? "Normale" : "Haute"}
+              </button>
+            ))}
+          </div>
+          <div className="inline-flex items-center gap-1 rounded-md bg-bg-base/60 px-2 py-0.5 ring-1 ring-white/[0.04]">
+            <Calendar className="size-2.5 text-fg-dim" />
+            <input
+              type="date"
+              value={draftDueDate}
+              onChange={(e) => setDraftDueDate(e.target.value)}
+              className="bg-transparent text-[11px] text-fg-muted outline-none [color-scheme:dark]"
+            />
+            {draftDueDate && (
+              <button
+                onClick={() => setDraftDueDate("")}
+                className="text-fg-dim hover:text-danger"
+                title="Effacer la date"
+              >
+                <X className="size-2.5" />
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
-      {todos.length === 0 ? (
+      {/* Filtres + sort */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex gap-0.5 rounded-md bg-bg-base/40 p-0.5 text-[10px] uppercase tracking-wider">
+          <FilterChip
+            active={filter === "all"}
+            onClick={() => setFilter("all")}
+            label="Tout"
+            count={counts.all}
+          />
+          <FilterChip
+            active={filter === "todo"}
+            onClick={() => setFilter("todo")}
+            label="À faire"
+            count={counts.todo}
+          />
+          <FilterChip
+            active={filter === "in-progress"}
+            onClick={() => setFilter("in-progress")}
+            label="En cours"
+            count={counts["in-progress"]}
+          />
+          <FilterChip
+            active={filter === "done"}
+            onClick={() => setFilter("done")}
+            label="Terminé"
+            count={counts.done}
+          />
+        </div>
+        <div className="flex gap-0.5 rounded-md bg-bg-base/40 p-0.5 text-[10px] uppercase tracking-wider">
+          <FilterChip
+            active={sortBy === "date"}
+            onClick={() => setSortBy("date")}
+            label="Récent"
+          />
+          <FilterChip
+            active={sortBy === "priority"}
+            onClick={() => setSortBy("priority")}
+            label="Priorité"
+          />
+        </div>
+      </div>
+
+      {visibleTodos.length === 0 ? (
         <div className="grid h-32 place-items-center text-sm text-fg-muted">
-          Pas de tâches. Lance la dynamique !
+          {todos.length === 0
+            ? "Pas de tâches. Lance la dynamique !"
+            : `Aucune tâche ${filter === "all" ? "" : `dans « ${filter} »`}.`}
         </div>
       ) : (
         <div className="flex flex-col gap-2">
           <AnimatePresence>
-            {todos.map((todo) => (
+            {visibleTodos.map((todo) => (
               <motion.div
                 key={todo.id}
                 layout
@@ -427,22 +625,57 @@ function TodosTab({ crewId }: { crewId: string }) {
                   )}
                 </button>
                 <div className="min-w-0 flex-1">
-                  <div
-                    className={cn(
-                      "text-sm text-fg-primary",
-                      todo.status === "done" && "line-through",
-                    )}
-                  >
-                    {todo.title}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => cyclePriority(todo)}
+                      title={`Priorité : ${todo.priority} (cliquer pour cycler)`}
+                      className={cn(
+                        "inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0 text-[9px] font-bold uppercase ring-1 transition hover:opacity-80",
+                        priorityClass(todo.priority, "badge"),
+                      )}
+                    >
+                      <Flag className="size-2" />
+                      {todo.priority === "low"
+                        ? "Bas"
+                        : todo.priority === "normal"
+                          ? "Norm"
+                          : "Haut"}
+                    </button>
+                    <div
+                      className={cn(
+                        "min-w-0 truncate text-sm text-fg-primary",
+                        todo.status === "done" && "line-through",
+                      )}
+                    >
+                      {todo.title}
+                    </div>
                   </div>
-                  <div className="mt-0.5 flex items-center gap-2 text-[10px] text-fg-dim">
+                  <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-fg-dim">
                     <span>par {todo.authorName ?? "Anonyme"}</span>
+                    {todo.dueDate && (
+                      <>
+                        <span>·</span>
+                        <DueDateBadge dueDate={todo.dueDate} done={todo.status === "done"} />
+                      </>
+                    )}
                     {todo.completedByUid && todo.status === "done" && (
                       <>
                         <span>·</span>
-                        <span>fini par un membre</span>
+                        <span>fini</span>
                       </>
                     )}
+                    <input
+                      type="date"
+                      value={
+                        todo.dueDate
+                          ? new Date(todo.dueDate).toISOString().slice(0, 10)
+                          : ""
+                      }
+                      onChange={(e) => setDueDate(todo, e.target.value)}
+                      className="ml-auto bg-transparent text-[10px] text-fg-dim outline-none opacity-0 transition group-hover:opacity-100 [color-scheme:dark]"
+                      title="Définir une date d'échéance"
+                    />
                   </div>
                 </div>
                 <button
@@ -457,6 +690,79 @@ function TodosTab({ crewId }: { crewId: string }) {
         </div>
       )}
     </div>
+  );
+}
+
+function FilterChip({
+  active,
+  onClick,
+  label,
+  count,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  count?: number;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-1 rounded px-2 py-0.5 transition",
+        active
+          ? "bg-accent/15 text-accent"
+          : "text-fg-dim hover:bg-white/[0.04] hover:text-fg-muted",
+      )}
+    >
+      {label}
+      {count !== undefined && (
+        <span className="rounded-full bg-bg-base/40 px-1 text-[8px] font-mono">
+          {count}
+        </span>
+      )}
+    </button>
+  );
+}
+
+function priorityClass(p: TodoPriority, kind: "active" | "badge"): string {
+  if (kind === "badge") {
+    return p === "high"
+      ? "bg-rose-500/15 text-rose-300 ring-rose-500/30"
+      : p === "low"
+        ? "bg-cyan-500/15 text-cyan-300 ring-cyan-500/30"
+        : "bg-amber-500/15 text-amber-300 ring-amber-500/30";
+  }
+  return p === "high"
+    ? "bg-rose-500/20 text-rose-300"
+    : p === "low"
+      ? "bg-cyan-500/20 text-cyan-300"
+      : "bg-amber-500/20 text-amber-300";
+}
+
+function DueDateBadge({ dueDate, done }: { dueDate: number; done: boolean }) {
+  const date = new Date(dueDate);
+  const now = Date.now();
+  const overdue = !done && dueDate < now;
+  const soon = !done && !overdue && dueDate - now < 86_400_000 * 2; // < 2j
+  const formatted = date.toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "short",
+  });
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0 text-[9px] ring-1",
+        overdue
+          ? "bg-rose-500/15 text-rose-300 ring-rose-500/30"
+          : soon
+            ? "bg-amber-500/15 text-amber-300 ring-amber-500/30"
+            : "bg-white/[0.04] text-fg-muted ring-white/[0.06]",
+      )}
+    >
+      {overdue && <AlertTriangle className="size-2" />}
+      {!overdue && <Calendar className="size-2" />}
+      {formatted}
+    </span>
   );
 }
 

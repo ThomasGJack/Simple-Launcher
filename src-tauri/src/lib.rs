@@ -19,6 +19,9 @@ mod oauth;
 mod obs_ws;
 mod overlay;
 mod pip;
+mod steam_api;
+#[cfg(windows)]
+mod win_aumid;
 mod rcon;
 mod screenshot;
 mod shortcuts;
@@ -33,6 +36,15 @@ use tauri::{Emitter, Manager};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // ── Windows AUMID setup ───────────────────────────────────────
+    //
+    // BEFORE Tauri init : registre l'App User Model ID pour que les
+    // toast notifications affichent "Simple Launcher" comme source au
+    // lieu de "Windows PowerShell" (en dev) ou "App" (prod sans
+    // installer Velopack tout neuf). Best-effort, no-op si ça plante.
+    #[cfg(windows)]
+    win_aumid::install_aumid();
+
     // ── Single-instance guard (Windows only) ──────────────────────
     //
     // BEFORE any Tauri init : try to acquire a kernel mutex. If
@@ -253,6 +265,11 @@ pub fn run() {
             // shortcuts (steam://run/{appid}).
             steam::steam_detect,
             steam::steam_list_games,
+            // Steam Web API enrichment — fetch metadata riche (cover,
+            // screenshots, trailers, description, prix, joueurs en ligne,
+            // rating reviews, % achievements globaux). Cache côté frontend
+            // dans Firestore /steamApps/{appId} TTL 24h.
+            steam_api::steam_api_get_game_info,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { motion } from "framer-motion";
-import { MicOff, HeadphoneOff } from "lucide-react";
+import { MicOff, HeadphoneOff, Volume2, VolumeX } from "lucide-react";
 import { useVoiceStore } from "@/store/voice";
 import { createVoiceActivityDetector } from "@/lib/audioDevices";
 import { cn } from "@/lib/cn";
@@ -37,6 +37,8 @@ export function VoiceParticipant({
   stream: MediaStream | null;
 }) {
   const setSpeaking = useVoiceStore((s) => s.setSpeaking);
+  const setPeerVolume = useVoiceStore((s) => s.setPeerVolume);
+  const peerVolume = useVoiceStore((s) => s.peerVolumes.get(uid) ?? 1);
 
   // VAD — attach analyser sur le stream remote. Cleanup au unmount.
   useEffect(() => {
@@ -57,7 +59,7 @@ export function VoiceParticipant({
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.8 }}
       transition={{ type: "spring", stiffness: 380, damping: 28 }}
-      className="relative flex flex-col items-center gap-1"
+      className="group/voice relative flex flex-col items-center gap-1"
       title={`${displayName ?? "Anonyme"} · ${subtitle}`}
     >
       <div className="relative">
@@ -116,6 +118,38 @@ export function VoiceParticipant({
       <div className="max-w-[5rem] truncate text-[10px] text-fg-muted">
         {displayName ?? "Anon"}
       </div>
+
+      {/* Volume slider per-participant — caché par défaut, apparaît
+          au hover de la card. Pas affiché sur soi-même (ça muterait
+          mon propre stream local en local). */}
+      {!isMe && stream && (
+        <div className="absolute left-1/2 top-full z-10 mt-1 -translate-x-1/2 opacity-0 transition-opacity group-hover/voice:opacity-100">
+          <div className="flex items-center gap-1.5 rounded-full bg-bg-elevated/95 px-2 py-1 ring-1 ring-white/[0.08] shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+            <button
+              type="button"
+              onClick={() => setPeerVolume(uid, peerVolume > 0 ? 0 : 1)}
+              title={peerVolume > 0 ? "Couper ce participant" : "Réactiver"}
+              className="grid size-4 place-items-center rounded text-fg-muted hover:text-fg-primary"
+            >
+              {peerVolume > 0 ? (
+                <Volume2 className="size-3" />
+              ) : (
+                <VolumeX className="size-3 text-danger" />
+              )}
+            </button>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={peerVolume}
+              onChange={(e) => setPeerVolume(uid, parseFloat(e.target.value))}
+              className="h-1 w-16 cursor-pointer accent-accent"
+              title={`${Math.round(peerVolume * 100)}%`}
+            />
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }

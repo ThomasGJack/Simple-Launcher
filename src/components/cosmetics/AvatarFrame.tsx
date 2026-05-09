@@ -41,6 +41,34 @@ export function AvatarFrame({
   );
 }
 
+/**
+ * Variant non-clipping : juste l'anneau SVG cosmétique en overlay
+ * absolu, sans wrap des children + sans overflow-hidden. Utilisé
+ * quand on veut empiler le frame cosmétique par-dessus un autre
+ * avatar component (genre TierAvatar avec ses propres glows qui
+ * doivent dépasser).
+ *
+ * Le parent doit être positioned (relative) et avoir `size` px.
+ */
+export function CosmeticRingOverlay({
+  frameId,
+  size,
+  className,
+}: {
+  frameId: string | null | undefined;
+  size: number;
+  className?: string;
+}) {
+  const cosmetic = getCosmetic(frameId ?? null);
+  const frame = cosmetic?.frame;
+  if (!frame) return null;
+  return (
+    <div className={cn("pointer-events-none absolute inset-0", className)}>
+      <FrameOverlay frame={frame} size={size} />
+    </div>
+  );
+}
+
 function FrameOverlay({ frame, size }: { frame: FrameSpec; size: number }) {
   const { strokeColor, strokeWidth, gradient, pattern, animate } = frame;
   const r = (size - strokeWidth) / 2;

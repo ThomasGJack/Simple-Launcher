@@ -42,6 +42,13 @@ export type UserPresence = {
   discordId: string | null;
   lastSeen: number | null;
   currentActivity: CurrentActivity | null;
+  /** Status custom défini par l'user (genre "AFK 30min", "Travaille",
+   *  "Concentré"). Override l'affichage "joue à X" / "online" si set.
+   *  Null = pas de status custom, fallback sur l'activité auto. */
+  customStatus: string | null;
+  /** Cosmetics équipés par l'user (frame d'avatar pour l'instant —
+   *  badge / banner peuvent venir plus tard). Null si rien d'équipé. */
+  equippedFrameId: string | null;
   /**
    * Customization fields editable from the user's own profile page.
    * All optional — undefined = unset / inherit defaults.
@@ -99,6 +106,24 @@ export async function pushHeartbeat(uid: string, activity: CurrentActivity | nul
     {
       lastSeen: serverTimestamp(),
       currentActivity: activity,
+    },
+    { merge: true },
+  );
+}
+
+/**
+ * Set / clear le status custom de l'user. Pass `null` ou `""` pour
+ * effacer. Cap 80 chars pour éviter qu'un user balance un roman dans
+ * son statut et casse les UIs qui l'affichent.
+ */
+export async function setCustomStatus(uid: string, text: string | null): Promise<void> {
+  const fb = getFirebase();
+  if (!fb) return;
+  const cleaned = text?.trim().slice(0, 80) ?? "";
+  await setDoc(
+    doc(fb.db, "users", uid),
+    {
+      customStatus: cleaned || null,
     },
     { merge: true },
   );
@@ -170,7 +195,9 @@ function userPresenceEqual(a: UserPresence, b: UserPresence): boolean {
     a.bannerUrl !== b.bannerUrl ||
     a.accentColor !== b.accentColor ||
     a.profileTheme !== b.profileTheme ||
-    a.tier !== b.tier
+    a.tier !== b.tier ||
+    a.customStatus !== b.customStatus ||
+    a.equippedFrameId !== b.equippedFrameId
   ) {
     return false;
   }
@@ -238,6 +265,14 @@ export function parseUserDoc(uid: string, data: Record<string, unknown>): UserPr
     discordId: typeof data.discordId === "string" ? data.discordId : null,
     lastSeen,
     currentActivity: activity,
+    customStatus:
+      typeof data.customStatus === "string" && data.customStatus.trim()
+        ? data.customStatus.trim().slice(0, 80)
+        : null,
+    equippedFrameId: (() => {
+      const eq = data.equippedCosmetics as { frame?: unknown } | undefined;
+      return typeof eq?.frame === "string" ? eq.frame : null;
+    })(),
     bio: typeof data.bio === "string" ? data.bio : null,
     bannerUrl: typeof data.bannerUrl === "string" ? data.bannerUrl : null,
     accentColor: typeof data.accentColor === "string" ? data.accentColor : null,

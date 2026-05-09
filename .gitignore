@@ -20,6 +20,8 @@ dist-ssr
 # Tauri build artifacts
 src-tauri/target/
 src-tauri/gen/
+# Steam depots cache (downloaded at runtime by Steam scanner, not source)
+src-tauri/depots/
 
 # Tauri updater signing keys (NEVER commit private key!)
 .tauri-keys/

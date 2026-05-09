@@ -59,6 +59,7 @@ export function FriendsOnlineStrip() {
             size="xs"
             className="ring-2 ring-bg-base"
             fallbackTone="muted"
+            frameId={u.equippedFrameId}
           />
         ))}
       </div>
