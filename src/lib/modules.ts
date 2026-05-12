@@ -58,6 +58,20 @@ export async function launchModule(module: LauncherModule): Promise<void> {
     // directly). This top-level helper is only for non-MC entry points.
     throw new Error("Minecraft modules launch via the native action panel, not launchModule");
   }
+  if (module.type === "fivem") {
+    if (!module.executablePath) {
+      // Should have been gated by the UI (handlePrimary opens the
+      // install URL when executablePath is null). If we land here
+      // anyway, surface a clear error instead of spawning nothing.
+      throw new Error("FiveM n'est pas installé sur ce PC. Clique « Installer FiveM ».");
+    }
+    return invoke<void>("module_launch_shortcut", {
+      moduleId: module.id,
+      moduleName: module.name,
+      executablePath: module.executablePath,
+      args: null,
+    });
+  }
   return invoke<void>("module_launch_shortcut", {
     moduleId: module.id,
     moduleName: module.name,
@@ -105,6 +119,14 @@ export function deriveStatus(module: LauncherModule, local: ModuleStateLocal | n
   if (module.type === "shortcut") return { kind: "shortcut" };
   if (module.type === "minecraft" || module.type === "custom-minecraft") {
     return { kind: "minecraft" };
+  }
+  if (module.type === "fivem") {
+    // Native FiveM module : `executablePath` est null tant que FiveM
+    // n'a pas été détecté sur la machine. On réutilise "shortcut"
+    // comme "prêt à lancer" (zéro install à faire côté Simple Launcher,
+    // FiveM lui-même gère sa chaîne) et "not-installed" pour basculer
+    // le bouton primaire en "Installer FiveM" (ouvre fivem.net).
+    return module.executablePath ? { kind: "shortcut" } : { kind: "not-installed" };
   }
   if (!local) return { kind: "not-installed" };
   if (local.version !== module.version) {

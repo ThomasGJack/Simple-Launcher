@@ -1,4 +1,4 @@
-export type ModuleType = "hosted" | "shortcut" | "minecraft" | "custom-minecraft";
+export type ModuleType = "hosted" | "shortcut" | "minecraft" | "custom-minecraft" | "fivem";
 
 export type ModuleStatus =
   | "not-installed"
@@ -202,8 +202,35 @@ export type CustomMinecraftModule = BaseModule & {
   maxRamMb?: number;
 };
 
+/**
+ * FiveM — module natif bundled dans le launcher (jamais publié sur
+ * Firestore /modules/, injecté côté client par useNativeModules).
+ *
+ * Le launcher détecte FiveM.exe au boot (registry HKCU\Software\Cfx.re\FiveM
+ * ou %LOCALAPPDATA%\FiveM\FiveM.exe). Si trouvé → bouton "Jouer" qui
+ * spawn FiveM.exe direct. Sinon → bouton "Installer FiveM" qui ouvre
+ * https://fivem.net/ dans le navigateur.
+ *
+ * FiveM gère lui-même downstream :
+ *   - Détection GTA V (Steam / Epic / Rockstar Launcher)
+ *   - Auth Rockstar Social Club via le jeu
+ *   - Anti-cheat + intégrité fichiers
+ *
+ * Pas de Firestore /modules/fivem entry — c'est purement client-side.
+ */
+export type FivemModule = BaseModule & {
+  type: "fivem";
+  /**
+   * Path absolu vers FiveM.exe sur cette machine — `null` si pas
+   * détecté. Quand `null`, le bouton primaire devient "Installer FiveM"
+   * et ouvre https://fivem.net/ au lieu de spawn un exe.
+   */
+  executablePath: string | null;
+};
+
 export type LauncherModule =
   | HostedModule
   | ShortcutModule
   | MinecraftModule
-  | CustomMinecraftModule;
+  | CustomMinecraftModule
+  | FivemModule;

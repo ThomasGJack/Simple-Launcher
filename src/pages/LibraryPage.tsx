@@ -13,6 +13,7 @@ import { watchUserCustomMinecraft } from "@/firebase/customMinecraft";
 import { useAuthStore } from "@/store/auth";
 import { useSettingsStore } from "@/store/settings";
 import { filterVisibleModules } from "@/lib/moduleVisibility";
+import { useNativeModules } from "@/lib/nativeModules";
 import { getSteamGameInfo, extractSteamAppId } from "@/lib/steamGameInfo";
 import { sounds } from "@/lib/sounds";
 import { cn } from "@/lib/cn";
@@ -79,9 +80,14 @@ export function LibraryPage() {
   }, [user]);
 
   const loading = !modulesPrimed || shortcuts === null || customMc === null;
+  // Modules natifs bundled dans le launcher (FiveM aujourd'hui). Affichés
+  // EN PREMIER dans la grille — ce sont les "valeurs sûres" qui marchent
+  // sans setup côté admin Firestore. Le hook gère la détection et le
+  // re-detect au focus.
+  const nativeModules = useNativeModules();
   const all: LauncherModule[] = useMemo(
-    () => [...(customMc ?? []), ...(shortcuts ?? []), ...hosted],
-    [customMc, shortcuts, hosted],
+    () => [...nativeModules, ...(customMc ?? []), ...(shortcuts ?? []), ...hosted],
+    [nativeModules, customMc, shortcuts, hosted],
   );
 
   // Pour chaque shortcut Steam de la library, fetch les genres en

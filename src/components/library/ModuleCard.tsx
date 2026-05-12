@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Play, Download, RefreshCw, Gamepad2, Trash2, AlertTriangle, Folder, Pencil, Star, Sparkles } from "lucide-react";
+import { Play, Download, RefreshCw, Gamepad2, Trash2, AlertTriangle, Folder, Pencil, Star, Sparkles, ExternalLink } from "lucide-react";
+import { FIVEM_INSTALL_URL } from "@/lib/nativeModules";
 import {
   deriveStatus,
   getModuleState,
@@ -78,14 +79,38 @@ export function ModuleCard({
         return;
       }
     }
+    // FiveM natif n'a pas de page detail dans Firestore — un clic sur
+    // la card déclenche directement l'action primaire (Jouer ou
+    // ouvrir fivem.net). Inline le flow pour éviter une dépendance
+    // circulaire avec handlePrimary (qui est déclaré plus bas dans le
+    // composant et utilise des refs qui n'existent pas encore ici).
+    if (module.type === "fivem") {
+      if (module.executablePath) {
+        sounds.launch();
+        launchModule(module).catch((err) =>
+          console.warn("[fivem] launch failed:", err),
+        );
+      } else {
+        sounds.click();
+        import("@tauri-apps/plugin-opener")
+          .then(({ openUrl }) => openUrl(FIVEM_INSTALL_URL))
+          .catch((err) => console.warn("[fivem] open install URL failed:", err));
+      }
+      return;
+    }
     navigate({ name: "module", moduleId: module.id });
   };
 
   useEffect(() => {
-    if (module.type === "shortcut" || module.type === "custom-minecraft") {
-      // Custom MC instances don't go through the hosted-module install
-      // pipeline (no `module-version` on disk to compare). The Module
-      // detail page handles the MC-specific install + launch flow.
+    if (
+      module.type === "shortcut" ||
+      module.type === "custom-minecraft" ||
+      module.type === "fivem"
+    ) {
+      // Ces types n'ont pas de version on-disk gérée par notre install
+      // pipeline. Shortcuts + custom MC : géré dans la page detail.
+      // FiveM : géré par FiveM lui-même downstream, on a juste l'exe
+      // path résolu au boot par le hook useNativeModules.
       setStateLoaded(true);
       return;
     }
@@ -142,6 +167,25 @@ export function ModuleCard({
     // Minecraft modpacks: install flow is complex — open detail page
     if (module.type === "minecraft" || module.type === "custom-minecraft") {
       openDetail();
+      return;
+    }
+
+    // FiveM natif : si l'exe n'a pas été détecté, "Installer" ouvre la
+    // page officielle de téléchargement au lieu de tenter un install
+    // pipeline qui n'existe pas. Au prochain focus de la fenêtre, le
+    // hook useNativeModules re-détecte et le bouton passe à "Jouer".
+    if (module.type === "fivem" && status.kind === "not-installed") {
+      sounds.click();
+      try {
+        const { openUrl } = await import("@tauri-apps/plugin-opener");
+        await openUrl(FIVEM_INSTALL_URL);
+      } catch (err) {
+        sounds.error();
+        setAction({
+          kind: "error",
+          message: err instanceof Error ? err.message : String(err),
+        });
+      }
       return;
     }
 
@@ -302,7 +346,12 @@ export function ModuleCard({
           ) : action.kind === "error" ? (
             <ErrorBanner message={action.message} onDismiss={() => setAction({ kind: "idle" })} />
           ) : (
-            <PrimaryButton status={status} action={action} onClick={handlePrimary} />
+            <PrimaryButton
+              status={status}
+              action={action}
+              onClick={handlePrimary}
+              module={module}
+            />
           )}
         </div>
       </div>
@@ -380,6 +429,16 @@ function SourceBadge({ module }: { module: LauncherModule }) {
       </Pill>
     );
   }
+  if (module.type === "fivem") {
+    // Native bundled module — pas de Firestore, pas de versioning,
+    // détecté localement sur la machine. On les met en orange/rouge
+    // pour les distinguer des modules officiels publiés via Firestore.
+    return (
+      <Pill color="orange">
+        <Sparkles className="size-3" /> Natif
+      </Pill>
+    );
+  }
   return (
     <Pill color="cyan">
       <Sparkles className="size-3" /> Officiel
@@ -392,7 +451,7 @@ function Pill({
   pulsing,
   children,
 }: {
-  color: "accent" | "fuchsia" | "muted" | "success" | "amber" | "emerald" | "cyan";
+  color: "accent" | "fuchsia" | "muted" | "success" | "amber" | "emerald" | "cyan" | "orange";
   pulsing?: boolean;
   children: React.ReactNode;
 }) {
@@ -404,6 +463,7 @@ function Pill({
     amber: "bg-amber-500/15 text-amber-300 ring-amber-500/30",
     emerald: "bg-emerald-500/15 text-emerald-300 ring-emerald-500/30",
     cyan: "bg-cyan-500/15 text-cyan-300 ring-cyan-500/30",
+    orange: "bg-orange-500/15 text-orange-300 ring-orange-500/30",
   } as const;
   return (
     <span
@@ -422,20 +482,31 @@ function PrimaryButton({
   status,
   action,
   onClick,
+  module,
 }: {
   status: DerivedStatus;
   action: Action;
   onClick: () => void;
+  module: LauncherModule;
 }) {
   const launching = action.kind === "launching";
   let label = "Jouer";
   let Icon = Play;
-  let glow = true;
+  const glow = true;
 
   switch (status.kind) {
     case "not-installed":
-      label = "Installer";
-      Icon = Download;
+      // FiveM natif n'est pas "Installable" depuis notre launcher — on
+      // ouvre fivem.net pour que l'user télécharge l'installer officiel.
+      // Label + icone spécifiques pour bien marquer que c'est un saut
+      // externe et pas un download intégré.
+      if (module.type === "fivem") {
+        label = "Installer FiveM";
+        Icon = ExternalLink;
+      } else {
+        label = "Installer";
+        Icon = Download;
+      }
       break;
     case "update-available":
       label = "Mettre à jour";

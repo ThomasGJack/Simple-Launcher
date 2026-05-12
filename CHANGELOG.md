@@ -28,6 +28,8 @@ dans ce fichier mais n'est pas envoyée.
 
 ### Nouveau
 
+- FiveM (GTA V Multiplayer) intégré nativement dans la bibliothèque — le launcher détecte automatiquement FiveM.exe sur ton PC. Clique "Jouer" pour le lancer direct, ou "Installer FiveM" si pas encore installé (ouvre fivem.net).
+
 ### Amélioré
 
 ### Corrigé
@@ -43,6 +45,8 @@ dans ce fichier mais n'est pas envoyée.
      ────────────────────────────────────────────────────────────────── -->
 
 ### Détails techniques
+
+- **FiveM module natif** ([src-tauri/src/fivem.rs](src-tauri/src/fivem.rs), [src/lib/nativeModules.ts](src/lib/nativeModules.ts), [src/types/module.ts](src/types/module.ts), [public/native-modules/fivem/](public/native-modules/fivem/) banner + icon SVG) — nouveau type de module `"fivem"` dans le `LauncherModule` union, bundle un seul `FivemModule` côté client via hook `useNativeModules()` injecté en tête de la grille Library. Pas de doc Firestore — purement client-side. Détection cascade : registry `HKCU\Software\Cfx.re\FiveM\Installed Path` → fallback `%LOCALAPPDATA%\FiveM\FiveM.exe`. Re-detect au `window.focus` pour catcher "user vient d'installer pendant qu'on tournait". Launch passe par `module_launch_shortcut` (réutilise le tracker existant pour playtime + Discord RPC). Quand `executablePath === null`, le PrimaryButton montre "Installer FiveM" avec icone ExternalLink et clic ouvre https://fivem.net/ via `tauri-plugin-opener`. SourceBadge nouvelle couleur orange "Natif" pour distinguer des modules Firestore officiels. AdminPage `startEdit` skip "fivem" (jamais publié via admin form). Banner SVG inline 600×900 avec gradient brand FiveM (orange→rouge→noir, wordmark stylisé "FiveM" + tagline "GTA V Multiplayer" + silhouette skyline). FiveM lui-même gère downstream : détection GTA V (Steam/Epic/RGSC), auth Rockstar Social Club, anti-cheat — on n'a rien à doubler côté Simple Launcher.
 
 ## [v26.05.09.2] - 2026-05-09  · semver `26.509.1`
 

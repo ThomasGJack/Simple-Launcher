@@ -1,6 +1,7 @@
 mod cache;
 mod diagnostic;
 mod discord_rpc;
+mod fivem;
 mod log_file;
 mod mc_auth;
 mod mc_backup;
@@ -265,6 +266,9 @@ pub fn run() {
             // shortcuts (steam://run/{appid}).
             steam::steam_detect,
             steam::steam_list_games,
+            // FiveM — détecte FiveM.exe (registry Cfx.re + fallback default
+            // path). Le frontend lance ensuite via module_launch_shortcut.
+            fivem::fivem_detect,
             // Steam Web API enrichment — fetch metadata riche (cover,
             // screenshots, trailers, description, prix, joueurs en ligne,
             // rating reviews, % achievements globaux). Cache côté frontend

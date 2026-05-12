@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="iconBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ff7a3d"/>
+      <stop offset="55%" stop-color="#f40552"/>
+      <stop offset="100%" stop-color="#7d0535"/>
+    </linearGradient>
+    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.32"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded-square shield à la app icon iOS -->
+  <rect x="6" y="6" width="116" height="116" rx="28" ry="28" fill="url(#iconBg)"/>
+  <rect x="6" y="6" width="116" height="58" rx="28" ry="28" fill="url(#gloss)"/>
+
+  <!-- Stylized "F" mark — sharp, low-poly look that says "racing / GTA vibe" -->
+  <g transform="translate(64, 64)" fill="#ffffff">
+    <path d="
+      M -22 -32
+      L  26 -32
+      L  26 -16
+      L  -6 -16
+      L  -6  -2
+      L  20  -2
+      L  20  14
+      L  -6  14
+      L  -6  34
+      L -22  34
+      Z
+    "/>
+  </g>
+
+  <!-- Subtle inner stroke -->
+  <rect x="6.5" y="6.5" width="115" height="115" rx="27.5" ry="27.5"
+        fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="1"/>
+</svg>

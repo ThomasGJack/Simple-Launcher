@@ -171,7 +171,10 @@ export function AdminPage() {
   };
 
   const startEdit = (m: LauncherModule) => {
-    if (m.type === "shortcut" || m.type === "custom-minecraft") return; // user-side, never published
+    // Skip module types that aren't admin-published via Firestore :
+    //  - shortcut + custom-minecraft  → owned by individual users
+    //  - fivem                        → native bundled, no Firestore doc
+    if (m.type === "shortcut" || m.type === "custom-minecraft" || m.type === "fivem") return;
     const page = m.page;
     const v1Sections = page && !isModulePageV2(page) ? page.sections : undefined;
     const bg = page?.background && "particles" in page.background ? page.background.particles : undefined;
