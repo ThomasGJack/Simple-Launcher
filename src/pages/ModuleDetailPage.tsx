@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Play, Download, RefreshCw, Trash2, Folder, Loader2, AlertTriangle, Star, CheckCircle2, KeyRound, Archive, Square } from "lucide-react";
+import { ArrowLeft, Play, Download, RefreshCw, Trash2, Folder, Loader2, AlertTriangle, Star, CheckCircle2, KeyRound, Archive, Square, ExternalLink } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import type { ModuleLaunchEvent, ModuleExitEvent } from "@/lib/modules";
 import { MinecraftBackupsModal } from "@/components/library/MinecraftBackupsModal";
@@ -22,6 +22,7 @@ import { useAuthStore } from "@/store/auth";
 import { useFavoritesStore } from "@/store/favorites";
 import { addFavorite, removeFavorite } from "@/firebase/favorites";
 import { useModules } from "@/store/firebaseStores";
+import { useNativeModules, FIVEM_INSTALL_URL } from "@/lib/nativeModules";
 import { watchUserShortcuts } from "@/firebase/shortcuts";
 import { watchUserCustomMinecraft } from "@/firebase/customMinecraft";
 import {
@@ -66,9 +67,10 @@ export function ModuleDetailPage() {
   const navigate = useUIStore((s) => s.navigate);
   const user = useAuthStore((s) => s.user);
   const hosted = useModules();
+  const nativeModules = useNativeModules();
   const [shortcuts, setShortcuts] = useState<LauncherModule[]>([]);
   const [customMc, setCustomMc] = useState<LauncherModule[]>([]);
-  const allModules = [...customMc, ...shortcuts, ...hosted];
+  const allModules = [...nativeModules, ...customMc, ...shortcuts, ...hosted];
   const [local, setLocal] = useState<ModuleStateLocal | null>(null);
   const [stateLoaded, setStateLoaded] = useState(false);
   const [action, setAction] = useState<Action>({ kind: "idle" });
@@ -92,7 +94,8 @@ export function ModuleDetailPage() {
     if (
       module.type === "shortcut" ||
       module.type === "minecraft" ||
-      module.type === "custom-minecraft"
+      module.type === "custom-minecraft" ||
+      module.type === "fivem"
     ) {
       setStateLoaded(true);
       setLocal(null);
@@ -211,6 +214,25 @@ export function ModuleDetailPage() {
       // listener (effect above) will set state to 'running' as soon
       // as the spawn fires. State only goes back to idle when the
       // matching `module-exited` event lands.
+      return;
+    }
+
+    // FiveM not-installed : on n'a pas de pipeline d'install côté
+    // launcher — clic "Installer FiveM" ouvre la page officielle dans
+    // le browser. Au prochain focus de la fenêtre, useNativeModules
+    // re-détecte et le bouton bascule en "Jouer" automatiquement.
+    if (module.type === "fivem" && status.kind === "not-installed") {
+      sounds.click();
+      try {
+        const { openUrl } = await import("@tauri-apps/plugin-opener");
+        await openUrl(FIVEM_INSTALL_URL);
+      } catch (err) {
+        sounds.error();
+        setAction({
+          kind: "error",
+          message: err instanceof Error ? err.message : String(err),
+        });
+      }
       return;
     }
 
@@ -337,6 +359,7 @@ export function ModuleDetailPage() {
                     customLabel={module.page?.playButton?.label}
                     sizeScale={isModulePageV2(module.page) ? module.page.playButton?.sizeScale : undefined}
                     style={module.page?.playButton?.style}
+                    fivem={module.type === "fivem"}
                   />
                 )}
               </div>
@@ -520,10 +543,20 @@ function StatusBadge({
 
   switch (status.kind) {
     case "shortcut":
+      // FiveM réutilise `shortcut` quand son exe est détecté — on
+      // distingue le label pour ne pas afficher "Raccourci local" qui
+      // serait trompeur (l'user n'a pas créé un raccourci, c'est
+      // notre module natif).
+      if (module.type === "fivem") {
+        return <Pill color="emerald">Détecté sur ce PC</Pill>;
+      }
       return <Pill color="fuchsia">Raccourci local</Pill>;
     case "minecraft":
       return <Pill color="emerald">Modpack Minecraft</Pill>;
     case "not-installed":
+      if (module.type === "fivem") {
+        return <Pill color="muted">FiveM pas détecté</Pill>;
+      }
       return <Pill color="muted">Non installé</Pill>;
     case "installed":
       return <Pill color="success">v{status.localVersion}</Pill>;
@@ -572,6 +605,7 @@ function PrimaryButton({
   customLabel,
   sizeScale,
   style,
+  fivem,
 }: {
   status: DerivedStatus;
   action: Action;
@@ -580,6 +614,10 @@ function PrimaryButton({
   customLabel?: string;
   sizeScale?: number;
   style?: "neon-pulse" | "solid" | "outline" | "ghost";
+  /** Quand true, "not-installed" affiche "INSTALLER FIVEM" + icone
+   *  ExternalLink pour signaler que le clic ouvre une page externe
+   *  (fivem.net) au lieu d'un install pipeline intégré. */
+  fivem?: boolean;
 }) {
   const launching = action.kind === "launching";
   const running = action.kind === "running";
@@ -588,8 +626,13 @@ function PrimaryButton({
 
   switch (status.kind) {
     case "not-installed":
-      label = "INSTALLER";
-      Icon = Download;
+      if (fivem) {
+        label = "INSTALLER FIVEM";
+        Icon = ExternalLink;
+      } else {
+        label = "INSTALLER";
+        Icon = Download;
+      }
       break;
     case "update-available":
       label = "METTRE À JOUR";

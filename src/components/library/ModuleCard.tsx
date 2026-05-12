@@ -79,25 +79,6 @@ export function ModuleCard({
         return;
       }
     }
-    // FiveM natif n'a pas de page detail dans Firestore — un clic sur
-    // la card déclenche directement l'action primaire (Jouer ou
-    // ouvrir fivem.net). Inline le flow pour éviter une dépendance
-    // circulaire avec handlePrimary (qui est déclaré plus bas dans le
-    // composant et utilise des refs qui n'existent pas encore ici).
-    if (module.type === "fivem") {
-      if (module.executablePath) {
-        sounds.launch();
-        launchModule(module).catch((err) =>
-          console.warn("[fivem] launch failed:", err),
-        );
-      } else {
-        sounds.click();
-        import("@tauri-apps/plugin-opener")
-          .then(({ openUrl }) => openUrl(FIVEM_INSTALL_URL))
-          .catch((err) => console.warn("[fivem] open install URL failed:", err));
-      }
-      return;
-    }
     navigate({ name: "module", moduleId: module.id });
   };
 

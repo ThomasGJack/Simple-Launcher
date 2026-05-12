@@ -24,7 +24,7 @@
 
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import type { FivemModule, LauncherModule } from "@/types/module";
+import type { FivemModule, LauncherModule, ModulePageV2 } from "@/types/module";
 
 /**
  * Page d'installation officielle FiveM. Quand `executablePath` est
@@ -32,6 +32,147 @@ import type { FivemModule, LauncherModule } from "@/types/module";
  * de lancer un exe.
  */
 export const FIVEM_INSTALL_URL = "https://fivem.net/";
+
+/**
+ * Page detail riche pour le module FiveM — affichée quand l'user clique
+ * sur la tile dans la library. Compose les blocks pré-existants
+ * (hero-parallax, rich-text, feature-cards, cta) pour expliquer ce
+ * qu'est FiveM, lister les principaux modes de jeu, et offrir des
+ * raccourcis vers les sites officiels Cfx.re.
+ */
+const FIVEM_PAGE: ModulePageV2 = {
+  version: 2,
+  background: {
+    type: "color",
+    value: "#0a0710",
+  },
+  theme: {
+    primary: "#f40552",
+    accent: "#ff7a3d",
+    fontDisplay: "Audiowide",
+  },
+  playButton: {
+    label: "JOUER",
+    position: "bottom-center",
+    style: "neon-pulse",
+    sizeScale: 1.0,
+  },
+  blocks: [
+    {
+      id: "fivem-hero",
+      type: "hero-parallax",
+      props: {
+        bgUrl: "/native-modules/fivem/banner.svg",
+        title: "FiveM",
+        subtitle: "Le mod multijoueur officiel de GTA V",
+        height: "lg",
+        overlay: "gradient-bottom",
+        parallaxStrength: 0.3,
+      },
+    },
+    {
+      id: "fivem-desc",
+      type: "rich-text",
+      props: {
+        markdown: [
+          "FiveM ouvre GTA V à des **milliers de serveurs communautaires**",
+          "avec des règles, scripts et économies propres : RP médiéval,",
+          "drift à San Andreas, course Mario Kart-style, deathmatch infini.",
+          "",
+          "Le launcher Simple détecte FiveM.exe sur ton PC et le lance",
+          "directement quand tu cliques **Jouer**. Tu gardes ton compte",
+          "Rockstar Social Club (rien à reconfigurer côté Simple Launcher).",
+          "Le Rich Presence Discord et le tracking du temps de jeu sont",
+          "automatiques — comme pour tes autres jeux.",
+        ].join("\n"),
+        align: "left",
+        prose: "default",
+        appearAnimation: "fade-up",
+      },
+      theme: {
+        bg: "glass",
+        paddingY: "md",
+        maxWidth: "default",
+      },
+    },
+    {
+      id: "fivem-modes",
+      type: "feature-cards",
+      props: {
+        cards: [
+          {
+            icon: "🎭",
+            title: "Roleplay",
+            description:
+              "Incarne un perso dans une ville persistante. Police, médecin, mafia, mécano…",
+            accent: "#f40552",
+          },
+          {
+            icon: "🏎️",
+            title: "Drift & Race",
+            description:
+              "Circuits dédiés, tunings poussés, leaderboards. Du fun pur sans timer.",
+            accent: "#ff7a3d",
+          },
+          {
+            icon: "💥",
+            title: "Deathmatch",
+            description:
+              "Arènes free-for-all ou en équipe. Loadouts custom, respawn rapide.",
+            accent: "#ffb547",
+          },
+          {
+            icon: "🌍",
+            title: "Custom maps",
+            description:
+              "Mondes entièrement remodelés : Liberty City, San Andreas étendu, lunaire.",
+            accent: "#bd0a4c",
+          },
+        ],
+        columns: 4,
+        iconStyle: "filled",
+      },
+      theme: {
+        paddingY: "lg",
+        maxWidth: "wide",
+      },
+    },
+    {
+      id: "fivem-cta-servers",
+      type: "cta",
+      props: {
+        title: "Découvre les serveurs",
+        description:
+          "Le browser officiel liste plus de 5 000 serveurs FiveM actifs, triés par joueurs et catégorie.",
+        buttonLabel: "Ouvrir le browser de serveurs",
+        buttonAction: "url",
+        buttonUrl: "https://servers.fivem.net/",
+      },
+      theme: {
+        bg: "glass-strong",
+        paddingY: "md",
+        maxWidth: "default",
+      },
+    },
+    {
+      id: "fivem-cta-wiki",
+      type: "cta",
+      props: {
+        title: "Tu veux créer ton propre serveur ?",
+        description:
+          "Le wiki officiel Cfx.re documente l'installation d'un serveur, l'écriture de resources Lua/JS, l'admin de ta communauté.",
+        buttonLabel: "Lire le wiki Cfx.re",
+        buttonAction: "url",
+        buttonUrl: "https://docs.fivem.net/",
+      },
+      theme: {
+        bg: "glass",
+        paddingY: "md",
+        maxWidth: "default",
+      },
+    },
+  ],
+};
 
 /**
  * Template du module FiveM — tout sauf le `executablePath` qui est
@@ -45,6 +186,7 @@ const FIVEM_TEMPLATE: Omit<FivemModule, "executablePath"> = {
     "Mod multijoueur officiel de GTA V — serveurs RP, drift, race, DM.",
   iconUrl: "/native-modules/fivem/icon.svg",
   bannerUrl: "/native-modules/fivem/banner.svg",
+  page: FIVEM_PAGE,
 };
 
 type FivemDetectResponse = { executablePath: string } | null;
