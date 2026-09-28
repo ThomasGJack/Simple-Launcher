@@ -50,3 +50,9 @@ hosting/launcher/*/*.zip
 
 # Claude Code internal session state (per-machine, not source)
 .claude/
+
+# Claude-flow tooling runtime state (per-session, not source)
+.claude-flow/
+
+# DepotDownloader cache (Steam depots fetched at runtime, not source)
+src-tauri/depots/
