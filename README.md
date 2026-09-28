@@ -16,6 +16,10 @@
   <img src="https://img.shields.io/badge/Windows-0078D6?logo=windows&logoColor=white" alt="Windows" />
 </p>
 
+<p align="center">
+  <img src="docs/screenshots/01-accueil.png" alt="Écran d'accueil de Simple Launcher" width="100%" />
+</p>
+
 ---
 
 Launcher de jeux Windows pour une communauté d'amis — pensé comme un mélange de **Steam + Discord + un launcher Minecraft**, dans une seule app native. Interface frameless animée, backend Firebase temps réel, connexion via Discord.
@@ -59,6 +63,37 @@ L'idée : un seul endroit pour lancer ses jeux (jeux hébergés, raccourcis loca
 - **Soutien (Ko-fi)** — 3 tiers VIP avec effets visuels premium ; abonnements gérés par webhook Ko-fi côté Cloud Functions.
 - **Tray Windows** — l'app continue en arrière-plan comme Discord/Steam.
 - **Auto-update Velopack** — mises à jour delta (~3-5 Mo au lieu du binaire complet), install atomique sans dialog Windows.
+
+---
+
+## 📸 Aperçu
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/02-bibliotheque.png" alt="Bibliothèque" /></td>
+    <td width="50%"><img src="docs/screenshots/03-jeu-minecraft.png" alt="Fiche jeu" /></td>
+  </tr>
+  <tr>
+    <td><b>Bibliothèque</b> — tes jeux, import Steam, modules, raccourcis</td>
+    <td><b>Fiche jeu</b> — launcher Minecraft natif : RAM, serveur, RCON, backups</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/05-crews.png" alt="Crews" /></td>
+    <td><img src="docs/screenshots/07-profil.png" alt="Profil" /></td>
+  </tr>
+  <tr>
+    <td><b>Crews</b> — chat façon Discord, sondages, images, salon vocal, membres VIP</td>
+    <td><b>Profil</b> — temps de jeu, succès, cadre d'avatar cosmétique, vitrine de badges</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/04-communaute.png" alt="Communauté" /></td>
+    <td><img src="docs/screenshots/06-parametres.png" alt="Paramètres" /></td>
+  </tr>
+  <tr>
+    <td><b>Communauté</b> — tous les amis Discord connectés au launcher</td>
+    <td><b>Paramètres</b> — thème complet : couleurs, polices, sons, densité, raccourcis</td>
+  </tr>
+</table>
 
 ---
 
