@@ -1,4 +1,22 @@
-# Simple Launcher
+<p align="center">
+  <img src="logo.png" alt="Simple Launcher" width="128" />
+</p>
+
+<h1 align="center">Simple Launcher</h1>
+
+<p align="center"><b>Steam + Discord + un launcher Minecraft</b>, réunis dans une seule app native Windows.</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white" alt="Tauri 2" />
+  <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black" alt="React 19" />
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Rust-CE422B?logo=rust&logoColor=white" alt="Rust" />
+  <img src="https://img.shields.io/badge/Firebase-FFCA28?logo=firebase&logoColor=black" alt="Firebase" />
+  <img src="https://img.shields.io/badge/Tailwind-v4-06B6D4?logo=tailwindcss&logoColor=white" alt="Tailwind v4" />
+  <img src="https://img.shields.io/badge/Windows-0078D6?logo=windows&logoColor=white" alt="Windows" />
+</p>
+
+---
 
 Launcher de jeux Windows pour une communauté d'amis — pensé comme un mélange de **Steam + Discord + un launcher Minecraft**, dans une seule app native. Interface frameless animée, backend Firebase temps réel, connexion via Discord.
 
